@@ -1,0 +1,29 @@
+# Configuração declarativa do cluster k3d - cluster-kubernetes
+# Topologia local espelhando produção: 1 servidor + 1 agente
+# Traefik e ServiceLB desabilitados — Kong DB-Less assume o roteamento de borda
+# Limites de recurso: configurar no Docker Desktop (≥6GB RAM, ≥4 CPUs)
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: cluster-kubernetes
+servers: 1
+agents: 1
+options:
+  k3d:
+    wait: true
+    timeout: "300s"
+  k3s:
+    extraArgs:
+      - arg: --disable=traefik
+        nodeFilters:
+          - server:*
+      - arg: --disable=servicelb
+        nodeFilters:
+          - server:*
+ports:
+  - port: 8080:80
+    nodeFilters:
+      - loadbalancer
+  - port: 8443:443
+    nodeFilters:
+      - loadbalancer

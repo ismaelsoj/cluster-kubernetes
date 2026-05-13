@@ -1,0 +1,17 @@
+# Pipeline de CI - Validação de manifestos YAML - cluster-kubernetes
+# Implementação completa: Story 1.4
+name: lint
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: echo "[PLACEHOLDER] Linter configurado na Story 1.4"

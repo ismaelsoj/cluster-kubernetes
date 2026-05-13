@@ -1,0 +1,7 @@
+# Kustomization base - kong-gateway - cluster-kubernetes
+# Wave 3 — gateway de borda DB-Less, roteamento e segurança zero-trust
+# Recursos (kong) serão adicionados na Story 3.1
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources: []

@@ -1,0 +1,7 @@
+# Kustomization base - keycloak-auth - cluster-kubernetes
+# Wave 1 (PostgreSQL) + Wave 2 (Keycloak) — provedor de identidade da plataforma
+# Recursos (postgres, keycloak) serão adicionados nas Stories 2.1 e 2.2
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources: []

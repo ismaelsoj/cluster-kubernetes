@@ -1,0 +1,77 @@
+# generated: 2026-05-12
+# last_updated: 2026-05-12
+# project: cluster-kubernetes
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: "{project-root}/_bmad-output/implementation-artifacts"
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: "2026-05-12"
+last_updated: "2026-05-13"  # story 1.1 review concluída — done
+project: cluster-kubernetes
+project_key: NOKEY
+tracking_system: file-system
+story_location: "{project-root}/_bmad-output/implementation-artifacts"
+
+development_status:
+  # --- Épico 1: Fundação do Repositório, Automação Local e Bootstrap GitOps ---
+  epic-1: in-progress
+  1-1-scaffold-repositorio-configuracao-k3d: done
+  1-2-makefile-scripts-automacao-local: backlog
+  1-3-bootstrap-argocd-manifestos-app-of-apps: backlog
+  1-4-linter-yaml-pipeline-ci-readme: backlog
+  1-5-procedimento-secrets-documentacao-emergencia: backlog
+  epic-1-retrospective: optional
+
+  # --- Épico 2: Identidade, Persistência e Recuperação de Desastres ---
+  epic-2: backlog
+  2-1-manifestos-kustomize-postgresql: backlog
+  2-2-manifestos-kustomize-keycloak: backlog
+  2-3-configuracao-realm-client-m2m: backlog
+  2-4-procedimento-backup-restore-postgresql: backlog
+  epic-2-retrospective: optional
+
+  # --- Épico 3: Gateway de Borda e Segurança Zero-Trust ---
+  epic-3: backlog
+  3-1-manifestos-kustomize-kong-db-less: backlog
+  3-2-tls-validacao-jwks-rate-limit-default: backlog
+  3-3-script-token-feedback-terminal: backlog
+  3-4-refinamento-bootstrap-emergencia: backlog
+  epic-3-retrospective: optional
+
+  # --- Épico 4: Boilerplate, Habilitação do Desenvolvedor e Deep Security ---
+  epic-4: backlog
+  4-1-base-kustomize-boilerplate-contract-md: backlog
+  4-2-overlays-ambiente-rate-limiting-bypass-swagger: backlog
+  4-3-api-teste-homologacao-end-to-end: backlog
+  4-4-sidecar-oauth2-proxy-deep-security: backlog
+  4-5-contrato-do-desenvolvedor: backlog
+  epic-4-retrospective: optional

@@ -1,0 +1,7 @@
+# Kustomization overlay homologacao - api-base-v1 - cluster-kubernetes
+# Ambiente: homologacao — customizações de validação pré-produção
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base

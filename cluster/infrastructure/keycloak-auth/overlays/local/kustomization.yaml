@@ -1,0 +1,7 @@
+# Kustomization overlay local - keycloak-auth - cluster-kubernetes
+# Ambiente: local (k3d) — customizações de desenvolvimento local
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
