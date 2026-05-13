@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-05-12"
-last_updated: "2026-05-13"  # story 1.1 review concluída — done
+last_updated: "2026-05-13"  # story 1.2 implementada — aguardando review
 project: cluster-kubernetes
 project_key: NOKEY
 tracking_system: file-system
@@ -45,7 +45,7 @@ development_status:
   # --- Épico 1: Fundação do Repositório, Automação Local e Bootstrap GitOps ---
   epic-1: in-progress
   1-1-scaffold-repositorio-configuracao-k3d: done
-  1-2-makefile-scripts-automacao-local: backlog
+  1-2-makefile-scripts-automacao-local: review
   1-3-bootstrap-argocd-manifestos-app-of-apps: backlog
   1-4-linter-yaml-pipeline-ci-readme: backlog
   1-5-procedimento-secrets-documentacao-emergencia: backlog

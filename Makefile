@@ -1,22 +1,34 @@
 # Makefile de automação local - cluster-kubernetes
 # Orquestrador do ciclo de vida do cluster k3d
-# Uso: make up | make down | make token | make lint | make status
+# Uso: make up | make down | make token | make lint | make status | make help
 
-.PHONY: up down token lint status
+.DEFAULT_GOAL := help
 
-up: lint
+# Resolve raiz do repositório independentemente de onde make é chamado
+REPO_ROOT := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+# Timeout do k3d (override: K3D_TIMEOUT=600 make up)
+export K3D_TIMEOUT ?= 300
+
+.PHONY: up down token lint status help
+
+help: ## Exibe esta ajuda
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+	  awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+
+up: lint ## Provisiona o cluster k3d completo
 	@echo "Provisionando cluster k3d (cluster-kubernetes)..."
-	@bash scripts/cluster-up.sh
+	@bash "$(REPO_ROOT)/scripts/cluster-up.sh"
 
-down:
+down: ## Destrói o cluster sem resíduos
 	@echo "Destruindo cluster k3d..."
-	@bash scripts/cluster-down.sh
+	@bash "$(REPO_ROOT)/scripts/cluster-down.sh"
 
-token:
-	@bash scripts/generate-token.sh
+token: ## Gera e exibe o token M2M de teste
+	@bash "$(REPO_ROOT)/scripts/generate-token.sh"
 
-lint:
-	@bash scripts/lint.sh
+lint: ## Valida todos os manifestos YAML
+	@bash "$(REPO_ROOT)/scripts/lint.sh"
 
-status:
-	@bash scripts/status.sh
+status: ## Exibe status dos componentes e URLs locais
+	@bash "$(REPO_ROOT)/scripts/status.sh"

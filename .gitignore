@@ -1,0 +1,20 @@
+# Configuração kubeconfig gerada automaticamente
+.kube/
+kubeconfig*
+
+# Logs e artefatos de runtime
+*.log
+*.tmp
+
+# Artefatos de editor/IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Dependências locais (se algum tool usar node_modules no futuro)
+node_modules/
+
+# Binários locais
+bin/

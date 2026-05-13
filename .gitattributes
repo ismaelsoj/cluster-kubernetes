@@ -1,0 +1,20 @@
+# Forçar LF em todos os arquivos de texto para prevenir corrupção
+# em clones Windows com core.autocrlf=true
+* text=auto eol=lf
+
+# Arquivos que DEVEM ser LF (shebang e bit executável)
+*.sh     text eol=lf
+Makefile text eol=lf
+*.yaml   text eol=lf
+*.yml    text eol=lf
+*.md     text eol=lf
+*.json   text eol=lf
+
+# Binários — sem conversão
+*.png    binary
+*.jpg    binary
+*.gif    binary
+*.ico    binary
+*.gz     binary
+*.tar    binary
+*.zip    binary
