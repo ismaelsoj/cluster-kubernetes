@@ -7,8 +7,7 @@
 # Resolve raiz do repositório independentemente de onde make é chamado
 REPO_ROOT := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
 
-# Timeout do k3d (override: K3D_TIMEOUT=600 make up)
-export K3D_TIMEOUT ?= 300
+export CLUSTER_NAME ?= cluster-kubernetes
 
 .PHONY: up down token lint status help
 

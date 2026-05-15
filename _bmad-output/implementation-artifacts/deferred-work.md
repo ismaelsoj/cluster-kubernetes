@@ -49,3 +49,10 @@ Registro centralizado de itens identificados em revisões/triagens que não pert
 ### Diferido para trabalho cross-story / repo
 
 - Repo sem `.gitattributes` — clones em Windows com `core.autocrlf=true` corrompem shebang em `*.sh` (`$'\r': command not found`) e perdem bit executável; agrupar com a tarefa de `.gitignore` (cross-story)
+
+## Deferred from: code review of story-1-2-makefile-scripts-automacao-local (2026-05-15)
+
+### Diferido para trabalho cross-story / repo
+
+- `k3d.yaml` sem resource limits (`memory`, `cpuCount`) definidos nos containers k3d — decisão arquitetural documentada ("configurar no Docker Desktop"), não é escopo dos scripts de automação
+- Containers k3d sem Docker healthcheck definido — pertence ao lifecycle management geral do cluster, não aos scripts de ciclo de vida

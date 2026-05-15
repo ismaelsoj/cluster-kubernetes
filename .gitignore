@@ -18,3 +18,10 @@ node_modules/
 
 # Binários locais
 bin/
+
+# Variáveis de ambiente locais (podem conter credenciais)
+.env
+.env.*
+
+# Backups
+*.bak

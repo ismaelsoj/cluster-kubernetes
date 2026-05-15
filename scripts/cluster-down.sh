@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-CLUSTER_NAME="cluster-kubernetes"
+CLUSTER_NAME="${CLUSTER_NAME:-cluster-kubernetes}"
 
 # ─── Verificar presença de k3d ────────────────────────────────────────────────
 if ! command -v k3d >/dev/null 2>&1; then
@@ -12,8 +12,19 @@ if ! command -v k3d >/dev/null 2>&1; then
   exit 1
 fi
 
+# ─── Verificar Docker em execução ─────────────────────────────────────────────
+# Sem Docker ativo, k3d não consegue listar clusters. Avisa e sai com sucesso
+# pois o cluster será destruído automaticamente quando o Docker reiniciar.
+if ! docker info >/dev/null 2>&1; then
+  echo "AVISO: Docker daemon não está em execução."
+  echo "       Se o cluster existia, ele será destruído quando Docker reiniciar."
+  exit 0
+fi
+
 # ─── Idempotência: cluster não existe ─────────────────────────────────────────
-if ! k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
+# Usa k3d cluster get para verificação exata por nome. Se não existe, sai com
+# sucesso (operação idempotente).
+if ! k3d cluster get "${CLUSTER_NAME}" &>/dev/null; then
   echo "Cluster '${CLUSTER_NAME}' não existe. Nenhuma ação necessária."
   exit 0
 fi
@@ -23,7 +34,7 @@ echo "Destruindo cluster '${CLUSTER_NAME}'..."
 k3d cluster delete "${CLUSTER_NAME}"
 
 # ─── Confirmar remoção ────────────────────────────────────────────────────────
-if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
+if k3d cluster get "${CLUSTER_NAME}" &>/dev/null; then
   echo "ERRO: Cluster ainda listado após deleção. Verifique manualmente com 'k3d cluster list'."
   exit 1
 fi

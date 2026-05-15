@@ -1,6 +1,6 @@
 # Story 1.2: Makefile e Scripts de Automação Local
 
-Status: review
+Status: done
 
 ## Story
 
@@ -432,3 +432,16 @@ Story context criada pelo BMad Create Story workflow. Análise exaustiva de: epi
 - Makefile (modificado)
 - .gitignore (criado)
 - .gitattributes (criado)
+
+### Review Findings
+
+- [x] [Review][Patch] DN-1: Abordagem híbrida no kubectl wait — cluster não é destruído mas mensagem clara orienta o dev [cluster-up.sh:77-83]
+- [x] [Review][Patch] DN-2: CLUSTER_NAME centralizado no Makefile como fonte única de verdade [Makefile + ambos scripts]
+- [x] [Review][Patch] P-1: Verificação de porta com ss (Linux) + /dev/tcp (macOS) como fallback [cluster-up.sh:42-44]
+- [x] [Review][Patch] P-2: Guarda numérica na aritmética de memória/CPU Docker [cluster-up.sh:29-32]
+- [x] [Review][Patch] P-3: k3d cluster get para match exato por nome [cluster-up.sh + cluster-down.sh]
+- [x] [Review][Patch] P-4: Timeout apenas no k3d.yaml — removido de CLI e Makefile [cluster-up.sh + Makefile]
+- [x] [Review][Patch] P-5: .gitignore com padrões .env e .bak [.gitignore]
+- [x] [Review][Patch] P-6: cluster-down.sh verifica Docker antes de listar clusters [cluster-down.sh]
+- [x] [Review][Defer] D-1: k3d.yaml sem resource limits nos containers — decisão arquitetural documentada, fora do escopo
+- [x] [Review][Defer] D-2: Sem Docker healthcheck nos containers k3d — pertence ao lifecycle management geral
