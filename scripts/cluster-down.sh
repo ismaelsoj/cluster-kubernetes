@@ -13,11 +13,11 @@ if ! command -v k3d >/dev/null 2>&1; then
 fi
 
 # ─── Verificar Docker em execução ─────────────────────────────────────────────
-# Sem Docker ativo, k3d não consegue listar clusters. Avisa e sai com sucesso
-# pois o cluster será destruído automaticamente quando o Docker reiniciar.
+# Sem Docker ativo, k3d não consegue listar clusters. Avisa e sai com sucesso.
+# Nota: O cluster persistirá no Docker e deverá ser removido manualmente quando o daemon iniciar.
 if ! docker info >/dev/null 2>&1; then
   echo "AVISO: Docker daemon não está em execução."
-  echo "       Se o cluster existia, ele será destruído quando Docker reiniciar."
+  echo "       Não é possível verificar o cluster. Certifique-se de removê-lo manualmente quando o Docker estiver ativo."
   exit 0
 fi
 
