@@ -144,18 +144,18 @@ Para que a fundação esteja estabelecida com limites de recursos definidos.
 ### Story 1.2: Makefile e Scripts de Automação Local
 
 Como um Desenvolvedor,
-Eu quero provisionar e destruir o cluster k3d com `make up` / `make down`,
-Para que eu trabalhe com a infraestrutura sem conhecer os detalhes do Kubernetes.
+Eu quero provisionar e destruir o cluster k3d com `make up` / `make down` (nativamente no macOS/Linux ou via WSL2 no Windows),
+Para que eu trabalhe com a infraestrutura sem conhecer os detalhes do Kubernetes e com atrito zero.
 
 **Critérios de Aceitação:**
 
 **Dado** que o repositório possui a estrutura (Story 1.1)
-**Quando** `make up` for executado
+**Quando** `make up` for executado (seja no terminal Unix nativo ou no shell do WSL2 no Windows)
 **Então** `scripts/cluster-up.sh` deve provisionar o cluster k3d conforme `k3d.yaml`
 **E** o cluster deve estar acessível via `kubectl`
 
 **Dado** que o cluster está em execução
-**Quando** `make down` for executado
+**Quando** `make down` for executado (no terminal Unix ou via WSL2 no Windows)
 **Então** `scripts/cluster-down.sh` deve destruir completamente o cluster sem resíduos
 
 **Dado** imagens Docker cacheadas
