@@ -198,8 +198,8 @@ A evolução máxima da Plataforma (O "Sonho"):
 ## Requisitos Funcionais (Functional Requirements)
 
 ### 1. Gestão do Ambiente Local (Local DevEx)
-- **FR01:** O Desenvolvedor deve ser capaz de provisionar um cluster Kubernetes local completo via comando único de automação (`make up`).
-- **FR02:** O Desenvolvedor deve ser capaz de destruir completamente e resetar o cluster local para o seu estado original limpo via comando único (`make down`).
+- **FR01:** O Desenvolvedor deve ser capaz de provisionar um cluster Kubernetes local completo via comando único de automação (`make up`), executado nativamente no macOS/Linux ou através do ambiente WSL2 no Windows.
+- **FR02:** O Desenvolvedor deve ser capaz de destruir completamente e resetar o cluster local para o seu estado original limpo via comando único (`make down`), executado nativamente no macOS/Linux ou através do WSL2 no Windows.
 - **FR03:** O Sistema Local deve espelhar a exata topologia de infraestrutura da Produção (Kong, Keycloak).
 - **FR04:** O Sistema Local deve gerar e apresentar automaticamente um Token M2M de Teste válido diretamente no terminal após o provisionamento.
 - **FR05:** O Desenvolvedor deve ser capaz de instanciar uma nova API utilizando um modelo padronizado (*Boilerplate YAML*) fornecido pela plataforma.
@@ -235,7 +235,7 @@ A evolução máxima da Plataforma (O "Sonho"):
 
 ### Desempenho (Performance)
 - **NFR-P01 (Latência de Borda):** A interceptação de segurança do Gateway (validação local do JWT e roteamento) deve adicionar, no máximo, **20ms** de latência de rede à requisição original da API em condições normais de operação.
-- **NFR-P02 (DevEx / Tempo de Setup):** O provisionamento completo do ambiente local pelo desenvolvedor (execução do `make up`), assumindo que as imagens Docker já estejam cacheadas localmente na máquina, deve ser concluído e entregar o token em **menos de 5 minutos**.
+- **NFR-P02 (DevEx / Tempo de Setup):** O provisionamento completo do ambiente local pelo desenvolvedor (execução do `make up`), assumindo que as imagens Docker já estejam cacheadas localmente na máquina, deve ser concluído e entregar o token em **menos de 5 minutos** (tanto nativamente em macOS/Linux quanto através do WSL2 no Windows).
 
 ### Segurança (Security)
 - **NFR-S01 (Criptografia Restrita):** 100% do tráfego externo gerenciado pelo Gateway deve ser forçado a operar sob criptografia (TLS/HTTPS), rejeitando e bloqueando ativamente conexões planas (HTTP porta 80) na borda.

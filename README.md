@@ -7,7 +7,22 @@ Plataforma GitOps local-produção construída com k3d, Kong DB-Less e Keycloak.
 - **Docker Desktop** com no mínimo **6GB RAM** e **4 CPUs** configurados em Settings → Resources
 - **kubectl** (qualquer versão recente compatível com k8s 1.28+)
 - **k3d** ≥ 5.8.3 (`brew install k3d` ou [releases oficiais](https://github.com/k3d-io/k3d/releases))
-- **make** (padrão na maioria dos sistemas Unix/macOS)
+- **make** (padrão em sistemas Unix/macOS)
+
+---
+
+### 💻 Usuários Windows (WSL2 Obrigatório)
+Para rodar este ambiente no Windows de forma padronizada e com atrito zero, **é obrigatório o uso do WSL2** (Windows Subsystem for Linux), mantendo assim o uso do `Makefile` e scripts shell:
+1. Certifique-se de que o **WSL2** está habilitado e configurado com uma distribuição (como Ubuntu).
+2. No **Docker Desktop para Windows**, ative a integração com o WSL2 em *Settings → Resources → WSL Integration* para a sua distribuição.
+3. Dentro do seu terminal da distribuição WSL2, instale as dependências executando:
+   ```bash
+   sudo apt update && sudo apt install -y make kubectl
+   # Para instalar o k3d no WSL2:
+   curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.8.3 bash
+   ```
+
+---
 
 ## Início Rápido
 
@@ -17,7 +32,7 @@ make up
 
 O comando valida os manifestos (`lint`) e provisiona o cluster k3d com Kong e Keycloak conforme declarado em `k3d.yaml`.
 
-## Comandos Disponíveis
+## Comandos Disponíveis (executados sob macOS/Linux ou WSL2)
 
 | Comando       | Descrição                                             |
 |---------------|-------------------------------------------------------|

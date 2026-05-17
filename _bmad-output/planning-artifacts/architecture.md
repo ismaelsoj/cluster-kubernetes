@@ -104,7 +104,7 @@ touch Makefile
 **Decisões Arquiteturais Fornecidas pelo Starter:**
 
 **Linguagem & Runtime:**
-Arquivos declarativos YAML orquestrados pelo Kubelet (Kubernetes) e executados localmente via `k3d`. Automação de terminal apoiada em `Bash` e `Makefile`.
+Arquivos declarativos YAML orquestrados pelo Kubelet (Kubernetes) e executados localmente via `k3d`. Automação de terminal apoiada em `Bash` e `Makefile` (executados nativamente no macOS/Linux e obrigatoriamente sob o ambiente **WSL2** no Windows).
 
 **Solução de Estilização:**
 N/A (Plataforma Backend/Infra).
@@ -122,7 +122,7 @@ Validação contínua através de scripts acoplados ao `Makefile` que gerarão u
 - `/cluster/boilerplates/`: Bases estruturadas (Kustomize/Helm) para padronizar novas APIs.
 
 **Experiência de Desenvolvimento:**
-"Fricção Zero": O desenvolvedor executa exclusivamente `make up`. O Makefile sobe o cluster k3d vazio, instala o ArgoCD e aplica o `bootstrap/`. O ArgoCD, a partir daí, sincroniza a infraestrutura inteira em cascata.
+"Fricção Zero": O desenvolvedor executa exclusivamente `make up` (nativamente ou sob WSL2). O Makefile sobe o cluster k3d vazio, instala o ArgoCD e aplica o `bootstrap/`. O ArgoCD, a partir daí, sincroniza a infraestrutura inteira em cascata.
 
 **Nota:** A inicialização do projeto estabelecendo esta estrutura de pastas e o `Makefile` base deve ser a primeira história de implementação.
 
@@ -209,7 +209,7 @@ Validação contínua através de scripts acoplados ao `Makefile` que gerarão u
 **Organização do Projeto:**
 - Scripts auxiliares (bash) DEVEM residir exclusivamente em `/scripts/`, sendo chamados pelo `Makefile`. NÃO DEVE haver scripts bash soltos na raiz do repositório.
 - Documentação do "Contrato do Desenvolvedor" e guias de onboarding DEVEM residir em `/docs/`.
-- O repositório DEVE conter um `README.md` na raiz documentando pré-requisitos de sistema (Docker, kubectl, k3d), o comando de entrada (`make up`) e um link para o Contrato do Desenvolvedor em `/docs/`.
+- O repositório DEVE conter um `README.md` na raiz documentando pré-requisitos de sistema (Docker, kubectl, k3d, make, e WSL2 se no Windows), o comando de entrada (`make up`) e um link para o Contrato do Desenvolvedor em `/docs/`.
 - NÃO DEVE haver documentação técnica misturada dentro das pastas de infraestrutura.
 
 **Estrutura Kustomize:**
