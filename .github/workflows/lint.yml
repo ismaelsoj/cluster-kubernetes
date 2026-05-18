@@ -24,9 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # Hardening: Pinar checkout por SHA estável do commit do checkout v4.1.7 e desativar persistência de credenciais
+      # Hardening: Utilizar a major version v6 estável do checkout e desativar persistência de credenciais
       - name: Checkout do Código
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
 
