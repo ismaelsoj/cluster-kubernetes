@@ -213,12 +213,73 @@ claude-opus-4-7 (via /bmad-dev-story)
 
 ### Completion Notes List
 
-- **AC #1 (ARGOCD-INSTALLATION):** `scripts/cluster-up.sh` ganhou as funções `install_argocd()` e `apply_root_app()`. Versão fixa `v3.4.2` aplicada do manifesto oficial; namespace criado com `kubectl create namespace --dry-run=client | kubectl apply -f -` (idempotente); `kubectl wait --for=condition=Available deployment/argocd-server --timeout=180s` cobre a espera robusta. Caminho de cluster já existente também reconcilia o bootstrap (idempotência completa).
-- **AC #2 (ROOT-APP-BOOTSTRAP):** Após o ArgoCD ficar disponível, o script aplica `cluster/bootstrap/root-app.yaml` substituindo `targetRevision: main` pela branch local (`ARGO_TARGET_BRANCH=${ARGO_TARGET_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}`). O arquivo em disco permanece com `targetRevision: main` (canônico para CI/produção).
-- **AC #3 (APP-OF-APPS-HIERARCHY):** Criados `infra-app.yaml` (prune: false — Safe-Prune FR21) e `apps-app.yaml` (prune: true, selfHeal: true, `directory.recurse: true`, `CreateNamespace=true`). Os três Applications recebem o finalizer `resources-finalizer.argocd.argoproj.io` para limpeza em cascata.
-- **AC #4 (CORE-NAMESPACES):** `cluster/infrastructure/namespaces/base/namespaces.yaml` declara `keycloak-auth` (component=identity-provider) e `kong-gateway` (component=gateway), ambos com `app.kubernetes.io/part-of: cluster-kubernetes` e annotation `argocd.argoproj.io/sync-wave: "0"`. Nenhum Secret em texto plano (NFR-S02 respeitado — Secrets ficam para a Story 1.5).
-- **Higiene:** `cluster/bootstrap/.gitkeep` removido; o diretório agora contém apenas os 3 manifestos GitOps.
-- **Limitação de teste:** validação server-side dos `Application` foi feita por parse estrutural (CRDs do ArgoCD/Kustomize ainda não instalados no contexto local). A validação end-to-end ocorrerá quando `make up` for executado em um ambiente com Docker + k3d.
+> **Nota para o revisor:** o Debug Log acima registra 4 incidentes encontrados na
+> validação end-to-end (`make up`), com 5 versões correspondentes no Change Log
+> (v0.1 → v0.5). Esta seção descreve o **estado final consolidado** (v0.5) que
+> está no Git e foi validado em cluster real. Para entender a jornada de cada
+> decisão, leia também o Debug Log.
+
+**Estado final validado em cluster k3d (2026-05-18):**
+
+```
+kubectl get applications.argoproj.io -n argocd
+NAME        SYNC STATUS   HEALTH STATUS
+root-app    Synced        Healthy
+infra-app   Synced        Healthy
+apps-app    Synced        Healthy
+
+kubectl get namespaces  →  keycloak-auth + kong-gateway ativos, com labels e sync-wave=0
+```
+
+**Atendimento dos Critérios de Aceitação:**
+
+- **AC #1 (ARGOCD-INSTALLATION):** `scripts/cluster-up.sh` instala o ArgoCD `v3.4.2`
+  via `kubectl apply --server-side=true --force-conflicts -n argocd -f <manifest-url>`
+  em `install_argocd()`. Server-side apply é obrigatório (e recomendado oficialmente
+  pelo ArgoCD) porque o CRD `applicationsets.argoproj.io` excede o limite de 256 KB
+  da annotation `last-applied-configuration` do apply client-side. Namespace criado
+  idempotentemente; espera ativa via `kubectl wait --for=condition=Available
+  deployment/argocd-server --timeout=180s`. Caminho de "cluster já existe" também
+  reconcilia o bootstrap.
+
+- **AC #2 (ROOT-APP-BOOTSTRAP):** Após o ArgoCD ficar disponível, `apply_bootstrap_apps()`
+  (no `cluster-up.sh`) aplica os **três** manifestos do bootstrap (`root-app`, `infra-app`,
+  `apps-app`) substituindo `targetRevision: main` pela branch local via sed
+  (`ARGO_TARGET_BRANCH=${ARGO_TARGET_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}`).
+  Aplicar os 3 (e não só o root) é essencial: os filhos `infra-app`/`apps-app` precisam
+  nascer já apontando para a branch local, caso contrário herdariam `main` dos arquivos
+  do Git e sincronizariam contra um estado vazio. Em CI/produção
+  (`ARGO_TARGET_BRANCH=main`), o sed é no-op.
+
+- **AC #3 (APP-OF-APPS-HIERARCHY):** Estrutura final em `cluster/bootstrap/`:
+  - `root-app.yaml`: prune: true, selfHeal: true, **gerencia apenas os filhos** (não a si próprio).
+    Contém `ignoreDifferences` para `/spec/source/targetRevision` em recursos `kind: Application`
+    e `RespectIgnoreDifferences=true` em syncOptions — combinação obrigatória para que o
+    sync (e não só a detecção de drift) preserve o override de branch nos filhos.
+  - `infra-app.yaml`: **prune: false (Safe-Prune FR21)**, selfHeal: true, source = `cluster/infrastructure`.
+  - `apps-app.yaml`: prune: true, selfHeal: true, `directory.recurse: true`, `CreateNamespace=true`,
+    source = `cluster/apps` (vazio no momento, será populado a partir do Épico 4).
+  - `kustomization.yaml`: lista **apenas** `infra-app.yaml` e `apps-app.yaml`, excluindo
+    `root-app.yaml` deliberadamente — root-app é "bootstrap out-of-band" (aplicado pelo
+    `cluster-up.sh`, não auto-gerenciado pelo GitOps). Decisão de design tomada para
+    eliminar o `OutOfSync` cosmético causado pela auto-referência em conjunto com
+    override de branch.
+  - Todos os 3 têm o finalizer `resources-finalizer.argocd.argoproj.io` para limpeza em cascata.
+
+- **AC #4 (CORE-NAMESPACES):** `cluster/infrastructure/namespaces/base/namespaces.yaml`
+  declara `keycloak-auth` (component=identity-provider) e `kong-gateway` (component=gateway),
+  ambos com `app.kubernetes.io/part-of: cluster-kubernetes` e annotation
+  `argocd.argoproj.io/sync-wave: "0"`. Sem Secrets em texto plano (NFR-S02 respeitado —
+  injeção de Secrets é escopo da Story 1.5).
+
+**Tradeoff documentado (v0.5):** alterações em `root-app.yaml` **não são auto-sincronizadas**
+pelo ArgoCD — precisam de `make up` (idempotente) para serem aplicadas. Em troca, ganhamos
+UI 100% Synced e a feature `ARGO_TARGET_BRANCH` funciona limpa em dev local.
+
+**Higiene:** `cluster/bootstrap/.gitkeep` removido (substituído por arquivos reais).
+
+**Validação end-to-end:** executada em cluster k3d local com `make down && make up`,
+confirmando todos os ACs (saída do `kubectl` acima).
 
 ### File List
 
@@ -232,7 +293,7 @@ claude-opus-4-7 (via /bmad-dev-story)
 
 **Modificados:**
 - `cluster/infrastructure/namespaces/base/kustomization.yaml` (adicionado `namespaces.yaml` em `resources`)
-- `scripts/cluster-up.sh` (funções `install_argocd` e `apply_root_app`, variáveis `ARGOCD_VERSION`/`ARGO_TARGET_BRANCH`, integração em ambos os caminhos: cluster novo e cluster existente)
+- `scripts/cluster-up.sh` (funções `install_argocd()` com server-side apply e `apply_bootstrap_apps()` que substitui `targetRevision` nos 3 manifestos via sed; variáveis `ARGOCD_VERSION`/`ARGO_TARGET_BRANCH`/`BOOTSTRAP_DIR`/`BOOTSTRAP_APPS`; integração em ambos os caminhos: cluster novo e cluster existente)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (status: ready-for-dev → in-progress → review)
 
 **Removidos:**
