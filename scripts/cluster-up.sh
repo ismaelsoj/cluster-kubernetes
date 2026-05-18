@@ -13,7 +13,11 @@ ARGOCD_VERSION="${ARGOCD_VERSION:-v3.4.2}"
 ARGOCD_NAMESPACE="argocd"
 ARGOCD_MANIFEST_URL="https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
 ARGOCD_WAIT_TIMEOUT="${ARGOCD_WAIT_TIMEOUT:-180s}"
-ROOT_APP_MANIFEST="${REPO_ROOT}/cluster/bootstrap/root-app.yaml"
+BOOTSTRAP_DIR="${REPO_ROOT}/cluster/bootstrap"
+# Ordem importa: root-app primeiro (estabelece governança); infra-app e apps-app
+# são tecnicamente gerenciados pelo root-app, mas aplicamos diretamente para que
+# já nasçam com a branch local correta (override de targetRevision).
+BOOTSTRAP_APPS=(root-app infra-app apps-app)
 
 # Branch que o ArgoCD vai monitorar — usa a branch local detectada por padrão.
 # Em CI/produção, sobrescrever com ARGO_TARGET_BRANCH=main.
@@ -84,18 +88,29 @@ install_argocd() {
   echo "==> [Bootstrap] ArgoCD operacional."
 }
 
-# Aplica o root-app.yaml substituindo targetRevision em tempo de execução.
-# O arquivo em disco permanece com 'targetRevision: main' (canônico para CI/produção).
-apply_root_app() {
+# Aplica todos os manifestos App-of-Apps (root-app, infra-app, apps-app) substituindo
+# targetRevision em tempo de execução pela branch local. Os arquivos em disco mantêm
+# 'targetRevision: main' (canônico para CI/produção, onde a substituição é no-op).
+#
+# Por que aplicar TODOS os 3 (e não só o root)?
+# O root-app é gerenciado por si mesmo (App-of-Apps recursivo). Se aplicássemos apenas
+# o root-app via sed, os filhos infra-app/apps-app nasceriam apontando para 'main'
+# (vindos do arquivo no Git) e ficariam sincronizando contra a main vazia. O root-app
+# com ignoreDifferences impede a reversão do targetRevision após o seed inicial.
+apply_bootstrap_apps() {
   echo ""
-  echo "==> [Bootstrap] Aplicando root-app (App-of-Apps) monitorando branch '${ARGO_TARGET_BRANCH}'..."
-  if [ ! -f "${ROOT_APP_MANIFEST}" ]; then
-    echo "ERRO: Manifesto root-app não encontrado em '${ROOT_APP_MANIFEST}'."
-    return 1
-  fi
-  sed "s|targetRevision: main|targetRevision: ${ARGO_TARGET_BRANCH}|" \
-    "${ROOT_APP_MANIFEST}" | kubectl apply -f -
-  echo "==> [Bootstrap] root-app aplicado. ArgoCD iniciará a sincronização recursiva."
+  echo "==> [Bootstrap] Aplicando App-of-Apps monitorando branch '${ARGO_TARGET_BRANCH}'..."
+  for app in "${BOOTSTRAP_APPS[@]}"; do
+    local manifest="${BOOTSTRAP_DIR}/${app}.yaml"
+    if [ ! -f "${manifest}" ]; then
+      echo "ERRO: Manifesto '${app}' não encontrado em '${manifest}'."
+      return 1
+    fi
+    echo "    -> ${app}.yaml"
+    sed "s|targetRevision: main|targetRevision: ${ARGO_TARGET_BRANCH}|" \
+      "${manifest}" | kubectl apply -f -
+  done
+  echo "==> [Bootstrap] App-of-Apps aplicado. ArgoCD iniciará a sincronização recursiva."
 }
 
 # ─── Idempotência: cluster já existe ─────────────────────────────────────────
@@ -108,7 +123,7 @@ if k3d cluster get "${CLUSTER_NAME}" &>/dev/null; then
     echo "Cluster operacional. Reconciliando bootstrap GitOps (idempotente)..."
     kubectl get nodes
     install_argocd
-    apply_root_app
+    apply_bootstrap_apps
     echo ""
     echo "Bootstrap reconciliado. Branch monitorada pelo ArgoCD: '${ARGO_TARGET_BRANCH}'."
     exit 0
@@ -153,7 +168,7 @@ kubectl get nodes
 # Instala o ArgoCD e aplica o root-app (App-of-Apps) para iniciar a sincronização
 # recursiva da infraestrutura e das aplicações de negócio.
 install_argocd
-apply_root_app
+apply_bootstrap_apps
 
 echo ""
 echo "Bootstrap GitOps concluído."

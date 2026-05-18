@@ -3,6 +3,9 @@
 # Finalizer resources-finalizer.argocd.argoproj.io garante limpeza em cascata quando deletado.
 # IMPORTANTE: targetRevision: main é o valor canônico. O cluster-up.sh substitui em tempo de
 # execução para a branch local detectada (ARGO_TARGET_BRANCH), sem alterar este arquivo em disco.
+# ignoreDifferences: impede que o selfHeal reverta o targetRevision dos Applications filhos
+# (e do próprio root-app), permitindo override de branch em desenvolvimento local sem que o
+# root-app force os filhos de volta para 'main' a cada reconciliação.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -31,3 +34,8 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jsonPointers:
+        - /spec/source/targetRevision
