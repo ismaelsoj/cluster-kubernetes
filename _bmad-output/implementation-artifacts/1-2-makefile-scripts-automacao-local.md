@@ -80,9 +80,8 @@ Makefile                  ← ATUALIZAR (REPO_ROOT, .DEFAULT_GOAL, help)
 
 set -euo pipefail
 
-CLUSTER_NAME="cluster-kubernetes"
+CLUSTER_NAME="${CLUSTER_NAME:-cluster-kubernetes}"
 K3D_CONFIG="$(git rev-parse --show-toplevel)/k3d.yaml"
-TIMEOUT="${K3D_TIMEOUT:-300}"
 
 # ─── Pre-flight: binários obrigatórios ──────────────────────────────────────
 for bin in docker kubectl k3d; do
@@ -99,8 +98,13 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 # ─── Pre-flight: recursos Docker (aviso — não bloqueia) ─────────────────────
+# Consulta CPUs e memória disponíveis no Docker para avisar se estão abaixo do
+# recomendado. Guardas numéricas evitam abort do script caso docker info
+# retorne valores inesperados (Docker remoto, versões antigas, etc).
 DOCKER_CPUS=$(docker info --format '{{.NCPU}}' 2>/dev/null || echo 0)
+[[ "$DOCKER_CPUS" =~ ^[0-9]+$ ]] || DOCKER_CPUS=0
 DOCKER_MEM_BYTES=$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)
+[[ "$DOCKER_MEM_BYTES" =~ ^[0-9]+$ ]] || DOCKER_MEM_BYTES=0
 DOCKER_MEM_GB=$(( DOCKER_MEM_BYTES / 1073741824 ))
 if [ "$DOCKER_CPUS" -lt 4 ] || [ "$DOCKER_MEM_GB" -lt 6 ]; then
   echo "AVISO: Docker com ${DOCKER_CPUS} CPUs e ${DOCKER_MEM_GB}GB RAM."
@@ -108,8 +112,11 @@ if [ "$DOCKER_CPUS" -lt 4 ] || [ "$DOCKER_MEM_GB" -lt 6 ]; then
 fi
 
 # ─── Pre-flight: conflito de portas ──────────────────────────────────────────
+# Verifica se as portas que o k3d precisa expor (HTTP/HTTPS) já estão em uso.
+# Usa ss (Linux) como método primário e /dev/tcp (bash built-in, macOS) como fallback.
 for port in 8080 8443; do
-  if (echo >/dev/tcp/localhost/$port) 2>/dev/null; then
+  if ss -tlnp 2>/dev/null | grep -q ":${port} " || \
+     (echo >/dev/tcp/localhost/$port) 2>/dev/null; then
     echo "ERRO: Porta ${port} já está em uso no host."
     echo "      Libere a porta antes de provisionar o cluster."
     exit 1
@@ -117,7 +124,10 @@ for port in 8080 8443; do
 done
 
 # ─── Idempotência: cluster já existe ─────────────────────────────────────────
-if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
+# Verifica se o cluster já existe usando k3d cluster get (match exato por nome).
+# Se existe e está saudável, sai com sucesso. Se existe mas kubectl falha,
+# orienta o dev a destruir e recriar.
+if k3d cluster get "${CLUSTER_NAME}" &>/dev/null; then
   echo "Cluster '${CLUSTER_NAME}' já existe. Verificando saúde..."
   if kubectl get nodes >/dev/null 2>&1; then
     echo "Cluster operacional. Nenhuma ação necessária."
@@ -139,15 +149,21 @@ _cleanup() {
 trap _cleanup INT TERM ERR
 
 # ─── Criar cluster ────────────────────────────────────────────────────────────
-echo "Criando cluster k3d '${CLUSTER_NAME}' (timeout: ${TIMEOUT}s)..."
-k3d cluster create --config "${K3D_CONFIG}" --timeout "${TIMEOUT}s"
+echo "Criando cluster k3d '${CLUSTER_NAME}'..."
+k3d cluster create --config "${K3D_CONFIG}"
 
 # ─── Desabilitar trap após criação bem-sucedida ───────────────────────────────
 trap - INT TERM ERR
 
 # ─── Aguardar nós ficarem prontos ─────────────────────────────────────────────
 echo "Aguardando nós ficarem prontos..."
-kubectl wait --for=condition=Ready nodes --all --timeout=120s
+if ! kubectl wait --for=condition=Ready nodes --all --timeout=120s; then
+  echo ""
+  echo "AVISO: Nós não ficaram prontos dentro do timeout (120s)."
+  echo "       O cluster foi criado mas pode não estar operacional."
+  echo "       Execute 'kubectl get nodes' para verificar ou 'make down' para destruir."
+  exit 1
+fi
 
 # ─── Validação final ──────────────────────────────────────────────────────────
 echo ""
@@ -159,10 +175,14 @@ echo "Execute 'make status' para ver URLs e token M2M (disponível após Story 3
 
 **Notas de implementação:**
 - `git rev-parse --show-toplevel` resolve o path de `k3d.yaml` independentemente do CWD — isso corrige o bug de `make -C /outro/path`
-- A verificação `/dev/tcp/localhost/$port` é portável em bash em macOS e Linux; não requer `ss`, `netstat` ou `lsof`
+- `CLUSTER_NAME` é lido da env var com default `cluster-kubernetes` — centralizado no Makefile como fonte única de verdade (DN-2)
+- Verificação de portas usa `ss -tlnp` (Linux) como método primário e `/dev/tcp` (bash built-in) como fallback para macOS (P-1)
+- Guardas numéricas (`[[ =~ ^[0-9]+$ ]]`) protegem a aritmética de CPU/memória contra valores inesperados do Docker (P-2)
+- `k3d cluster get` faz match exato por nome — evita falso positivo com `grep` em nomes similares (P-3)
+- Timeout de criação é controlado exclusivamente pelo `k3d.yaml` — removido da CLI e do Makefile para fonte única (P-4)
 - `trap _cleanup INT TERM ERR` é desativado com `trap - INT TERM ERR` após criação bem-sucedida — evita deletar um cluster saudável se um comando posterior falhar
-- `K3D_TIMEOUT` como env var permite override sem alterar o arquivo (ex: `K3D_TIMEOUT=600 make up` em rede lenta)
-- Verificação de idempotência não usa `|| true` — distingue "cluster funcional" de "cluster corrompido"
+- `kubectl wait` com tratamento de falha: não destrói o cluster se nós não ficarem prontos, apenas orienta o dev (DN-1)
+- Verificação de idempotência distingue "cluster funcional" de "cluster corrompido"
 
 ### Implementação: `scripts/cluster-down.sh`
 
@@ -173,7 +193,7 @@ echo "Execute 'make status' para ver URLs e token M2M (disponível após Story 3
 
 set -euo pipefail
 
-CLUSTER_NAME="cluster-kubernetes"
+CLUSTER_NAME="${CLUSTER_NAME:-cluster-kubernetes}"
 
 # ─── Verificar presença de k3d ────────────────────────────────────────────────
 if ! command -v k3d >/dev/null 2>&1; then
@@ -181,8 +201,19 @@ if ! command -v k3d >/dev/null 2>&1; then
   exit 1
 fi
 
+# ─── Verificar Docker em execução ─────────────────────────────────────────────
+# Sem Docker ativo, k3d não consegue listar clusters. Avisa e sai com sucesso
+# pois o cluster será destruído automaticamente quando o Docker reiniciar.
+if ! docker info >/dev/null 2>&1; then
+  echo "AVISO: Docker daemon não está em execução."
+  echo "       Se o cluster existia, ele será destruído quando Docker reiniciar."
+  exit 0
+fi
+
 # ─── Idempotência: cluster não existe ─────────────────────────────────────────
-if ! k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
+# Usa k3d cluster get para verificação exata por nome. Se não existe, sai com
+# sucesso (operação idempotente).
+if ! k3d cluster get "${CLUSTER_NAME}" &>/dev/null; then
   echo "Cluster '${CLUSTER_NAME}' não existe. Nenhuma ação necessária."
   exit 0
 fi
@@ -192,7 +223,7 @@ echo "Destruindo cluster '${CLUSTER_NAME}'..."
 k3d cluster delete "${CLUSTER_NAME}"
 
 # ─── Confirmar remoção ────────────────────────────────────────────────────────
-if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
+if k3d cluster get "${CLUSTER_NAME}" &>/dev/null; then
   echo "ERRO: Cluster ainda listado após deleção. Verifique manualmente com 'k3d cluster list'."
   exit 1
 fi
@@ -236,8 +267,7 @@ agents: 1
 # Resolve raiz do repositório independentemente de onde make é chamado
 REPO_ROOT := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
 
-# Timeout do k3d (override: K3D_TIMEOUT=600 make up)
-export K3D_TIMEOUT ?= 300
+export CLUSTER_NAME ?= cluster-kubernetes
 
 .PHONY: up down token lint status help
 
@@ -267,7 +297,7 @@ status: ## Exibe status dos componentes e URLs locais
 - `.DEFAULT_GOAL := help` — `make` puro exibe ajuda em vez de provisionar
 - `REPO_ROOT` via `git rev-parse` — corrige `make -C /outro/path`
 - Paths dos scripts agora usam `$(REPO_ROOT)/`
-- `export K3D_TIMEOUT` expõe a variável para os scripts bash
+- `export CLUSTER_NAME` centraliza o nome do cluster como fonte única de verdade (DN-2)
 - Target `help` com `##` como delimitador de descrição (padrão autodoc)
 - Comentários `## Descrição` nos targets para autodoc via `grep`
 
@@ -294,6 +324,13 @@ node_modules/
 
 # Binários locais
 bin/
+
+# Variáveis de ambiente locais (podem conter credenciais)
+.env
+.env.*
+
+# Backups
+*.bak
 ```
 
 ### Implementação: `.gitattributes`
@@ -325,9 +362,9 @@ Makefile text eol=lf
 
 | Item Diferido | Tratamento |
 |---|---|
-| Sem detecção de conflito de portas 8080/8443 | Implementado em `cluster-up.sh` (pre-flight `/dev/tcp`) |
+| Sem detecção de conflito de portas 8080/8443 | Implementado em `cluster-up.sh` (pre-flight `ss` + `/dev/tcp` fallback) |
 | Sem guarda de idempotência no cluster-up | Implementado — verifica existência antes de criar |
-| `k3d.yaml` timeout 300s pode ser curto | Exposto como `K3D_TIMEOUT` env var (default 300, override fácil) |
+| `k3d.yaml` timeout 300s pode ser curto | Timeout controlado exclusivamente pelo `k3d.yaml` (fonte única de verdade) |
 | Sem verificação pre-flight de kubectl/docker/k3d | Implementado — verifica todos os 3 binários |
 | Scripts sem `trap` para cleanup | Implementado com `trap _cleanup INT TERM ERR` + desativa após sucesso |
 | Makefile assume CWD == repo root | Corrigido com `REPO_ROOT := git rev-parse --show-toplevel` |
@@ -337,7 +374,7 @@ Makefile text eol=lf
 | `k3d.yaml` sem `image:` para fixar k3s | Adicionado `image: rancher/k3s:v1.29.4-k3s1` |
 | Repo sem `.gitignore` | Criado |
 | Repo sem `.gitattributes` | Criado |
-| `K3D_TIMEOUT` forwarding de argumentos | Implementado via `export K3D_TIMEOUT` no Makefile |
+| `K3D_TIMEOUT` forwarding de argumentos | Timeout centralizado no `k3d.yaml`; `CLUSTER_NAME` exportado via Makefile (DN-2) |
 
 **AVISO — Item diferido para Story 1.4 (não implementar aqui):**
 - Makefile sem `SKIP_LINT=1` escape hatch — diferido para Story 1.4 (quando o linter real for implementado)
@@ -415,10 +452,10 @@ claude-sonnet-4-6
 Story context criada pelo BMad Create Story workflow. Análise exaustiva de: epics.md, architecture.md, project-context.md, story 1.1 (Dev Notes + Review Findings), deferred-work.md, estado atual do repositório (Makefile, scripts stubs, k3d.yaml). Todos os 12 items diferidos para Story 1.2 foram incorporados nas tarefas e na implementação detalhada.
 
 **Implementação concluída (2026-05-13):**
-- `scripts/cluster-up.sh`: implementação completa com pre-flight (binários, Docker daemon, recursos, conflito de portas), idempotência, trap de cleanup e validação final via `kubectl get nodes`. `K3D_TIMEOUT` lido da env var com default 300s. `K3D_CONFIG` resolvido via `git rev-parse --show-toplevel` (corrige make -C /outro/path).
+- `scripts/cluster-up.sh`: implementação completa com pre-flight (binários, Docker daemon, recursos com guardas numéricas, conflito de portas via `ss`+`/dev/tcp`), idempotência via `k3d cluster get`, trap de cleanup e validação final via `kubectl get nodes` com tratamento de falha. `CLUSTER_NAME` lido da env var (centralizado no Makefile). `K3D_CONFIG` resolvido via `git rev-parse --show-toplevel`.
 - `scripts/cluster-down.sh`: implementação completa com verificação de k3d no PATH, idempotência (sai com 0 se cluster não existe), deleção e confirmação de remoção.
 - `k3d.yaml`: campo `image: rancher/k3s:v1.29.4-k3s1` adicionado após `metadata.name` — pina versão do k3s para reprodutibilidade entre máquinas.
-- `Makefile`: adicionados `.DEFAULT_GOAL := help`, `REPO_ROOT` via `git rev-parse`, `export K3D_TIMEOUT ?= 300`, target `help` com autodoc via `##`, paths de scripts atualizados para usar `$(REPO_ROOT)/`.
+- `Makefile`: adicionados `.DEFAULT_GOAL := help`, `REPO_ROOT` via `git rev-parse`, `export CLUSTER_NAME ?= cluster-kubernetes` (fonte única de verdade), target `help` com autodoc via `##`, paths de scripts atualizados para usar `$(REPO_ROOT)/`.
 - `.gitignore`: criado com padrões para kubeconfig, logs, IDE artifacts.
 - `.gitattributes`: criado com `* text=auto eol=lf` e regras explícitas para `.sh`, `Makefile`, `*.yaml`, `*.md`, `*.json` + binários.
 - `lint.sh` preservado intacto (stub exit 0) — conforme requisito crítico da story.
