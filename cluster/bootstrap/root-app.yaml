@@ -34,6 +34,12 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
+      # RespectIgnoreDifferences é OBRIGATÓRIO em conjunto com ignoreDifferences.
+      # Sem ele, ignoreDifferences afeta apenas a detecção de drift (Sync Status),
+      # e a operação de sync continua aplicando o manifesto INTEIRO do Git — o que
+      # reverteria o targetRevision dos filhos (e do próprio root-app) para 'main'
+      # a cada reconciliação, anulando o override de ARGO_TARGET_BRANCH.
+      - RespectIgnoreDifferences=true
   ignoreDifferences:
     - group: argoproj.io
       kind: Application
