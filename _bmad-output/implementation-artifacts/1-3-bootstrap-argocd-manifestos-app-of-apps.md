@@ -1,6 +1,6 @@
 # Story 1.3: Bootstrap do ArgoCD e Manifestos App-of-Apps
 
-Status: review
+Status: done
 
 ## Story
 
