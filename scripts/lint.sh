@@ -50,7 +50,7 @@ while IFS= read -r kustomize_file; do
   $KUSTOMIZE_CMD "$dir" > "$output_file"
 
   # Conta manifestos gerados nesta pasta
-  manifest_count=$(grep -c "^kind:" "$output_file" || echo 0)
+  manifest_count=$(grep -c "^kind:" "$output_file" || true)
   if [ "$manifest_count" -gt 0 ]; then
     echo "   - Compilado: $dir ($manifest_count manifestos)"
   else
@@ -73,9 +73,25 @@ fi
 
 echo "📊 Total de manifestos consolidados para validação: $total_manifests"
 
-# 6. Execução do scripts/validate_yaml.py para validar nomenclatura kebab-case
-echo "🏷️  Validando nomenclatura kebab-case dos recursos..."
-python3 scripts/validate_yaml.py "$TEMP_DIR"
+# 6. Execução do conftest (local ou fallback transparente via Docker)
+echo "🏷️  Validando nomenclatura kebab-case com conftest (OPA)..."
+if command -v conftest &>/dev/null; then
+  echo "✅ conftest local detectado. Executando..."
+  conftest test "$TEMP_DIR" --policy policy
+else
+  # Fallback transparente via Docker
+  if ! command -v docker &>/dev/null; then
+    echo "❌ Erro: conftest não está instalado localmente e o Docker não está em execução!" >&2
+    echo "   Para rodar localmente sem Docker, instale o conftest ou configure SKIP_LINT=1." >&2
+    exit 1
+  fi
+
+  echo "ℹ️  conftest não encontrado localmente. Rodando via Docker (openpolicyagent/conftest:v0.45.0)..."
+  docker run --rm \
+    -v "$(pwd):/dir" \
+    -w /dir \
+    openpolicyagent/conftest:v0.45.0 test "$TEMP_DIR" --policy policy
+fi
 
 # 7. Execução do kube-linter (local ou fallback transparente via Docker)
 echo "🛡️  Validando políticas de segurança e robustez com kube-linter..."

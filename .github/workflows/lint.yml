@@ -30,12 +30,6 @@ jobs:
         with:
           persist-credentials: false
 
-      # Garante que o runner tem suporte a Python 3 (padrão em ubuntu-latest)
-      - name: Configurar Python
-        uses: actions/setup-python@82c7e631bb3eae9174d560195a63fc9d19a11d2c # v5.1.0
-        with:
-          python-version: '3.11'
-
       # Instala kustomize com versão pinada — fallback kubectl kustomize não garante versão consistente
       - name: Instalar kustomize v5.8.1
         run: |

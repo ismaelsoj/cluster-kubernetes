@@ -294,7 +294,7 @@ Para reconstrução do cluster a partir do zero, DEVE seguir esta ordem:
 - Esta configuração DEVE ser habilitada desde o primeiro deploy.
 
 **Validação Automatizada (Linter):**
-- O repositório DEVE incluir um linter YAML (ex: `kube-linter`) configurado para validar automaticamente nomenclatura, labels obrigatórios e proibição da tag `latest`.
+- O repositório DEVE incluir validações automatizadas de manifestos YAML através do `kube-linter` (para boas práticas e segurança) e do `Conftest` baseado em Open Policy Agent - OPA (para regras estruturais e de nomenclatura, como o padrão kebab-case).
 - O `Makefile` DEVE executar o linter como pré-condição obrigatória antes de aplicar manifestos no cluster local via `make up`.
 - O pipeline de CI DEVE executar a mesma validação como gate de qualidade.
 

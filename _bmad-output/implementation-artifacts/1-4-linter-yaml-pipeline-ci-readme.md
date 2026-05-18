@@ -1,19 +1,20 @@
 # Story 1.4: Linter YAML, Pipeline CI e README
 
-Status: in-progress
+Status: review
 
 <!-- Note: A validação é opcional. Execute validate-create-story para checagem de qualidade antes do dev-story. -->
 
-## Story
+## História
 
 Como um Engenheiro de Plataforma,
 Eu quero a validação automática de todos os manifestos e documentação clara de onboarding,
 Para que erros de nomenclatura, labels ausentes, tags `latest` ou violações de segurança sejam detectados de forma precoce (localmente e na esteira) e novos membros se integrem sem atrito.
 
-## Acceptance Criteria
+## Critérios de Aceitação
 
-1. **[LINT-SCRIPT-IMPLEMENTATION]** Dado que o script `scripts/lint.sh` está configurado para usar `kube-linter` e `kustomize`, quando executado (tanto de forma avulsa pelo `make lint` quanto pelo `make up`), então ele deve validar de forma recursiva todos os recursos gerados pelo `kustomize build` nos diretórios do cluster (incluindo `cluster/bootstrap/` e `cluster/infrastructure/`). A validação deve garantir de forma rígida:
-   - **Nomenclatura Kubernetes**: Recursos e namespaces em `kebab-case` (`kebab-case-names-only`).
+1. **[LINT-SCRIPT-IMPLEMENTATION]** Dado que o script `scripts/lint.sh` está configurado para usar `kube-linter`, `conftest` (OPA) e `kustomize`, quando executado (tanto de forma avulsa pelo `make lint` quanto pelo `make up`), então ele deve validar de forma recursiva todos os recursos gerados pelo `kustomize build` nos diretórios do cluster (incluindo `cluster/bootstrap/` e `cluster/infrastructure/`). A validação deve garantir de forma rígida:
+   - **Nomenclatura Kubernetes (Conftest OPA)**: Recursos e namespaces em `kebab-case` avaliados estruturalmente por políticas declarativas escritas em Rego sob a pasta `policy/`.
+   - **Exclusão de Script Proprietário**: Remoção definitiva do script em Python `scripts/validate_yaml.py` do repositório, erradicando a manutenção de parsers de expressões regulares para YAML estruturado.
    - **Labels Obrigatórios**: Presença dos labels `app.kubernetes.io/name` (combinando com o app/componente), `app.kubernetes.io/component` (restrito aos valores: `api`, `database`, `identity-provider`, `gateway`, `worker`), e `app.kubernetes.io/part-of` (fixo como `cluster-kubernetes`).
    - **Proibição de Tags Imutáveis**: Nenhuma imagem Docker pode usar a tag `:latest` (FR20 / NFR-S02).
    - **Probes de Resiliência**: Presença obrigatória de `readinessProbe` e `livenessProbe` em Deployments (infraestrutura e stubs).
@@ -36,16 +37,17 @@ Para que erros de nomenclatura, labels ausentes, tags `latest` ou violações de
    - **Higiene do Git (.gitignore)**: Criar o `.gitignore` na raiz do projeto contendo exclusões padrão do ecossistema Kubernetes local e desenvolvimento (kubeconfigs temporários, `.kube`, chaves locais, dumps `.sql`, logs, diretórios temporários).
    - **Higiene Windows (.gitattributes)**: Criar o `.gitattributes` na raiz do projeto contendo regras estritas para forçar finais de linha LF (`* text eol=lf`) nos arquivos shell `*.sh` e `Makefile`, garantindo compatibilidade total no Windows/WSL2 e prevenindo erros clássicos no Windows/WSL2 causados pela conversão de final de linha CRLF (`\r\n`). Nota técnica: o bit de execução dos scripts não é controlável via `.gitattributes` — é preservado quando os scripts são commitados com `git update-index --chmod=+x`, o que já foi feito no commit inicial desta story.
 
-## Tasks / Subtasks
+## Tarefas e Subtarefas
 
-- [x] **Tarefa 1: Implementar o script `scripts/lint.sh` completo** (AC: #1)
+- [x] **Tarefa 1: Implementar a orquestração do script `scripts/lint.sh` com Conftest e Kube-linter** (AC: #1)
   - [x] Adicionar suporte à verificação e bypass imediato se `SKIP_LINT=1` estiver setada no topo do script.
-  - [x] Implementar a lógica de busca local do binário `kube-linter`.
-  - [x] Se `kube-linter` não for encontrado no PATH, implementar o fallback transparente via Docker:
-    - [x] Rodar container `docker run --rm -v "$(pwd):/dir" stackrox/kube-linter:v0.8.3 lint /dir/cluster/` (com fallback para v0.8.3 estável e imutável).
-  - [x] Garantir que o linter valide manifestos gerados pelo `kustomize build` para todas as pastas de infraestrutura (`cluster/infrastructure/namespaces`, `cluster/infrastructure/keycloak-auth`, `cluster/infrastructure/kong-gateway`, etc.).
-  - [x] Adicionar guarda anti-"Falso Verde": ler o output do `kustomize build` e garantir que o número de manifestos compilados é maior que 0 (`grep -c "kind:"` ou similar). Abortar com erro se 0 objetos forem encontrados para lint.
-  - [x] Garantir que o script retorne exit code não nulo se violações de nomenclatura, labels ausentes, tags `:latest` ou falta de probes forem detectadas.
+  - [x] Garantir que o linter valide manifestos gerados pelo `kustomize build` para todas as pastas de infraestrutura.
+  - [x] Adicionar guarda anti-"Falso Verde": ler o output do `kustomize build` e garantir que o número de manifestos compilados é maior que 0. Abortar com erro se 0 objetos forem encontrados.
+  - [x] Garantir que o script retorne exit code não nulo se violações forem detectadas por qualquer ferramenta.
+  - [x] Implementar a política OPA/Rego de validação de nomenclatura `kebab-case` para recursos e namespaces em `policy/kebab-case.rego`.
+  - [x] Integrar a execução do `conftest` localmente no `scripts/lint.sh`.
+  - [x] Se o `conftest` não for encontrado localmente, implementar o fallback automático via Docker rodando a imagem `openpolicyagent/conftest:v0.45.0` (ou estável equivalente) para analisar a pasta `.tmp-lint`.
+  - [x] Remover completamente o script legado e frágil `scripts/validate_yaml.py` e suas referências.
 
 - [x] **Tarefa 2: Integrar o Linter no Makefile e Validar Localmente** (AC: #2)
   - [x] Garantir que o Makefile declare os targets `.PHONY: lint` e `up: lint` de forma robusta e idempotente.
@@ -71,7 +73,7 @@ Para que erros de nomenclatura, labels ausentes, tags `latest` ou violações de
   - [x] Criar o `.gitattributes` na raiz para forçar finais de linha LF (`* text eol=lf`) nos arquivos shell `*.sh` e `Makefile`, garantindo compatibilidade total no Windows/WSL2 e preservando permissões de execução (+x).
   - [x] Migrar em todos os manifestos de stubs Kustomize a diretiva obsoleta `apiVersion: kustomize.config.k8s.io/v1beta1` para `apiVersion: kustomize.config.k8s.io/v1` para evitar avisos futuros de obsolescência das novas versões. *Nota: Revertido para v1beta1 devido à restrição estrita do compilador local kubectl kustomize v1.34.1 que crasheia em v1.*iVersion: kustomize.config.k8s.io/v1beta1` para `apiVersion: kustomize.config.k8s.io/v1` para evitar avisos futuros de obsolescência das novas versões.
 
-## Dev Notes
+## Notas de Desenvolvimento
 
 ### Padrões e Regras Críticas do `kube-linter` e `Kustomize`
 
@@ -105,19 +107,34 @@ Qualquer manifesto modificado nesta Story deve respeitar rigorosamente essas dir
 - [BDD da Story 1.4](file:///Users/ismael/git/cluster-kubernetes/_bmad-output/planning-artifacts/epics.md#story-14-linter-yaml-pipeline-ci-readme)
 - [Itens Diferidos para a Story 1.4](file:///Users/ismael/git/cluster-kubernetes/_bmad-output/implementation-artifacts/deferred-work.md#diferido-para-story-14-linter-real--ci-hardening)
 
-## Dev Agent Record
+## Registro do Agente de Desenvolvimento
 
-### Agent Model Used
+### Modelo de Agente Utilizado
 
-gemini-3-flash (via /bmad-create-story)
+Antigravity (Gemini 3 Flash)
 
-### Debug Log References
+### Referências de Log de Depuração
 
-### Completion Notes List
+- Execução do `make lint` local rodando Conftest (OPA) via Docker com a imagem `openpolicyagent/conftest:v0.45.0`.
+- Validação de falha e bloqueio no provisionamento do k3d local ao inserir namespace inválido temporário em `namespaces.yaml`.
+- Execução limpa com sucesso em 12 testes no conftest após a restauração e correções.
 
-### File List
+### Notas de Conclusão
 
-## Review Findings
+- Substituição integral da lógica frágil e textual do script Python `validate_yaml.py` por políticas declarativas escritas em Rego sob `policy/kebab-case.rego` integradas no `Conftest`.
+- Integração da orquestração do `conftest` no script `scripts/lint.sh` com suporte local e fallback transparente via Docker.
+- Correção técnica do bug de inteiros do bash com `manifest_count` de stubs de infraestrutura vazios no script `scripts/lint.sh`.
+- Atualização do pipeline de CI do GitHub Actions em `.github/workflows/lint.yml` eliminando o setup do ambiente Python, tornando a esteira mais limpa e veloz.
+- Exclusão do script legado `/scripts/validate_yaml.py` e limpeza de suas referências.
+
+### Lista de Arquivos
+
+- [policy/kebab-case.rego](file:///home/ismael.sjunior/git-pessoal/cluster-kubernetes/policy/kebab-case.rego)
+- [scripts/lint.sh](file:///home/ismael.sjunior/git-pessoal/cluster-kubernetes/scripts/lint.sh)
+- [.github/workflows/lint.yml](file:///home/ismael.sjunior/git-pessoal/cluster-kubernetes/.github/workflows/lint.yml)
+- [scripts/validate_yaml.py](file:///home/ismael.sjunior/git-pessoal/cluster-kubernetes/scripts/validate_yaml.py) (Removido)
+
+## Resultados da Revisão de Código
 
 > Code review realizado em 2026-05-18 — 3 camadas adversariais (Blind Hunter, Edge Case Hunter, Acceptance Auditor)
 
@@ -145,3 +162,63 @@ gemini-3-flash (via /bmad-create-story)
 ### Defer
 
 - [x] [Review][Defer] **Output vazio de `kustomize build` (exit 0, 0 bytes) é indistinguível de stub intencional** — diretórios de stubs de infraestrutura por design produzem 0 manifestos; o guard de `total_manifests > 0` mitiga no agregado mas não reporta qual diretório falhou silenciosamente. Pré-existente por design — deferred.
+
+## Evidências de Teste (Test Evidence)
+
+> [!NOTE]
+> Esta seção registra os testes de validação funcionais locais executados pelo agente para garantir a conformidade dos manifestos e o correto funcionamento do Conftest (OPA) e do kube-linter.
+
+### 1. Teste de Sucesso Local (Happy Path / Green Light)
+*   **Comando Executado:** `make lint`
+*   **Finalidade:** Validar se a esteira compilada do Kustomize monta todos os componentes corretos e se o Conftest + kube-linter passam com sucesso sem falsos positivos.
+*   **Resultado Obtido:** Sucesso (Exit Code: 0).
+*   **Log da Execução:**
+    ```bash
+    🔍 Iniciando validação de manifestos do cluster...
+    🛠️  Compilando componentes com kubectl kustomize...
+       - Compilado: cluster/bootstrap (2 manifestos)
+       - Compilado: cluster/infrastructure (2 manifestos)
+       - Compilado: cluster/infrastructure/namespaces/base (2 manifestos)
+    📊 Total de manifestos consolidados para validação: 6
+    🏷️  Validando nomenclatura kebab-case com conftest (OPA)...
+    ℹ️  conftest não encontrado localmente. Rodando via Docker (openpolicyagent/conftest:v0.45.0)...
+
+    12 tests, 12 passed, 0 warnings, 0 failures, 0 exceptions
+    🛡️  Validando políticas de segurança e robustez com kube-linter...
+    ℹ️  kube-linter não encontrado localmente. Rodando via Docker (stackrox/kube-linter:v0.8.3)...
+    KubeLinter 0.8.3
+
+    No lint errors found!
+    🎉 Excelente! Todos os manifestos passaram nas validações de segurança e nomenclatura!
+    ```
+
+### 2. Teste de Bloqueio de Nomenclatura Inválida (Failure Path / Red Light)
+*   **Comando Executado:** `make lint`
+*   **Cenário de Teste:** Inserção temporária de um namespace com nome em PascalCase (`InvalidNamespaceName`) no arquivo `cluster/infrastructure/namespaces/base/namespaces.yaml`.
+*   **Finalidade:** Garantir que o Conftest baseado na política `policy/kebab-case.rego` detecte com precisão o desvio de nomenclatura em `kebab-case` e aborte a esteira de lint local / CI (exit code não nulo).
+*   **Resultado Obtido:** Falha controlada estruturada (Exit Code: 2 do make / 1 do lint.sh).
+*   **Log da Execução:**
+    ```bash
+    🔍 Iniciando validação de manifestos do cluster...
+    🛠️  Compilando componentes com kubectl kustomize...
+       - Compilado: cluster/bootstrap (2 manifestos)
+       - Compilado: cluster/infrastructure (3 manifestos)
+       - Compilado: cluster/infrastructure/namespaces/base (3 manifestos)
+    📊 Total de manifestos consolidados para validação: 8
+    🏷️  Validando nomenclatura kebab-case com conftest (OPA)...
+    ℹ️  conftest não encontrado localmente. Rodando via Docker (openpolicyagent/conftest:v0.45.0)...
+    FAIL - .tmp-lint/cluster-infrastructure-namespaces-base.yaml - main - Recurso 'InvalidNamespaceName' (Kind: Namespace) não está seguindo o padrão kebab-case (deve conter apenas letras minúsculas, números e hifens).
+    FAIL - .tmp-lint/cluster-infrastructure.yaml - main - Recurso 'InvalidNamespaceName' (Kind: Namespace) não está seguindo o padrão kebab-case (deve conter apenas letras minúsculas, números e hifens).
+
+    16 tests, 14 passed, 0 warnings, 2 failures, 0 exceptions
+    make: *** [Makefile:34: lint] Erro 1
+    ```
+
+### 3. Teste de Escape Hatch (Bypass / SKIP_LINT)
+*   **Comando Executado:** `SKIP_LINT=1 make lint`
+*   **Finalidade:** Validar se a flag de escape hatch é detectada pelo script de lint e pula a esteira exibindo o aviso regulamentar em português do Brasil sem estourar o build.
+*   **Resultado Obtido:** Sucesso com Bypass (Exit Code: 0).
+*   **Log da Execução:**
+    ```bash
+    ⚠️  Aviso: SKIP_LINT=1 está ativa. Pulando a validação de manifestos!
+    ```

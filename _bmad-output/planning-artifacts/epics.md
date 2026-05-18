@@ -188,10 +188,10 @@ Para que erros de nomenclatura, labels ausentes ou tags `latest` sejam detectado
 
 **Critérios de Aceitação:**
 
-**Dado** `scripts/lint.sh` configurado com `kube-linter`
+**Dado** `scripts/lint.sh` configurado com `kube-linter` e `conftest` (OPA)
 **Quando** `make lint` ou `make up` executado
-**Então** valida: `kebab-case`, labels `app.kubernetes.io/*`, proibição `latest`, probes obrigatórios
-**E** `make up` falha se violações detectadas
+**Então** valida: `kebab-case` (via Conftest), labels `app.kubernetes.io/*`, proibição `latest` e probes obrigatórios (via kube-linter)
+**E** `make up` falha se violações em qualquer validador forem detectadas
 
 **Dado** `.github/workflows/lint.yml` existe
 **Quando** commit enviado

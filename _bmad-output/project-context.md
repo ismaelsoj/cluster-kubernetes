@@ -8,13 +8,13 @@ rule_count: 40
 optimized_for_llm: true
 ---
 
-# Project Context for AI Agents
+# Contexto do Projeto para Agentes de IA
 
 _Este arquivo contém regras críticas e padrões que agentes de IA devem seguir ao implementar código neste projeto. Foco nos detalhes não-óbvios que os agentes poderiam perder._
 
 ---
 
-## Technology Stack & Versions
+## Stack de Tecnologia e Versões
 
 - **k3d** v5.8.3 — provisiona o cluster Kubernetes local via Docker
 - **Kubernetes** (via k3d) — runtime de orquestração de contêineres
@@ -23,7 +23,7 @@ _Este arquivo contém regras críticas e padrões que agentes de IA devem seguir
 - **Keycloak** 26.2.1 — Identity Provider OIDC
 - **PostgreSQL** (versão a fixar no overlay) — banco de estado exclusivo do Keycloak
 - **Kustomize** v5.x (nativo no `kubectl`) — motor de templates YAML
-- **kube-linter** (a configurar na Story 1.4) — validação automática de manifestos YAML
+- **kube-linter** & **Conftest (OPA)** (a configurar na Story 1.4) — validação automática estrutural, de segurança e de nomenclatura de manifestos YAML
 - **GitHub Actions** (`actions/checkout@v4`) — pipeline de CI
 - **Makefile + Bash** — orquestrador do ciclo de vida local do desenvolvedor
 
@@ -117,7 +117,7 @@ _Este arquivo contém regras críticas e padrões que agentes de IA devem seguir
 
 ---
 
-## Usage Guidelines
+## Diretrizes de Uso
 
 **Para Agentes de IA:**
 
@@ -133,4 +133,4 @@ _Este arquivo contém regras críticas e padrões que agentes de IA devem seguir
 - Revise periodicamente para remover regras que se tornarem óbvias
 - Ao adicionar nova restrição arquitetural, adicione aqui também
 
-Last Updated: 2026-05-13
+Última Atualização: 2026-05-18
