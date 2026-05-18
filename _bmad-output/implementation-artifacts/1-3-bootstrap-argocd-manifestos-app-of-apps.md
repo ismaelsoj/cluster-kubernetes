@@ -179,6 +179,20 @@ claude-opus-4-7 (via /bmad-dev-story)
   `cluster-up.sh`, aplicando os **três** manifestos via sed para garantir que infra-app
   e apps-app nasçam apontando para a branch local. Em CI/produção (`ARGO_TARGET_BRANCH=main`),
   o sed vira no-op e o comportamento é idêntico ao manifesto canônico.
+- **Incidente 2026-05-18 (revert via sync apesar de `ignoreDifferences`):** após o
+  Caminho B, os Apps ainda foram revertidos para `targetRevision: main` na primeira
+  reconciliação. Diagnóstico via `kubectl get application root-app -n argocd -o jsonpath='{.spec.ignoreDifferences}'`
+  confirmou que `ignoreDifferences` estava presente no live state, mas
+  `spec.source.targetRevision` continuava sendo `main`. Status:
+  `"Skipping sync attempt to [<sha-main>]: auto-sync will wipe out all resources"` —
+  a salvaguarda do ArgoCD bloqueou a deleção em cascata, mas o root-app insistia
+  em sincronizar contra `main`.
+  Raiz: `ignoreDifferences` afeta apenas a detecção de drift (Sync Status). A
+  operação de sync (manual ou automática) continua aplicando o manifesto INTEIRO
+  do Git, sobrescrevendo os campos "ignorados".
+  Correção: adicionar `RespectIgnoreDifferences=true` em
+  `root-app.syncPolicy.syncOptions`. Essa flag (disponível desde ArgoCD 1.8) faz
+  com que o sync respeite `ignoreDifferences`, preservando o override de branch.
 
 ### Completion Notes List
 
@@ -213,3 +227,4 @@ claude-opus-4-7 (via /bmad-dev-story)
 | 2026-05-17 | 0.1    | Implementação inicial: Namespaces Wave 0, App-of-Apps (root/infra/apps), bootstrap ArgoCD `v3.4.2` no `cluster-up.sh`, `ARGO_TARGET_BRANCH` para sincronia local. | Amelia  |
 | 2026-05-18 | 0.2    | Fix: instalação do ArgoCD via `kubectl apply --server-side=true --force-conflicts` para contornar o limite de 256 KB de annotation no CRD `applicationsets.argoproj.io`. | Amelia  |
 | 2026-05-18 | 0.3    | Fix: `ignoreDifferences` em `root-app.yaml` (campo `/spec/source/targetRevision` em `Application`) + `apply_bootstrap_apps()` aplica os 3 manifestos via sed. Garante que `ARGO_TARGET_BRANCH` propague para os filhos sem auto-reversão pelo selfHeal do root-app. | Amelia  |
+| 2026-05-18 | 0.4    | Fix: adiciona `RespectIgnoreDifferences=true` em `root-app.syncPolicy.syncOptions`. Sem essa opção, `ignoreDifferences` só impede a detecção de drift; a operação de sync continuava aplicando o manifesto inteiro do Git, revertendo `targetRevision` dos filhos para `main`. | Amelia  |
