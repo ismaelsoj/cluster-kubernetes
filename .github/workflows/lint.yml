@@ -1,17 +1,51 @@
 # Pipeline de CI - Validação de manifestos YAML - cluster-kubernetes
 # Implementação completa: Story 1.4
+
 name: lint
 
 on:
   push:
-    branches: ["*"]
+    branches: ["**"]
   pull_request:
     branches: ["main"]
 
+# Prevenção de jobs concorrentes (cancela execuções pendentes na mesma branch ao enviar novos commits)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Hardening: Princípio do Menor Privilégio
+permissions:
+  contents: read
+
 jobs:
-  lint:
+  validate:
+    name: Compilar e Validar Manifestos
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - name: Placeholder
-        run: echo "[PLACEHOLDER] Linter configurado na Story 1.4"
+      # Hardening: Pinar checkout por SHA estável do commit do checkout v4.1.7 e desativar persistência de credenciais
+      - name: Checkout do Código
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf33db # v4.1.7
+        with:
+          persist-credentials: false
+
+      # Garante que o runner tem suporte a Python 3 (padrão em ubuntu-latest)
+      - name: Configurar Python
+        uses: actions/setup-python@82c7e631bb3eae9174d560195a63fc9d19a11d2c # v5.1.0
+        with:
+          python-version: '3.11'
+
+      # Instala kustomize com versão pinada — fallback kubectl kustomize não garante versão consistente
+      - name: Instalar kustomize v5.8.1
+        run: |
+          curl -fsSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.8.1/kustomize_v5.8.1_linux_amd64.tar.gz" \
+            | tar xz -C /usr/local/bin kustomize
+          chmod +x /usr/local/bin/kustomize
+          kustomize version
+
+      # Executa a esteira unificada de validação (Kustomize + kebab-case + kube-linter)
+      - name: Executar Validação de Lint (Unificado)
+        run: |
+          chmod +x scripts/lint.sh
+          ./scripts/lint.sh
