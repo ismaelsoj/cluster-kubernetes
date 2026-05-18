@@ -163,6 +163,22 @@ claude-opus-4-7 (via /bmad-dev-story)
   Correção: trocar para `kubectl apply --server-side=true --force-conflicts -n argocd -f ${ARGOCD_MANIFEST_URL}`
   em `install_argocd()`. Server-side apply é a recomendação oficial do ArgoCD; `--force-conflicts`
   mantém idempotência em re-execuções.
+- **Incidente 2026-05-18 (App-of-Apps em branch local):** após `make up` em branch
+  feature, os namespaces `keycloak-auth`/`kong-gateway` não eram criados. Diagnóstico:
+  `kubectl get application infra-app -n argocd -o jsonpath='{.spec.source.targetRevision}'`
+  retornava `main`, e `status.sync.revision` apontava para o commit anterior à Story 1.3
+  (cluster/infrastructure ainda vazio nesse commit → Synced + Healthy sem recursos).
+  Raiz: o `sed` substituía o `targetRevision` apenas em `root-app.yaml`. Os filhos
+  `infra-app`/`apps-app`, ao serem criados via root-app, herdavam `targetRevision: main`
+  dos arquivos no Git. Pior: o `selfHeal: true` do root-app, ao detectar que ele mesmo
+  diferia do Git (cluster=`<branch>` vs arquivo=`main`), revertia o próprio root-app
+  para `main`, propagando a regressão.
+  Correção (Caminho B): (a) adicionar `ignoreDifferences` no `root-app.yaml` para
+  ignorar drift em `/spec/source/targetRevision` de qualquer `Application` (incluindo
+  o próprio root-app); (b) refatorar `apply_root_app()` → `apply_bootstrap_apps()` no
+  `cluster-up.sh`, aplicando os **três** manifestos via sed para garantir que infra-app
+  e apps-app nasçam apontando para a branch local. Em CI/produção (`ARGO_TARGET_BRANCH=main`),
+  o sed vira no-op e o comportamento é idêntico ao manifesto canônico.
 
 ### Completion Notes List
 
@@ -196,3 +212,4 @@ claude-opus-4-7 (via /bmad-dev-story)
 |------------|--------|--------------------------------------------------------------------------------------------|---------|
 | 2026-05-17 | 0.1    | Implementação inicial: Namespaces Wave 0, App-of-Apps (root/infra/apps), bootstrap ArgoCD `v3.4.2` no `cluster-up.sh`, `ARGO_TARGET_BRANCH` para sincronia local. | Amelia  |
 | 2026-05-18 | 0.2    | Fix: instalação do ArgoCD via `kubectl apply --server-side=true --force-conflicts` para contornar o limite de 256 KB de annotation no CRD `applicationsets.argoproj.io`. | Amelia  |
+| 2026-05-18 | 0.3    | Fix: `ignoreDifferences` em `root-app.yaml` (campo `/spec/source/targetRevision` em `Application`) + `apply_bootstrap_apps()` aplica os 3 manifestos via sed. Garante que `ARGO_TARGET_BRANCH` propague para os filhos sem auto-reversão pelo selfHeal do root-app. | Amelia  |
