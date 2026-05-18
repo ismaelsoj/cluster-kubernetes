@@ -9,7 +9,7 @@ REPO_ROOT := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
 
 export CLUSTER_NAME ?= cluster-kubernetes
 
-.PHONY: up down token lint status help
+.PHONY: up up-force down token lint status help
 
 help: ## Exibe esta ajuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -18,6 +18,10 @@ help: ## Exibe esta ajuda
 up: lint ## Provisiona o cluster k3d completo
 	@echo "Provisionando cluster k3d (cluster-kubernetes)..."
 	@bash "$(REPO_ROOT)/scripts/cluster-up.sh"
+
+up-force: ## Provisiona o cluster k3d sem rodar a validação de lint
+	@echo "Provisionando cluster k3d (forçado)..."
+	@SKIP_LINT=1 $(MAKE) up
 
 down: ## Destrói o cluster sem resíduos
 	@echo "Destruindo cluster k3d..."

@@ -30,19 +30,21 @@ Para rodar este ambiente no Windows de forma padronizada e com atrito zero, **é
 make up
 ```
 
-O comando valida os manifestos (`lint`) e provisiona o cluster k3d com Kong e Keycloak conforme declarado em `k3d.yaml`.
+O comando compila e valida todos os manifestos recursivamente (`make lint`) e, se aprovados nas validações de segurança e nomenclatura kebab-case, provisiona o cluster k3d com Kong e Keycloak localmente conforme declarado em `k3d.yaml`.
 
 ## Comandos Disponíveis (executados sob macOS/Linux ou WSL2)
 
-| Comando       | Descrição                                             |
-|---------------|-------------------------------------------------------|
-| `make up`     | Provisiona o cluster k3d completo (executa lint antes) |
-| `make down`   | Destrói o cluster sem resíduos                        |
-| `make token`  | Gera e exibe o token M2M de teste via Keycloak        |
-| `make lint`   | Valida todos os manifestos YAML com kube-linter       |
-| `make status` | Exibe status dos componentes e URLs locais            |
+| Comando        | Descrição                                                               |
+|----------------|-------------------------------------------------------------------------|
+| `make up`      | Provisiona o cluster k3d completo (executa lint antes)                  |
+| `make up-force`| Provisiona o cluster k3d bypassando a validação de lint (depuração)     |
+| `make down`    | Destrói o cluster sem resíduos                                          |
+| `make token`   | Gera e exibe o token M2M de teste via Keycloak                          |
+| `make lint`    | Executa validação de nomenclatura (kebab-case) e segurança (kube-linter) |
+| `make status`  | Exibe status detalhado de todos os componentes e URLs locais            |
 
-## Documentação
+## Links Úteis & Documentação
 
-- [Contrato do Desenvolvedor](docs/contrato-do-desenvolvedor.md) — como publicar APIs na plataforma usando os Boilerplates YAML
-- [Bootstrap de Emergência](docs/bootstrap-emergencia.md) — sequência de recuperação manual do cluster
+- [Contrato do Desenvolvedor](docs/contrato-do-desenvolvedor.md) — guia e contratos para publicação de APIs de negócio usando os boilerplates da plataforma.
+- [Bootstrap de Emergência](docs/bootstrap-emergencia.md) — guia passo a passo para recuperação e provisionamento manual em caso de falhas catastróficas.
+- [Decisão de Arquitetura](_bmad-output/planning-artifacts/architecture.md) — documento de referência com as decisões arquiteturais de rede, fluxo M2M, gateway Kong e IDP Keycloak.

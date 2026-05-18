@@ -1,0 +1,51 @@
+# .kube-linter.yaml - Configuração de qualidade e segurança para o cluster
+# Validações rígidas de labels, probes, tags de imagem e nomenclatura.
+
+checks:
+  # Habilitar verificações padrão e as de probes que são desabilitadas por padrão
+  include:
+    - no-liveness-probe
+    - no-readiness-probe
+    - latest-tag
+    - required-label-name
+    - required-label-component
+    - required-label-part-of
+
+customChecks:
+  - name: required-label-name
+    template: required-label
+    params:
+      key: app.kubernetes.io/name
+    scope:
+      objectKinds:
+        - Deployment
+        - Service
+        - StatefulSet
+        - DaemonSet
+    remediation: "Todos os recursos devem conter o label 'app.kubernetes.io/name' especificando o nome da aplicação."
+
+  - name: required-label-component
+    template: required-label
+    params:
+      key: app.kubernetes.io/component
+      value: "^(api|database|identity-provider|gateway|worker)$"
+    scope:
+      objectKinds:
+        - Deployment
+        - Service
+        - StatefulSet
+        - DaemonSet
+    remediation: "Todos os recursos devem conter o label 'app.kubernetes.io/component' restrito a um dos valores válidos: api, database, identity-provider, gateway, worker."
+
+  - name: required-label-part-of
+    template: required-label
+    params:
+      key: app.kubernetes.io/part-of
+      value: "^cluster-kubernetes$"
+    scope:
+      objectKinds:
+        - Deployment
+        - Service
+        - StatefulSet
+        - DaemonSet
+    remediation: "Todos os recursos devem conter o label 'app.kubernetes.io/part-of' fixo como 'cluster-kubernetes'."
