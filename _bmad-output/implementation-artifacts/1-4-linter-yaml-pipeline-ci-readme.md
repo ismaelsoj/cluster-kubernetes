@@ -1,6 +1,6 @@
 # Story 1.4: Linter YAML, Pipeline CI e README
 
-Status: review
+Status: done
 
 <!-- Note: A validação é opcional. Execute validate-create-story para checagem de qualidade antes do dev-story. -->
 
@@ -46,7 +46,7 @@ Para que erros de nomenclatura, labels ausentes, tags `latest` ou violações de
   - [x] Garantir que o script retorne exit code não nulo se violações forem detectadas por qualquer ferramenta.
   - [x] Implementar a política OPA/Rego de validação de nomenclatura `kebab-case` para recursos e namespaces em `policy/kebab-case.rego`.
   - [x] Integrar a execução do `conftest` localmente no `scripts/lint.sh`.
-  - [x] Se o `conftest` não for encontrado localmente, implementar o fallback automático via Docker rodando a imagem `openpolicyagent/conftest:v0.45.0` (ou estável equivalente) para analisar a pasta `.tmp-lint`.
+  - [x] Se o `conftest` não for encontrado localmente, implementar o fallback automático via Docker rodando a imagem `openpolicyagent/conftest:v0.68.2` (ou estável equivalente) para analisar a pasta `.tmp-lint`.
   - [x] Remover completamente o script legado e frágil `scripts/validate_yaml.py` e suas referências.
 
 - [x] **Tarefa 2: Integrar o Linter no Makefile e Validar Localmente** (AC: #2)
@@ -162,6 +162,11 @@ Antigravity (Gemini 3 Flash)
 ### Defer
 
 - [x] [Review][Defer] **Output vazio de `kustomize build` (exit 0, 0 bytes) é indistinguível de stub intencional** — diretórios de stubs de infraestrutura por design produzem 0 manifestos; o guard de `total_manifests > 0` mitiga no agregado mas não reporta qual diretório falhou silenciosamente. Pré-existente por design — deferred.
+
+### Achados da Revisão (Passagem Atual)
+
+- [x] [Review][Patch] ~~Checkboxes das tarefas de Rego/Conftest não foram marcadas como concluídas~~ — **Aplicado** [_bmad-output/implementation-artifacts/1-4-linter-yaml-pipeline-ci-readme.md]
+- [x] [Review][Defer] ~~Instalar `conftest` nativamente no CI para otimizar tempo de execução~~ — **Aplicado** pós-review
 
 ## Evidências de Teste (Test Evidence)
 

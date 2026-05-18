@@ -38,6 +38,14 @@ jobs:
           chmod +x /usr/local/bin/kustomize
           kustomize version
 
+      # Instala conftest nativamente para evitar pull de imagem Docker no linter
+      - name: Instalar conftest v0.68.2
+        run: |
+          curl -fsSL "https://github.com/open-policy-agent/conftest/releases/download/v0.68.2/conftest_0.68.2_Linux_x86_64.tar.gz" \
+            | tar xz -C /usr/local/bin conftest
+          chmod +x /usr/local/bin/conftest
+          conftest --version
+
       # Executa a esteira unificada de validação (Kustomize + kebab-case + kube-linter)
       - name: Executar Validação de Lint (Unificado)
         run: |

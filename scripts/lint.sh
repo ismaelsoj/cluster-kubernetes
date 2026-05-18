@@ -95,11 +95,11 @@ else
     exit 1
   fi
 
-  echo "ℹ️  conftest não encontrado localmente. Rodando via Docker (openpolicyagent/conftest:v0.45.0)..."
+  echo "ℹ️  conftest não encontrado localmente. Rodando via Docker (openpolicyagent/conftest:v0.68.2)..."
   docker run --rm \
     -v "$(git rev-parse --show-toplevel):/dir" \
     -w /dir \
-    openpolicyagent/conftest:v0.45.0 test "$TEMP_DIR" --policy policy
+    openpolicyagent/conftest:v0.68.2 test "$TEMP_DIR" --policy policy
 fi
 
 # 7. Execução do kube-linter (local ou fallback transparente via Docker)
