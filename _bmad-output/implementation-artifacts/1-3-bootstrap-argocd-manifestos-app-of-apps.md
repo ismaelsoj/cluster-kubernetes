@@ -193,6 +193,23 @@ claude-opus-4-7 (via /bmad-dev-story)
   Correção: adicionar `RespectIgnoreDifferences=true` em
   `root-app.syncPolicy.syncOptions`. Essa flag (disponível desde ArgoCD 1.8) faz
   com que o sync respeite `ignoreDifferences`, preservando o override de branch.
+- **Incidente 2026-05-18 (root-app OutOfSync cosmético):** mesmo com
+  `RespectIgnoreDifferences=true` funcionando perfeitamente para infra-app e apps-app
+  (ambos Synced + Healthy, com `targetRevision` da branch local preservado), o
+  root-app reportava `OutOfSync` ao avaliar a si próprio. `status.operationState`
+  mostrava `phase: Succeeded, message: "successfully synced (all tasks run)"` e
+  `autoHealAttemptsCount: 4` (sync executou, sem efeito visível) — confirmando
+  que nada estava de fato quebrado, mas a UI permaneceria com 1 ⚠️ permanente.
+  Raiz: o padrão App-of-Apps recursivo (root-app gerencia o próprio diretório
+  `cluster/bootstrap/`, que contém `root-app.yaml`) cria um conflito perpétuo de
+  auto-referência quando `ARGO_TARGET_BRANCH != main`. `ignoreDifferences` cobre
+  bem os filhos, mas a auto-referência expõe drift cosmético.
+  Correção (decisão de design): criar `cluster/bootstrap/kustomization.yaml`
+  listando APENAS `infra-app.yaml` e `apps-app.yaml`. ArgoCD passa a usar
+  Kustomize como renderer (auto-detectado) e o root-app deixa de gerenciar a si
+  mesmo. Consequência: alterações em `root-app.yaml` não são auto-sincronizadas
+  pelo ArgoCD; precisam de `make up` (idempotente) para serem aplicadas. Padrão
+  comum em App-of-Apps ("bootstrap out-of-band").
 
 ### Completion Notes List
 
@@ -211,6 +228,7 @@ claude-opus-4-7 (via /bmad-dev-story)
 - `cluster/bootstrap/root-app.yaml`
 - `cluster/bootstrap/infra-app.yaml`
 - `cluster/bootstrap/apps-app.yaml`
+- `cluster/bootstrap/kustomization.yaml` (v0.5 — exclui root-app do auto-gerenciamento)
 
 **Modificados:**
 - `cluster/infrastructure/namespaces/base/kustomization.yaml` (adicionado `namespaces.yaml` em `resources`)
@@ -228,3 +246,4 @@ claude-opus-4-7 (via /bmad-dev-story)
 | 2026-05-18 | 0.2    | Fix: instalação do ArgoCD via `kubectl apply --server-side=true --force-conflicts` para contornar o limite de 256 KB de annotation no CRD `applicationsets.argoproj.io`. | Amelia  |
 | 2026-05-18 | 0.3    | Fix: `ignoreDifferences` em `root-app.yaml` (campo `/spec/source/targetRevision` em `Application`) + `apply_bootstrap_apps()` aplica os 3 manifestos via sed. Garante que `ARGO_TARGET_BRANCH` propague para os filhos sem auto-reversão pelo selfHeal do root-app. | Amelia  |
 | 2026-05-18 | 0.4    | Fix: adiciona `RespectIgnoreDifferences=true` em `root-app.syncPolicy.syncOptions`. Sem essa opção, `ignoreDifferences` só impede a detecção de drift; a operação de sync continuava aplicando o manifesto inteiro do Git, revertendo `targetRevision` dos filhos para `main`. | Amelia  |
+| 2026-05-18 | 0.5    | Decisão de design: cria `cluster/bootstrap/kustomization.yaml` listando apenas `infra-app.yaml` e `apps-app.yaml`. root-app deixa de se auto-gerenciar (era a causa do OutOfSync cosmético permanente). root-app continua aplicado pelo `cluster-up.sh` ("bootstrap out-of-band"); alterações nele exigem re-execução de `make up`. | Amelia  |
