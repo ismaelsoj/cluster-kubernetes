@@ -18,7 +18,7 @@ _Este arquivo contém regras críticas e padrões que agentes de IA devem seguir
 
 - **k3d** v5.8.3 — provisiona o cluster Kubernetes local via Docker
 - **Kubernetes** (via k3d) — runtime de orquestração de contêineres
-- **ArgoCD** (versão a definir na Story 1.3) — operador GitOps (pull-based), padrão App-of-Apps
+- **ArgoCD** v3.4.2 — operador GitOps (pull-based), padrão App-of-Apps
 - **Kong DB-Less** v3.4.x LTS — API Gateway stateless, instalado via Kong Ingress Controller (KIC)
 - **Keycloak** 26.2.1 — Identity Provider OIDC
 - **PostgreSQL** (versão a fixar no overlay) — banco de estado exclusivo do Keycloak

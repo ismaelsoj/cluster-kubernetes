@@ -1,0 +1,30 @@
+# Aplicação filha de infraestrutura - cluster-kubernetes
+# Aponta para cluster/infrastructure (Kong, Keycloak, namespaces e demais componentes centrais).
+# Safe-Prune obrigatório (prune: false): protege infraestrutura crítica de deleção acidental
+# por falhas de rede ou erros transitórios no Git (FR21).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infra-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: infra-app
+    app.kubernetes.io/component: gitops-infra
+    app.kubernetes.io/part-of: cluster-kubernetes
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ismaelsoj/cluster-kubernetes.git
+    targetRevision: main
+    path: cluster/infrastructure
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

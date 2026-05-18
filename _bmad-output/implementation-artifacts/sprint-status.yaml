@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-05-12"
-last_updated: "2026-05-15"  # story 1.2 code review concluído — done
+last_updated: "2026-05-17"  # story 1.3 pronta para review
 project: cluster-kubernetes
 project_key: NOKEY
 tracking_system: file-system
@@ -46,7 +46,7 @@ development_status:
   epic-1: in-progress
   1-1-scaffold-repositorio-configuracao-k3d: done
   1-2-makefile-scripts-automacao-local: done
-  1-3-bootstrap-argocd-manifestos-app-of-apps: backlog
+  1-3-bootstrap-argocd-manifestos-app-of-apps: review
   1-4-linter-yaml-pipeline-ci-readme: backlog
   1-5-procedimento-secrets-documentacao-emergencia: backlog
   epic-1-retrospective: optional

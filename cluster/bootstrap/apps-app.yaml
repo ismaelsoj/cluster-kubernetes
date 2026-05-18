@@ -1,0 +1,32 @@
+# Aplicação filha de aplicações de negócio - cluster-kubernetes
+# Aponta para cluster/apps com descoberta automática recursiva (directory.recurse: true).
+# Higiene total: prune: true para limpar recursos zumbis e CreateNamespace=true para
+# autodescoberta dos namespaces das APIs adicionadas pelas equipes.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: apps-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: apps-app
+    app.kubernetes.io/component: gitops-apps
+    app.kubernetes.io/part-of: cluster-kubernetes
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ismaelsoj/cluster-kubernetes.git
+    targetRevision: main
+    path: cluster/apps
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

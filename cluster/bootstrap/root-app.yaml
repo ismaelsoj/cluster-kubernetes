@@ -1,0 +1,33 @@
+# Aplicação raiz (App-of-Apps pai) - cluster-kubernetes
+# Inicia o ciclo de vida GitOps governando os Applications filhos em cluster/bootstrap.
+# Finalizer resources-finalizer.argocd.argoproj.io garante limpeza em cascata quando deletado.
+# IMPORTANTE: targetRevision: main é o valor canônico. O cluster-up.sh substitui em tempo de
+# execução para a branch local detectada (ARGO_TARGET_BRANCH), sem alterar este arquivo em disco.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: root-app
+    app.kubernetes.io/component: gitops-root
+    app.kubernetes.io/part-of: cluster-kubernetes
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ismaelsoj/cluster-kubernetes.git
+    targetRevision: main
+    path: cluster/bootstrap
+    directory:
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

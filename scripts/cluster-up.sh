@@ -5,7 +5,19 @@
 set -euo pipefail
 
 CLUSTER_NAME="${CLUSTER_NAME:-cluster-kubernetes}"
-K3D_CONFIG="$(git rev-parse --show-toplevel)/k3d.yaml"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+K3D_CONFIG="${REPO_ROOT}/k3d.yaml"
+
+# Versão fixa do ArgoCD (Story 1.3) — imutável e auditável via Git
+ARGOCD_VERSION="${ARGOCD_VERSION:-v3.4.2}"
+ARGOCD_NAMESPACE="argocd"
+ARGOCD_MANIFEST_URL="https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
+ARGOCD_WAIT_TIMEOUT="${ARGOCD_WAIT_TIMEOUT:-180s}"
+ROOT_APP_MANIFEST="${REPO_ROOT}/cluster/bootstrap/root-app.yaml"
+
+# Branch que o ArgoCD vai monitorar — usa a branch local detectada por padrão.
+# Em CI/produção, sobrescrever com ARGO_TARGET_BRANCH=main.
+ARGO_TARGET_BRANCH="${ARGO_TARGET_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
 
 # ─── Pre-flight: binários obrigatórios ──────────────────────────────────────
 for bin in docker kubectl k3d; do
@@ -47,15 +59,58 @@ for port in 8080 8443; do
   fi
 done
 
+# ─── Funções de bootstrap GitOps (Story 1.3) ─────────────────────────────────
+# Instala o ArgoCD de forma idempotente: cria namespace se necessário, aplica
+# o manifesto oficial da versão fixa e aguarda argocd-server ficar disponível.
+install_argocd() {
+  echo ""
+  echo "==> [Bootstrap] Instalando ArgoCD ${ARGOCD_VERSION} no namespace '${ARGOCD_NAMESPACE}'..."
+  kubectl create namespace "${ARGOCD_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+  # Server-side apply é obrigatório: o CRD applicationsets.argoproj.io excede o
+  # limite de 256KB da annotation 'last-applied-configuration' usada pelo apply
+  # client-side. --force-conflicts garante idempotência mesmo após reapply.
+  kubectl apply -n "${ARGOCD_NAMESPACE}" --server-side=true --force-conflicts \
+    -f "${ARGOCD_MANIFEST_URL}"
+
+  echo "==> [Bootstrap] Aguardando 'deployment/argocd-server' ficar disponível (timeout ${ARGOCD_WAIT_TIMEOUT})..."
+  if ! kubectl wait --for=condition=Available \
+       --namespace "${ARGOCD_NAMESPACE}" \
+       --timeout="${ARGOCD_WAIT_TIMEOUT}" \
+       deployment/argocd-server; then
+    echo "ERRO: ArgoCD não ficou disponível dentro do timeout (${ARGOCD_WAIT_TIMEOUT})."
+    echo "      Inspecione com: kubectl get pods -n ${ARGOCD_NAMESPACE}"
+    return 1
+  fi
+  echo "==> [Bootstrap] ArgoCD operacional."
+}
+
+# Aplica o root-app.yaml substituindo targetRevision em tempo de execução.
+# O arquivo em disco permanece com 'targetRevision: main' (canônico para CI/produção).
+apply_root_app() {
+  echo ""
+  echo "==> [Bootstrap] Aplicando root-app (App-of-Apps) monitorando branch '${ARGO_TARGET_BRANCH}'..."
+  if [ ! -f "${ROOT_APP_MANIFEST}" ]; then
+    echo "ERRO: Manifesto root-app não encontrado em '${ROOT_APP_MANIFEST}'."
+    return 1
+  fi
+  sed "s|targetRevision: main|targetRevision: ${ARGO_TARGET_BRANCH}|" \
+    "${ROOT_APP_MANIFEST}" | kubectl apply -f -
+  echo "==> [Bootstrap] root-app aplicado. ArgoCD iniciará a sincronização recursiva."
+}
+
 # ─── Idempotência: cluster já existe ─────────────────────────────────────────
 # Verifica se o cluster já existe usando k3d cluster get (match exato por nome).
-# Se existe e está saudável, sai com sucesso. Se existe mas kubectl falha,
-# orienta o dev a destruir e recriar.
+# Se existe e está saudável, garante que o ArgoCD e o root-app também estão
+# aplicados (bootstrap idempotente) antes de sair com sucesso.
 if k3d cluster get "${CLUSTER_NAME}" &>/dev/null; then
   echo "Cluster '${CLUSTER_NAME}' já existe. Verificando saúde..."
   if kubectl get nodes >/dev/null 2>&1; then
-    echo "Cluster operacional. Nenhuma ação necessária."
+    echo "Cluster operacional. Reconciliando bootstrap GitOps (idempotente)..."
     kubectl get nodes
+    install_argocd
+    apply_root_app
+    echo ""
+    echo "Bootstrap reconciliado. Branch monitorada pelo ArgoCD: '${ARGO_TARGET_BRANCH}'."
     exit 0
   else
     echo "ERRO: Cluster existe mas kubectl não consegue conectar."
@@ -93,5 +148,14 @@ fi
 echo ""
 echo "Cluster provisionado com sucesso!"
 kubectl get nodes
+
+# ─── Bootstrap GitOps (Story 1.3) ─────────────────────────────────────────────
+# Instala o ArgoCD e aplica o root-app (App-of-Apps) para iniciar a sincronização
+# recursiva da infraestrutura e das aplicações de negócio.
+install_argocd
+apply_root_app
+
 echo ""
+echo "Bootstrap GitOps concluído."
+echo "Branch monitorada pelo ArgoCD: '${ARGO_TARGET_BRANCH}'."
 echo "Execute 'make status' para ver URLs e token M2M (disponível após Story 3.3)."
