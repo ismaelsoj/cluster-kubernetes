@@ -56,3 +56,7 @@ Registro centralizado de itens identificados em revisões/triagens que não pert
 
 - `k3d.yaml` sem resource limits (`memory`, `cpuCount`) definidos nos containers k3d — decisão arquitetural documentada ("configurar no Docker Desktop"), não é escopo dos scripts de automação
 - Containers k3d sem Docker healthcheck definido — pertence ao lifecycle management geral do cluster, não aos scripts de ciclo de vida
+
+## Deferred from: code review of 1-4-linter-yaml-pipeline-ci-readme (2026-05-18)
+
+- Output vazio de `kustomize build` (exit 0, 0 bytes) é indistinguível de stub intencional — diretórios de stubs de infraestrutura por design produzem 0 manifestos; o guard de `total_manifests > 0` mitiga no agregado mas não reporta qual diretório falhou silenciosamente. Avaliar em story futura de hardening do lint.

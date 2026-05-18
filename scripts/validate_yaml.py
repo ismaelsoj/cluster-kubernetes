@@ -28,10 +28,16 @@ def validate_file(filepath):
         stripped = line.strip()
         if not stripped or stripped.startswith('#'):
             continue
-        
+
+        # Separador de documento YAML — reseta estado de metadata
+        if stripped == '---':
+            in_metadata = False
+            metadata_indent = -1
+            continue
+
         # Calcular indentação (número de espaços iniciais)
         indent = len(line) - len(line.lstrip())
-        
+
         if in_metadata:
             # Se a indentação for menor ou igual à indentação do 'metadata:', saímos do bloco
             if indent <= metadata_indent and not stripped.startswith('metadata:'):
@@ -39,23 +45,22 @@ def validate_file(filepath):
                 metadata_indent = -1
             else:
                 # Verificações de campos de nome e namespace
-                name_match = re.match(r'^name:\s*["\']?([a-zA-Z0-9-.:_]+)["\']?\s*$', stripped)
-                namespace_match = re.match(r'^namespace:\s*["\']?([a-zA-Z0-9-.:_]+)["\']?\s*$', stripped)
+                name_match = re.match(r'^name:\s*["\']?([a-zA-Z0-9][a-zA-Z0-9-.:_]*)["\']?\s*(?:#.*)?$', stripped)
+                namespace_match = re.match(r'^namespace:\s*["\']?([a-zA-Z0-9][a-zA-Z0-9-.:_]*)["\']?\s*(?:#.*)?$', stripped)
                 
                 if name_match:
                     name_val = name_match.group(1)
-                    if name_val not in EXCEPTIONS and not KEBAB_CASE_RE.match(name_val):
-                        # Ignorar nomes de regras de roles ou environment variables se houver (mas name: sob metadata é seguro)
-                        # Garante que estamos sob metadata/nome do recurso
+                    # Valores com ':' são nomes estruturados do K8s (service accounts, ClusterRoles) — ignorar
+                    if name_val not in EXCEPTIONS and ':' not in name_val and not KEBAB_CASE_RE.match(name_val):
                         errors.append(f"Linha {i}: Recurso '{name_val}' não está em kebab-case (deve conter apenas letras minúsculas, números e hifens).")
-                
+
                 elif namespace_match:
                     ns_val = namespace_match.group(1)
-                    if ns_val not in EXCEPTIONS and not KEBAB_CASE_RE.match(ns_val):
+                    if ns_val not in EXCEPTIONS and ':' not in ns_val and not KEBAB_CASE_RE.match(ns_val):
                         errors.append(f"Linha {i}: Namespace '{ns_val}' não está em kebab-case (deve conter apenas letras minúsculas, números e hifens).")
         
-        # Detectar entrada no bloco metadata
-        if stripped == 'metadata:':
+        # Detectar entrada no bloco metadata (apenas nível raiz do documento)
+        if stripped == 'metadata:' and indent == 0:
             in_metadata = True
             metadata_indent = indent
 
@@ -67,8 +72,13 @@ def main():
         sys.exit(1)
     
     target = sys.argv[1]
+
+    if not os.path.exists(target):
+        print(f"❌ Erro: Caminho '{target}' não encontrado.", file=sys.stderr)
+        sys.exit(1)
+
     all_errors = {}
-    
+
     if os.path.isfile(target):
         files_to_check = [target]
     else:

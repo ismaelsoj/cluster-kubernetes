@@ -38,25 +38,26 @@ trap cleanup EXIT
 echo "🛠️  Compilando componentes com $KUSTOMIZE_CMD..."
 
 # Encontra todas as pastas ativas que possuem kustomization.yaml (ignorando boilerplates vazios)
-find cluster/bootstrap cluster/infrastructure cluster/apps -name "kustomization.yaml" 2>/dev/null | while read -r kustomize_file; do
+# Process substitution evita subshell de pipe — falhas do kustomize build propagam set -e corretamente
+while IFS= read -r kustomize_file; do
   dir=$(dirname "$kustomize_file")
-  
+
   # Cria um nome de arquivo único para o manifesto compilado (trocando '/' por '-')
   safe_name=$(echo "$dir" | tr '/' '-')
   output_file="${TEMP_DIR}/${safe_name}.yaml"
-  
+
   # Executa compilação do Kustomize
   $KUSTOMIZE_CMD "$dir" > "$output_file"
-  
+
   # Conta manifestos gerados nesta pasta
-  manifest_count=$(grep -c "^kind:" "$output_file" || true)
+  manifest_count=$(grep -c "^kind:" "$output_file" || echo 0)
   if [ "$manifest_count" -gt 0 ]; then
     echo "   - Compilado: $dir ($manifest_count manifestos)"
   else
     # Se gerou 0 manifestos (stubs de infraestrutura vazios por design), removemos para não poluir o linter
     rm -f "$output_file"
   fi
-done
+done < <(find cluster/bootstrap cluster/infrastructure cluster/apps -name "kustomization.yaml" 2>/dev/null)
 
 # 5. Guarda anti-"Falso Verde": valida se de fato há manifestos para validar no total do repositório
 total_manifests=0

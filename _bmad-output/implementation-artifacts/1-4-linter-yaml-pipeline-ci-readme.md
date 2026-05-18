@@ -1,6 +1,6 @@
 # Story 1.4: Linter YAML, Pipeline CI e README
 
-Status: done
+Status: in-progress
 
 <!-- Note: A validação é opcional. Execute validate-create-story para checagem de qualidade antes do dev-story. -->
 
@@ -34,7 +34,7 @@ Para que erros de nomenclatura, labels ausentes, tags `latest` ou violações de
 
 5. **[HYGIENE-AND-CROSS-CUTTING]** Dado a hygiene geral do repositório, quando as alterações da Story 1.4 forem commitadas, então devem ser sanados os itens cross-cutting diferidos na Story 1.1:
    - **Higiene do Git (.gitignore)**: Criar o `.gitignore` na raiz do projeto contendo exclusões padrão do ecossistema Kubernetes local e desenvolvimento (kubeconfigs temporários, `.kube`, chaves locais, dumps `.sql`, logs, diretórios temporários).
-   - **Higiene Windows (.gitattributes)**: Criar o `.gitattributes` na raiz do projeto contendo regras estritas para forçar finais de linha LF (`* text eol=lf`) nos arquivos shell `*.sh` e `Makefile`, garantindo compatibilidade total no Windows/WSL2 e prevenindo erros clássicos no Windows/WSL2 causados pela conversão de final de linha CRLF (`\r\n`), bem como garantir que o bit de execução dos scripts em `/scripts/*.sh` seja mantido no Git.
+   - **Higiene Windows (.gitattributes)**: Criar o `.gitattributes` na raiz do projeto contendo regras estritas para forçar finais de linha LF (`* text eol=lf`) nos arquivos shell `*.sh` e `Makefile`, garantindo compatibilidade total no Windows/WSL2 e prevenindo erros clássicos no Windows/WSL2 causados pela conversão de final de linha CRLF (`\r\n`). Nota técnica: o bit de execução dos scripts não é controlável via `.gitattributes` — é preservado quando os scripts são commitados com `git update-index --chmod=+x`, o que já foi feito no commit inicial desta story.
 
 ## Tasks / Subtasks
 
@@ -116,3 +116,32 @@ gemini-3-flash (via /bmad-create-story)
 ### Completion Notes List
 
 ### File List
+
+## Review Findings
+
+> Code review realizado em 2026-05-18 — 3 camadas adversariais (Blind Hunter, Edge Case Hunter, Acceptance Auditor)
+
+### Decision Needed
+
+- [x] [Review][Decision] ~~Docker kube-linter pinado por tag `v0.8.3`, não por digest~~ — **Dispensado**: tag semântica aceita para uso local; risco mitigado.
+- [x] [Review][Decision] ~~`cluster/apps` incluído no escopo do kustomize scan~~ — **Deferred**: investigar quando apps reais forem adicionadas ao cluster.
+- [x] [Review][Decision] **`.gitattributes` não preserva bit de execução (+x)** — **Convertido em Patch**: AC5 com especificação incorreta; `.gitattributes` cuida de LF, execute bit é garantido via `git update-index --chmod=+x` no commit. Corrigir texto do AC5.
+- [x] [Review][Decision] ~~Escopo de labels no `.kube-linter.yaml` exclui `ConfigMap`, `Namespace`, `Ingress`~~ — **Deferred**: expandir escopo de labels progressivamente em story futura.
+- [x] [Review][Decision] ~~`.kube-linter.yaml` sem `addAllBuiltIn: false`~~ — **Deferred**: investigar quais built-in checks são ativados e decidir em story futura.
+
+### Patch
+
+- [x] [Review][Patch] ~~CRÍTICO: `find | while read` cria subshell~~ — **Aplicado**: process substitution `< <(find ...)` substitui pipe; falhas propagam `set -e` corretamente. [scripts/lint.sh:41]
+- [x] [Review][Patch] ~~ALTO: `validate_yaml.py` não reseta `in_metadata` ao encontrar `---`~~ — **Aplicado**: separador `---` reseta estado de metadata. [scripts/validate_yaml.py]
+- [x] [Review][Patch] ~~ALTO: `validate_yaml.py` captura blocos `metadata:` aninhados~~ — **Aplicado**: `metadata:` só rastreado em indentação 0. [scripts/validate_yaml.py]
+- [x] [Review][Patch] ~~ALTO: `validate_yaml.py` regex não captura scalares com comentários inline~~ — **Aplicado**: regex atualizada com `(?:#.*)?$`. [scripts/validate_yaml.py]
+- [x] [Review][Patch] ~~ALTO: CI sem instalação explícita do `kustomize`~~ — **Aplicado**: kustomize v5.8.1 instalado explicitamente no workflow. [.github/workflows/lint.yml]
+- [x] [Review][Patch] ~~MÉDIO: `grep -c "^kind:" \|\| true` pode retornar string vazia~~ — **Aplicado** (junto com P1): substituído por `\|\| echo 0`. [scripts/lint.sh]
+- [x] [Review][Patch] ~~MÉDIO: EXCEPTIONS hardcoded; nomes RBAC com `:` causam falsos positivos~~ — **Aplicado**: valores com `:` ignorados estruturalmente. [scripts/validate_yaml.py]
+- [x] [Review][Patch] ~~MÉDIO: `TEMP_DIR=".tmp-lint"` causa colisão em execuções concorrentes~~ — **Deferido**: risco teórico em ambiente single-user; CI tem concurrency guard.
+- [x] [Review][Patch] ~~BAIXO: `validate_yaml.py` passa com exit 0 se path não existir~~ — **Aplicado**: verificação de existência antes do walk. [scripts/validate_yaml.py]
+- [x] [Review][Patch] ~~BAIXO: README sem `make` como pré-requisito~~ — **Descartado**: `make` já listado na linha 10 do README (falso positivo do auditor).
+
+### Defer
+
+- [x] [Review][Defer] **Output vazio de `kustomize build` (exit 0, 0 bytes) é indistinguível de stub intencional** — diretórios de stubs de infraestrutura por design produzem 0 manifestos; o guard de `total_manifests > 0` mitiga no agregado mas não reporta qual diretório falhou silenciosamente. Pré-existente por design — deferred.
