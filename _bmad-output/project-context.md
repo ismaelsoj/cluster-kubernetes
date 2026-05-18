@@ -1,10 +1,10 @@
 ---
 project_name: 'cluster-kubernetes'
 user_name: 'Ismael'
-date: '2026-05-13'
-sections_completed: ['technology_stack', 'naming_conventions', 'file_structure', 'yaml_format', 'argocd_process', 'security_boundaries', 'critical_dont_do']
+date: '2026-05-18'
+sections_completed: ['technology_stack', 'naming_conventions', 'file_structure', 'yaml_format', 'argocd_process', 'security_boundaries', 'critical_dont_do', 'tracker_isolation']
 status: 'complete'
-rule_count: 40
+rule_count: 42
 optimized_for_llm: true
 ---
 
@@ -27,7 +27,7 @@ _Este arquivo contém regras críticas e padrões que agentes de IA devem seguir
 - **GitHub Actions** (`actions/checkout@v4`) — pipeline de CI
 - **Makefile + Bash** — orquestrador do ciclo de vida local do desenvolvedor
 
-## Critical Implementation Rules
+## Regras Críticas de Implementação
 
 ### Nomenclatura Kubernetes
 
@@ -98,6 +98,14 @@ _Este arquivo contém regras críticas e padrões que agentes de IA devem seguir
 - **GitOps estrito:** o ArgoCD lê exclusivamente do repositório Git. Alterações manuais no cluster são proibidas, exceto Secrets no bootstrap inicial.
 - **Ingress blindado:** o objeto `Ingress` pertence à Base Kustomize da plataforma. Desenvolvedores preenchem apenas variáveis via overlay — nunca manipulam a estrutura do Ingress diretamente.
 - **Anotações do Kong via Boilerplate:** Rate Limiting e autenticação fluem exclusivamente através de `annotations` declaradas no `Ingress`. Nenhuma configuração dinâmica via Admin API do Kong.
+
+### Isolamento do Domínio do Tracker (.tracker/)
+
+- **Escopo Sob Demanda Estrito:** A pasta `.tracker/` contém scripts locais (`work-tracker.py`), logs e documentação interna de tempo ativo dos desenvolvedores. Ela é visível e rastreável pelas IAs **exclusivamente quando houver solicitação explícita do desenvolvedor humano** para analisar, depurar ou realizar manutenção no rastreador.
+- **Prevenção de Sangramento de Contexto:** Em qualquer outra tarefa relacionada ao desenvolvimento do cluster Kubernetes (K3d, ArgoCD, Kong, Keycloak, etc.), a IA deve desconsiderar completamente a existência da pasta `.tracker/`. Ela não deve importar scripts, mesclar lógicas ou gerar acoplamento de código entre o ferramental do tracker e o produto final.
+- **Makefile Independente:** O arquivo `.tracker/Makefile` serve estritamente para comandos do rastreador (ex: `make -f .tracker/Makefile track-time`). Ele é matematicamente independente do `Makefile` na raiz do repositório. As IAs nunca devem referenciar targets ou lógicas de um no outro.
+- **Critério de Violação:** Qualquer menção espontânea (sem solicitação humana prévia) a `.tracker/`, `.tracker/Makefile`, `work-tracker.py` ou logs de rastreamento em contexto de tarefa de infraestrutura Kubernetes constitui uma **violação de escopo semântico**. A IA deve interromper imediatamente e informar o desenvolvedor.
+- **Protocolo de Fallback:** Se violações recorrentes forem detectadas, o desenvolvedor deve reverter para a Abordagem Híbrida: criar `.cursorignore`, `.claudeignore` e `.antigravityignore` com a entrada `.tracker/`, mantendo estas regras como camada complementar. Ver: `docs/ata-decisao-tracker-ia.md` para rastreabilidade da decisão.
 
 ### Regras Críticas — O Que NÃO Fazer
 
