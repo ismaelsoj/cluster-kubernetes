@@ -60,3 +60,10 @@ Registro centralizado de itens identificados em revisões/triagens que não pert
 ## Deferred from: code review of 1-4-linter-yaml-pipeline-ci-readme (2026-05-18)
 
 - Output vazio de `kustomize build` (exit 0, 0 bytes) é indistinguível de stub intencional — diretórios de stubs de infraestrutura por design produzem 0 manifestos; o guard de `total_manifests > 0` mitiga no agregado mas não reporta qual diretório falhou silenciosamente. Avaliar em story futura de hardening do lint.
+
+## Deferred from: code review of 1-4-linter-yaml-pipeline-ci-readme (2026-05-18, segunda passagem)
+
+- **[policy/kebab-case.rego:21-23]** `is_exception` com colon-check excessivamente amplo — `contains(val, ":")` isenta qualquer nome com `:`, mas a intenção era apenas service account subjects (que nunca aparecem em `metadata.name`). Kubernetes impede nomes com `:` de qualquer forma, então o risco é teórico. Substituir por `startswith(val, "system:")` em story de hardening futuro.
+- **[scripts/lint.sh:90-93, 112-115]** Docker fallback sensível ao diretório de chamada — `docker run --rm -v "$(pwd):/dir"` quebra se `lint.sh` for invocado fora da raiz do repositório. Padrão pré-existente (kube-linter usa o mesmo). Mitigável com `$(git rev-parse --show-toplevel)` em vez de `$(pwd)`.
+- **[policy/kebab-case.rego:9]** `kebab_case_pattern` rejeita nomes com ponto — operadores externos como cert-manager geram recursos com `.` no nome (ex: `cert-manager.io`). Não afeta escopo atual mas causará falsos positivos quando operadores forem integrados. Adicionar mecanismo de exceções por prefixo/sufixo em story futura.
+- **[scripts/lint.sh:60]** Mensagem de erro pouco informativa quando diretórios de scan ausentes — se `cluster/bootstrap`, `cluster/infrastructure` e `cluster/apps` não existirem (clone raso, branch errado), `find` produz zero resultados silenciosamente e a mensagem de erro é genérica (`0 manifestos`). Acrescentar validação explícita com nome dos diretórios faltantes.

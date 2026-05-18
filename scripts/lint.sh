@@ -37,6 +37,15 @@ trap cleanup EXIT
 # 4. Compilação recursiva de todos os componentes kustomize
 echo "🛠️  Compilando componentes com $KUSTOMIZE_CMD..."
 
+# Verificação explícita de diretórios obrigatórios antes do scan
+for scan_dir in cluster/bootstrap cluster/infrastructure cluster/apps; do
+  if [ ! -d "$scan_dir" ]; then
+    echo "❌ Erro: Diretório obrigatório não encontrado: $scan_dir" >&2
+    echo "   Verifique se você está na raiz do repositório e se o clone está completo." >&2
+    exit 1
+  fi
+done
+
 # Encontra todas as pastas ativas que possuem kustomization.yaml (ignorando boilerplates vazios)
 # Process substitution evita subshell de pipe — falhas do kustomize build propagam set -e corretamente
 while IFS= read -r kustomize_file; do
@@ -57,7 +66,7 @@ while IFS= read -r kustomize_file; do
     # Se gerou 0 manifestos (stubs de infraestrutura vazios por design), removemos para não poluir o linter
     rm -f "$output_file"
   fi
-done < <(find cluster/bootstrap cluster/infrastructure cluster/apps -name "kustomization.yaml" 2>/dev/null)
+done < <(find cluster/bootstrap cluster/infrastructure cluster/apps -name "kustomization.yaml")
 
 # 5. Guarda anti-"Falso Verde": valida se de fato há manifestos para validar no total do repositório
 total_manifests=0
@@ -88,7 +97,7 @@ else
 
   echo "ℹ️  conftest não encontrado localmente. Rodando via Docker (openpolicyagent/conftest:v0.45.0)..."
   docker run --rm \
-    -v "$(pwd):/dir" \
+    -v "$(git rev-parse --show-toplevel):/dir" \
     -w /dir \
     openpolicyagent/conftest:v0.45.0 test "$TEMP_DIR" --policy policy
 fi
@@ -110,7 +119,7 @@ else
   echo "ℹ️  kube-linter não encontrado localmente. Rodando via Docker (stackrox/kube-linter:v0.8.3)..."
   # NOTA: O kube-linter via Docker precisa montar o diretório atual
   docker run --rm \
-    -v "$(pwd):/dir" \
+    -v "$(git rev-parse --show-toplevel):/dir" \
     -w /dir \
     stackrox/kube-linter:v0.8.3 lint "$TEMP_DIR" --config .kube-linter.yaml
 fi

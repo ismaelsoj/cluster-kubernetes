@@ -19,10 +19,6 @@ is_exception(val) {
     exceptions[val]
 }
 
-is_exception(val) {
-    contains(val, ":")
-}
-
 # Regra para negar recursos cujo nome não segue o padrão kebab-case
 deny[msg] {
     name := input.metadata.name
