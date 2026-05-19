@@ -68,3 +68,10 @@ Registro centralizado de itens identificados em revisões/triagens que não pert
 - **[policy/kebab-case.rego:9]** `kebab_case_pattern` rejeita nomes com ponto — operadores externos como cert-manager geram recursos com `.` no nome (ex: `cert-manager.io`). Não afeta escopo atual mas causará falsos positivos quando operadores forem integrados. Adicionar mecanismo de exceções por prefixo/sufixo em story futura.
 - ~~**[scripts/lint.sh:60]** Mensagem de erro pouco informativa quando diretórios de scan ausentes — se `cluster/bootstrap`, `cluster/infrastructure` e `cluster/apps` não existirem (clone raso, branch errado), `find` produz zero resultados silenciosamente e a mensagem de erro é genérica (`0 manifestos`).~~ (Implementado na Story 1.4 com loop de validação explícita de existência de diretórios obrigatórios no topo do script)
 - ~~**[.github/workflows/lint.yml:20]** Instalar `conftest` nativamente no runner do GitHub Actions para otimizar o tempo de execução e evitar o pull da imagem Docker a cada pipeline run.~~ (Implementado a pedido do dev em PR-review)
+
+## Deferred from: feature branch-tracking-work-tracker (2026-05-19)
+
+### Diferido para melhoria futura do .tracker/work-tracker.py
+
+- **Detached HEAD capturado como SHA de branch:** `build_branch_timeline` captura verbatim o alvo de cada checkout — em detached HEAD, o "nome de branch" é um SHA abreviado (ex: `a3f9c21`). O relatório exibirá o SHA como se fosse nome de branch. Adicionar pós-processamento: se o destino parecer um SHA (regex `^[0-9a-f]{7,40}$`), substituir por `"(detached HEAD)"`.
+- **Tempo inter-ping em sessões com troca de branch:** quando uma sessão atravessa um checkout (ambos os pings pertencem a branches diferentes), o gap de duração entre eles é inteiramente atribuído à branch do ping anterior. A branch posterior recebe apenas suas próprias interações, sem a fração de tempo que lhe seria proporcional. Corrigir exigiria interpolar o timestamp exato do checkout dentro do gap.

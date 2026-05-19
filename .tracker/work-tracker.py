@@ -53,6 +53,49 @@ def format_hours(hours):
         m = 0
     return f"{h}h {m:02d}m"
 
+def build_branch_timeline(repo_root):
+    reflog_path = os.path.join(repo_root, ".git", "logs", "HEAD")
+    timeline = []
+    if not os.path.isfile(reflog_path):
+        return timeline
+    try:
+        with open(reflog_path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.rstrip("\n")
+                if "\t" not in line:
+                    continue
+                try:
+                    meta, msg = line.split("\t", 1)
+                    m = re.search(r"checkout: moving from .+ to (.+)", msg)
+                    if not m:
+                        continue
+                    branch = m.group(1).strip()
+                    parts = meta.split()
+                    unix_ts = int(parts[-2])
+                    entry_dt = datetime.utcfromtimestamp(unix_ts) - timedelta(hours=3)
+                    timeline.append((entry_dt, branch))
+                except Exception:
+                    continue
+    except Exception:
+        return []
+    timeline.sort(key=lambda x: x[0])
+    return timeline
+
+
+def get_branch_at(timeline, ping_dt):
+    if not timeline:
+        return "main"
+    result = None
+    for entry_dt, branch in timeline:
+        if entry_dt <= ping_dt:
+            result = branch
+        else:
+            break
+    if result is None:
+        return "Desconhecida"
+    return result
+
+
 def analyze_claude_code(repo_root):
     project_dir_name = re.sub(r'[^a-zA-Z0-9]', '-', repo_root)
     claude_dir = os.path.expanduser(f"~/.claude/projects/{project_dir_name}")
@@ -229,6 +272,8 @@ def main():
     brasilia_now = datetime.utcnow() - timedelta(hours=3)
     brasilia_now_str = brasilia_now.strftime('%d/%m/%Y %H:%M:%S')
     
+    branch_timeline = build_branch_timeline(repo_root)
+
     claude_events, claude_files, claude_steps = analyze_claude_code(repo_root)
     anti_events, anti_files, anti_steps = analyze_antigravity(repo_root)
     
@@ -252,6 +297,9 @@ def main():
         else:
             if ev["is_ping"]:
                 ping_events.append(ev)
+
+    for ev in ping_events:
+        ev["branch"] = get_branch_at(branch_timeline, ev["dt_br"])
                 
     # Agrupar em sessões ativas
     sessions = []
@@ -269,34 +317,51 @@ def main():
         
     # Estatísticas diárias
     daily_stats = defaultdict(lambda: defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0}))
+    branch_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0})))
     total_hours = 0.0
-    
+
     for sess in sessions:
         date_str = sess[0]["dt_br"].strftime("%d/%m/%Y")
-        
+
         models_in_session = set(ev["active_model"] for ev in sess)
         for m in models_in_session:
             daily_stats[date_str][m]["sessions"] += 1
-            
+
+        branches_in_session = set(ev["branch"] for ev in sess)
+        for b in branches_in_session:
+            models_in_branch_session = set(ev["active_model"] for ev in sess if ev["branch"] == b)
+            for m in models_in_branch_session:
+                branch_stats[date_str][b][m]["sessions"] += 1
+
         for ev in sess:
             daily_stats[date_str][ev["active_model"]]["interactions"] += 1
-            
+            branch_stats[date_str][ev["branch"]][ev["active_model"]]["interactions"] += 1
+
         model_duration_minutes = defaultdict(float)
+        branch_model_duration_minutes = defaultdict(lambda: defaultdict(float))
         for i in range(len(sess) - 1):
             gap = (sess[i+1]["dt_br"] - sess[i]["dt_br"]).total_seconds() / 60.0
             model = sess[i]["active_model"]
+            branch = sess[i]["branch"]
             model_duration_minutes[model] += gap
-            
+            branch_model_duration_minutes[branch][model] += gap
+
         session_duration = (sess[-1]["dt_br"] - sess[0]["dt_br"]).total_seconds() / 60.0
         if session_duration < 15.0:
             padding = 15.0 - session_duration
             last_model = sess[-1]["active_model"]
+            last_branch = sess[-1]["branch"]
             model_duration_minutes[last_model] += padding
-            
+            branch_model_duration_minutes[last_branch][last_model] += padding
+
         for m, m_mins in model_duration_minutes.items():
             h = m_mins / 60.0
             daily_stats[date_str][m]["hours"] += h
             total_hours += h
+
+        for b, bm_map in branch_model_duration_minutes.items():
+            for m, m_mins in bm_map.items():
+                branch_stats[date_str][b][m]["hours"] += m_mins / 60.0
 
     if args.export:
         report_path = os.path.join(repo_root, ".tracker", "TEMPO_DE_TRABALHO.md")
@@ -344,7 +409,23 @@ def main():
             
             if not daily_stats:
                 new_block += f"| N/A | Nenhum | 0h 00m | 0 | 0 |\n"
-                
+
+            new_block += (
+                f"\n### 🌿 Detalhamento Diário por Branch / História (Brasília)\n\n"
+                f"| Dia de Trabalho | Branch Ativa | Modelos Utilizados | Tempo Ativo | Interações |\n"
+                f"| :---: | :---: | :---: | :---: | :---: |\n"
+            )
+
+            if branch_stats:
+                for d in sorted(branch_stats.keys(), key=lambda x: datetime.strptime(x, "%d/%m/%Y")):
+                    for b in sorted(branch_stats[d].keys()):
+                        branch_hours = sum(branch_stats[d][b][m]["hours"] for m in branch_stats[d][b])
+                        branch_interactions = sum(branch_stats[d][b][m]["interactions"] for m in branch_stats[d][b])
+                        models_used = ", ".join(sorted(branch_stats[d][b].keys()))
+                        new_block += f"| {d} | `{b}` | {models_used} | {format_hours(branch_hours)} | {branch_interactions} |\n"
+            else:
+                new_block += f"| N/A | Nenhuma | Nenhum | 0h 00m | 0 |\n"
+
             blocks.append(new_block.strip())
             
             with open(report_path, "w", encoding="utf-8") as f:
