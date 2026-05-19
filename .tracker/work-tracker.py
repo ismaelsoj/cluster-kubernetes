@@ -53,6 +53,69 @@ def format_hours(hours):
         m = 0
     return f"{h}h {m:02d}m"
 
+def parse_hours_from_str(h_str):
+    m_h = re.search(r'(\d+)\s*h', h_str)
+    m_m = re.search(r'(\d+)\s*m', h_str)
+    hours = 0.0
+    if m_h:
+        hours += float(m_h.group(1))
+    if m_m:
+        hours += float(m_m.group(1)) / 60.0
+    return hours
+
+def parse_existing_developers_stats(content, current_masked_id):
+    parts = re.split(r'\n\s*---\s*\n', content)
+    dev_stats = {}
+    
+    for part in parts:
+        part_str = part.strip()
+        if not part_str or part_str.startswith("# Registro de Tempo") or part_str.startswith("## 📊 Resumo Geral"):
+            continue
+        
+        match = re.match(r'## 👤 Desenvolvedor:\s+`([^`]+)`', part_str)
+        if not match:
+            continue
+            
+        dev_id = match.group(1).strip()
+        if dev_id == current_masked_id:
+            continue
+            
+        branch_hours = defaultdict(float)
+        lines = part_str.split('\n')
+        in_branch_table = False
+        for line in lines:
+            if "### 🌿 Detalhamento Diário por Branch" in line:
+                in_branch_table = True
+                continue
+            if in_branch_table:
+                stripped = line.strip()
+                if not stripped.startswith('|'):
+                    if stripped:
+                        in_branch_table = False
+                    continue
+                if "Dia de Trabalho" in line or ":---:" in line:
+                    continue
+                cols = [c.strip() for c in stripped.split('|')]
+                if len(cols) >= 7:
+                    branch_raw = cols[2].replace('`', '').strip()
+                    time_raw = cols[5].strip()
+                    if branch_raw and branch_raw not in ("N/A", "Nenhuma"):
+                        h = parse_hours_from_str(time_raw)
+                        branch_hours[branch_raw] += h
+        
+        total_h = 0.0
+        tot_match = re.search(r'\*\s*\*\*Tempo Ativo Combinado \(IA\):\*\*\s*\*\*([^*]+)\*\*', part_str)
+        if tot_match:
+            total_h = parse_hours_from_str(tot_match.group(1))
+        else:
+            total_h = sum(branch_hours.values())
+            
+        dev_stats[dev_id] = {
+            "total_hours": total_h,
+            "branch_hours": branch_hours
+        }
+    return dev_stats
+
 def build_branch_timeline(repo_root):
     reflog_path = os.path.join(repo_root, ".git", "logs", "HEAD")
     timeline = []
@@ -383,6 +446,7 @@ def main():
         )
         
         blocks = []
+        all_devs_stats = {}
         try:
             if os.path.exists(report_path):
                 with open(report_path, "r", encoding="utf-8") as f:
@@ -391,12 +455,47 @@ def main():
                     raw_parts = re.split(r'\n\s*---\s*\n', content)
                     for part in raw_parts:
                         part_str = part.strip()
-                        if not part_str or part_str.startswith("# Registro de Tempo"):
+                        if not part_str or part_str.startswith("# Registro de Tempo") or part_str.startswith("## 📊 Resumo Geral"):
                             continue
                         match = re.match(r'## 👤 Desenvolvedor:\s+`([^`]+)`', part_str)
                         if match and match.group(1) == masked_id:
                             continue
                         blocks.append(part_str)
+                    
+                    all_devs_stats = parse_existing_developers_stats(content, masked_id)
+            
+            # Compute current developer branch stats
+            current_branch_hours = defaultdict(float)
+            for d in branch_stats:
+                for b in branch_stats[d]:
+                    for t in branch_stats[d][b]:
+                        for m in branch_stats[d][b][t]:
+                            current_branch_hours[b] += branch_stats[d][b][t][m]["hours"]
+            
+            all_devs_stats[masked_id] = {
+                "total_hours": total_hours,
+                "branch_hours": current_branch_hours
+            }
+            
+            global_total_hours = sum(d["total_hours"] for d in all_devs_stats.values())
+            global_branch_hours = defaultdict(float)
+            for d in all_devs_stats.values():
+                for b, h in d["branch_hours"].items():
+                    global_branch_hours[b] += h
+            
+            global_summary = (
+                f"## 📊 Resumo Geral Consolidado (Todos os Desenvolvedores)\n\n"
+                f"* **Tempo Total de Desenvolvimento:** **{format_hours(global_total_hours)}**\n\n"
+                f"### 🌿 Tempo Total por Branch\n\n"
+                f"| Branch / História | Tempo Ativo Total |\n"
+                f"| :--- | :---: |\n"
+            )
+            if global_branch_hours:
+                for b in sorted(global_branch_hours.keys()):
+                    bh = global_branch_hours[b]
+                    global_summary += f"| `{b}` | **{format_hours(bh)}** |\n"
+            else:
+                global_summary += f"| Nenhuma | **0h 00m** |\n"
             
             new_block = (
                 f"## 👤 Desenvolvedor: `{masked_id}`\n\n"
@@ -404,7 +503,7 @@ def main():
                 f"* **Tempo Ativo Combinado (IA):** **{format_hours(total_hours)}**\n"
                 f"* **Total de Interações:** **{len(ping_events)} comandos** em {len(sessions)} sessões\n\n"
             )
-
+ 
             # Seção: Totais por Ferramenta (inserida ANTES da Tabela 1)
             tool_totals = defaultdict(lambda: {"hours": 0.0, "interactions": 0})
             for d in daily_stats:
@@ -412,7 +511,7 @@ def main():
                     for m in daily_stats[d][t]:
                         tool_totals[t]["hours"] += daily_stats[d][t][m]["hours"]
                         tool_totals[t]["interactions"] += daily_stats[d][t][m]["interactions"]
-
+ 
             new_block += (
                 f"### 🛠️ Totais por Ferramenta\n\n"
                 f"| Ferramenta | Tempo Ativo | Interações |\n"
@@ -425,14 +524,14 @@ def main():
                     new_block += f"| **{t}** | {format_hours(th)} | {ti} |\n"
             else:
                 new_block += f"| Nenhuma | 0h 00m | 0 |\n"
-
+ 
             # Tabela 1: Detalhamento Diário com coluna Ferramenta
             new_block += (
                 f"\n### 🗓️ Detalhamento Diário das Horas (Brasília)\n\n"
                 f"| Dia de Trabalho | Ferramenta | Modelo LLM | Tempo Ativo | Sessões Ativas | Interações |\n"
                 f"| :---: | :---: | :---: | :---: | :---: | :---: |\n"
             )
-
+ 
             for d in sorted(daily_stats.keys(), key=lambda x: datetime.strptime(x, "%d/%m/%Y")):
                 for t in sorted(daily_stats[d].keys()):
                     for m in sorted(daily_stats[d][t].keys()):
@@ -440,17 +539,17 @@ def main():
                         s = daily_stats[d][t][m]["sessions"]
                         i = daily_stats[d][t][m]["interactions"]
                         new_block += f"| {d} | **{t}** | {m} | {format_hours(h)} | {s} | {i} |\n"
-
+ 
             if not daily_stats:
                 new_block += f"| N/A | Nenhuma | Nenhum | 0h 00m | 0 | 0 |\n"
-
+ 
             # Tabela 2: Detalhamento por Branch com colunas Ferramentas + Modelos Utilizados
             new_block += (
                 f"\n### 🌿 Detalhamento Diário por Branch / História (Brasília)\n\n"
                 f"| Dia de Trabalho | Branch Ativa | Ferramentas | Modelos Utilizados | Tempo Ativo | Interações |\n"
                 f"| :---: | :---: | :---: | :---: | :---: | :---: |\n"
             )
-
+ 
             if branch_stats:
                 for d in sorted(branch_stats.keys(), key=lambda x: datetime.strptime(x, "%d/%m/%Y")):
                     for b in sorted(branch_stats[d].keys()):
@@ -469,11 +568,13 @@ def main():
                         new_block += f"| {d} | `{b}` | {tools_used} | {models_used} | {format_hours(branch_hours)} | {branch_interactions} |\n"
             else:
                 new_block += f"| N/A | Nenhuma | Nenhuma | Nenhum | 0h 00m | 0 |\n"
-
+ 
             blocks.append(new_block.strip())
             
             with open(report_path, "w", encoding="utf-8") as f:
                 f.write(header)
+                f.write(global_summary.strip())
+                f.write("\n\n---\n\n")
                 for b in blocks:
                     f.write(b)
                     f.write("\n\n---\n\n")
