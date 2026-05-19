@@ -83,3 +83,11 @@ Registro centralizado de itens identificados em revisões/triagens que não pert
 - **Sessões cruzando meia-noite:** `date_str = sess[0]["dt_br"].strftime(...)` atribui toda a sessão à data do primeiro evento. Sessões que cruzam meia-noite acumulam horas, sessões e interações do dia seguinte no dia anterior. Corrigir exigiria dividir a sessão no limite da meia-noite e distribuir a duração proporcionalmente.
 - **Antigravity change events sem `active_model`:** eventos de tipo `is_change=True` do Antigravity não possuem o campo `active_model`. O filtro `is_ping` os mantém fora do loop de sessões, mas a ausência do campo é um risco de KeyError se o filtro mudar. Adicionar `active_model: None` nesses eventos na coleta ou reforçar a guarda no loop.
 - **Inconsistência de padrão de guarda de tabelas vazias:** a Tabela 1 usa `for ... ; if not daily_stats:` (guarda após loop) enquanto a Tabela 2 usa `if branch_stats: for ... ; else:` (guarda antes). Ambas corretas hoje, mas o padrão divergente é armadilha de manutenção. Padronizar para o padrão `if/else` antes do loop.
+
+## Deferred from: code review of spec-fix-antigravity-model-extraction-regex (2026-05-19)
+
+### Diferido para melhoria futura do .tracker/work-tracker.py
+
+- **Regex `(.*?)\.` em Pass 1/2 do Antigravity quebra com modelos cujo nome de exibição contém ponto:** payload `"to Gemini 3.1 Pro."` captura `"Gemini 3"` (truncamento no primeiro `.`). Pre-existente em Pass 2 antes desta spec, mantido no estado atual. Corrigir exigiria sentinela mais robusta (ex: `(.*?)(?:\.\s|\.$)` ou ancorar a um delimitador específico do payload da IDE).
+- **`re.search` captura apenas o primeiro `<USER_SETTINGS_CHANGE>` por linha JSON:** se uma única entry contiver múltiplas trocas, somente a primeira é vista. Pre-existente. Migrar para `re.finditer` se necessário.
+- **`-\d{8}\b` na normalização pode comer sufixos numéricos não-data legítimos:** ex. `model-12345678-beta` perde `-12345678`. Nenhum modelo dos dados atuais (Claude/Gemini) sofre — latente. Refinar para padrão de data real (`-20\d{6}\b`) se relevante no futuro.

@@ -63,6 +63,53 @@ def parse_hours_from_str(h_str):
         hours += float(m_m.group(1)) / 60.0
     return hours
 
+def normalize_model_name(raw_model):
+    if not raw_model:
+        return "Unknown"
+    
+    # 1. Trata tipos não-string com segurança
+    raw_model = str(raw_model).strip()
+    if not raw_model or raw_model.lower() == "none":
+        return "None"
+        
+    # 2. Remove sufixos de datas de forma abrangente (ex: -20241022 ou -2024-10-22)
+    clean = re.sub(r'-\d{8}\b', '', raw_model)
+    clean = re.sub(r'-\d{4}-\d{2}-\d{2}\b', '', clean)
+    
+    # 3. Normaliza separadores de versão curtos (dígito-dígito) para pontos (ex: 3-5 -> 3.5).
+    #    \b e dígito único evitam capturar sufixos de build longos (ex: 4-1106 não casa).
+    clean = re.sub(r'\b(\d)-(\d)\b', r'\1.\2', clean)
+    
+    # 4. Substitui hífens e sublinhados por espaços comuns
+    clean = clean.replace('-', ' ').replace('_', ' ')
+    
+    # 5. Processa palavra por palavra
+    words = clean.split()
+    capitalized_words = []
+    
+    for w in words:
+        # Capitaliza sequências de letras isoladas ou delimitadas por não-alfanuméricos (ex: "(unknown)" -> "(Unknown)")
+        # Mantém sufixos como "4o" em minúsculas, pois não há limite de palavra (\b) entre o dígito e a letra.
+        w_cap = re.sub(r'\b[a-zA-Z]+\b', lambda m: m.group(0).capitalize(), w)
+        
+        # Ajusta acrônimos específicos com limites de palavra (\b) para evitar corrupção em substrings (ex: Client)
+        w_cap = re.sub(r'\bgpt\b', 'GPT', w_cap, flags=re.IGNORECASE)
+        w_cap = re.sub(r'\bcli\b', 'CLI', w_cap, flags=re.IGNORECASE)
+        w_cap = re.sub(r'\boss\b', 'OSS', w_cap, flags=re.IGNORECASE)
+        
+        capitalized_words.append(w_cap)
+        
+    normalized = " ".join(capitalized_words)
+
+    
+    # 6. Garante prefixo "Claude" de forma case-insensitive e segura
+    norm_lower = normalized.lower()
+    if any(k in norm_lower for k in ('sonnet', 'opus', 'haiku')) and 'claude' not in norm_lower:
+        normalized = "Claude " + normalized
+        
+    return normalized
+
+
 def parse_existing_developers_stats(content, current_masked_id):
     parts = re.split(r'\n\s*---\s*\n', content)
     dev_stats = {}
@@ -189,14 +236,7 @@ def analyze_claude_code(repo_root):
                         if not raw_model:
                             raw_model = "Claude CLI (Unknown)"
                             
-                        if "sonnet-4-6" in raw_model.lower() or "sonnet" in raw_model.lower():
-                            mapped_model = "Sonnet 4.6"
-                        elif "opus" in raw_model.lower():
-                            mapped_model = "Opus 4.7"
-                        elif "haiku" in raw_model.lower():
-                            mapped_model = "Haiku 4.5"
-                        else:
-                            mapped_model = raw_model
+                        mapped_model = normalize_model_name(raw_model)
                             
                         events.append({
                             "dt": dt,
@@ -243,9 +283,12 @@ def analyze_antigravity(repo_root):
                 
             lines = content.strip().split('\n')
             
-            # Pass 1: Identificar o modelo inicial desta conversa olhando o primeiro USER_SETTINGS_CHANGE
+            # Pass 1: Captura o "to" do primeiro USER_SETTINGS_CHANGE e o ancora 1ms antes do
+            # primeiro turno — propaga o modelo selecionado para os pings da conversa atual e
+            # cronologicamente para conversas seguintes. O "from" é ignorado pois o payload
+            # inicial da IDE usa "from None to <selected>".
             first_dt = None
-            first_old_model = None
+            first_active_model = None
             for line in lines:
                 line = line.strip()
                 if not line:
@@ -255,22 +298,22 @@ def analyze_antigravity(repo_root):
                     created_at = data.get("created_at")
                     if created_at and not first_dt:
                         first_dt = parse_iso(created_at)
-                        
+
                     content_text = data.get("content", "")
-                    if "<USER_SETTINGS_CHANGE>" in content_text and first_old_model is None:
-                        match = re.search(r"changed setting `Model Selection` from (.*?) to (.*?)\.", content_text)
+                    if "<USER_SETTINGS_CHANGE>" in content_text and first_active_model is None:
+                        match = re.search(r"changed setting `Model Selection` from .*? to (.*?)\.", content_text)
                         if match:
-                            old_m = match.group(1).strip()
-                            first_old_model = old_m
+                            new_m = match.group(1).strip()
+                            first_active_model = normalize_model_name(new_m)
                 except Exception:
                     pass
-                    
-            if first_old_model and first_old_model != "None" and first_dt:
+
+            if first_active_model and first_active_model != "None" and first_dt:
                 events.append({
                     "dt": first_dt - timedelta(milliseconds=1),
                     "tool": "Antigravity",
                     "is_change": True,
-                    "model": first_old_model,
+                    "model": first_active_model,
                     "is_ping": False
                 })
                 
@@ -296,10 +339,10 @@ def analyze_antigravity(repo_root):
                     if "<USER_SETTINGS_CHANGE>" in content_text:
                         match = re.search(r"changed setting `Model Selection` from .*? to (.*?)\.", content_text)
                         if match:
-                            new_model = match.group(1).strip()
+                            new_model = normalize_model_name(match.group(1).strip())
                             is_change = True
                             
-                    if is_change:
+                    if is_change and new_model and new_model != "None":
                         events.append({
                             "dt": dt,
                             "tool": "Antigravity",
