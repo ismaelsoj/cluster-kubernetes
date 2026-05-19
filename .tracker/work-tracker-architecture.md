@@ -51,17 +51,37 @@ O utilitário foi construído com foco em **zero dependências externas corporat
 *   **Decisão:** Implementar agrupamento de comandos brutas consecutivos. Se a diferença de tempo entre duas interações for **menor ou igual a 45 minutos**, elas fazem parte da mesma sessão ativa. Sessões curtas com menos de 15 minutos são arredondadas para 15 minutos (engajamento mínimo).
 *   **Consequência:** Precisão científica no cálculo do tempo real em que o desenvolvedor esteve focado na IDE/CLI.
 
-### ADR-03: Prevenção de Dupla Contagem (Uso Simultâneo de Ferramentas)
+### ADR-03: Prevenção de Dupla Contagem (Mesclagem Global e Alocação Cruzada)
 *   **Status:** Aprovado
-*   **Contexto:** O desenvolvedor pode alternar entre IDE (Antigravity) e console (Claude Code) simultaneamente no mesmo período de trabalho. Somar as horas de ambas de forma isolada duplicaria o tempo de desenvolvimento real.
-*   **Decisão:** Realizar a concatenação de todos os carimbos de data/hora convertidos para Brasília (GMT-3) e rodar o algoritmo de agrupamento na lista combinada e ordenada.
-*   **Consequência:** Obtenção de um **Tempo Combinado Único** líquido e justo, livre de sobreposições de uso simultâneo.
+*   **Contexto:** O desenvolvedor pode alternar rapidamente entre IDE (Antigravity) e console (Claude Code) na mesma janela de 45 minutos. Somar as horas de ambas de forma isolada duplicaria o tempo de desenvolvimento real (ex: gerando '2 horas de trabalho' dentro de 1 hora de relógio).
+*   **Decisão:**
+    *   **Mesclagem Absoluta:** Realizar a concatenação e ordenação global cronológica de todos os carimbos de data/hora (já convertidos para Brasília GMT-3) *antes* de rodar o algoritmo de agrupamento de sessão.
+    *   **Alocação de Ociosidade (Gap):** O tempo ocioso entre duas interações distintas (mesmo que de ferramentas/LLMs diferentes) será creditado ao modelo responsável pela interação *anterior* imediata.
+    *   **Filtro Anti-Poluição:** A coleta deve filtrar pings órfãos vazios (ex: inicializações de serviço que não possuam prompt do usuário) para garantir que a métrica de "Total de Interações" reflita uso genuíno.
+*   **Consequência:** Obtenção de um **Tempo Combinado Único** líquido e justo, livre de sobreposições de uso simultâneo, onde o esforço faturado reflete com exatidão a realidade do relógio, independentemente da troca constante de assistentes.
 
 ### ADR-04: Privacidade por Mascaramento SHA-256
 *   **Status:** Aprovado
 *   **Contexto:** Comitar logs de desenvolvimento em repositórios públicos externos no GitHub pode vazar informações sigilosas como nomes de usuários de sistemas operacionais e nomes de computadores da rede interna corporativa.
 *   **Decisão:** Substituir a identificação em texto claro por um hash SHA-256 determinístico de 8 caracteres (`dev-[hash]`), calculado combinando `usuario@computador`.
 *   **Consequência:** Anonimato impecável para auditores e público externo, enquanto o time mantém a rastreabilidade interna ao ver seus hashes gerados na saída privada do terminal local.
+
+### ADR-05: Rastreamento Dinâmico por Modelo (LLM) e Mineração de Claude CLI JSONL
+*   **Status:** Aprovado
+*   **Contexto:** Diferentes assistentes de IA utilizam diferentes LLMs (ex: Gemini 3.1 Pro, Gemini 3 Flash, Sonnet 4.6, Opus 4.7) em momentos e contextos distintos. Para fins de auditoria de eficiência e custos, o time precisa de rastreamento tridimensional (tempo, data e modelo).
+*   **Decisão:**
+    *   **Claude Code:** Minar diretamente as bases de dados locais em formato texto plano JSONL sob `~/.claude/projects/`, extraindo a chave `"model"` exata de cada turno de conversação de forma 100% determinística.
+    *   **Antigravity:** Rastrear alterações de configuração (`USER_SETTINGS_CHANGE`) nos históricos locais (`overview.txt`).
+*   **Consequência:** Obtenção de relatórios analíticos tridimensionais detalhando com precisão comercial qual modelo de IA consumiu cada parcela do esforço de desenvolvimento.
+
+### ADR-06: Propagação Cronológica de Estado e Zero-Config
+*   **Status:** Aprovado
+*   **Contexto:** No Antigravity IDE, o log de troca de modelo só é gerado no chat se o desenvolvedor mudar a opção no dropdown no meio da sessão. Historicamente, os desenvolvedores podem iniciar projetos já utilizando o padrão da IDE sem que isso registre um log inicial explícito.
+*   **Decisão:**
+    *   **Premissa do Modelo de Fábrica:** Como o comportamento nativo do Antigravity ao ser instalado e iniciado é utilizar o `Gemini 3.1 Pro (High)`, a heurística do rastreador assumirá este modelo como sendo o **ativo** para todas as interações no início do tempo de vida do projeto, até que a primeira tag `<USER_SETTINGS_CHANGE>` no histórico indique uma alteração contrária.
+    *   **Propagação Cronológica de Estado:** Uma vez que uma troca via dropdown for mapeada (`<USER_SETTINGS_CHANGE>`), o novo modelo será considerado o "Modelo Ativo", propagando essa herança para as próximas conversas até encontrar outra alteração na linha do tempo.
+    *   **Assertividade nas Métricas:** Para justificar auditorias precisas, as saídas no painel e na tabela deverão separar claramente **Horas Efetivas**, **Número de Sessões** (grupos lógicos de esforço ininterrupto) e **Total de Interações** por cada modelo LLM diário.
+*   **Consequência:** Simplifica absolutamente a rotina do desenvolvedor por meio de uma arquitetura estritamente zero-config, eliminando qualquer dependência humana de manutenção de arquivos de calibração.
 
 ---
 
@@ -75,7 +95,7 @@ A arquitetura de arquivos sob `.tracker/` está organizada de forma modular:
 ├── README.md           # Developer Guide: Instruções conceituais de quando e como utilizar
 ├── work-tracker-architecture.md # Architecture Spec: Este documento formal de arquitetura BMad
 ├── work-tracker.py     # Analytics Engine: Script em Python contendo os algoritmos de coleta e análise
-└── TEMPO_DE_TRABALHO.md# Collaborative Log: Arquivo Markdown comitado com os dados anonimizados por dia
+└── TEMPO_DE_TRABALHO.md# Collaborative Log: Arquivo Markdown contendo os dados por dia e modelo
 ```
 
 ---
@@ -93,30 +113,34 @@ Para garantir que novos desenvolvedores adicionem suporte a novas IAs no futuro 
 ## 6. Fluxo de Dados e Interfaces de Componentes
 
 ### 6.1. Fluxo de Execução do Script
-O diagrama abaixo detalha o processamento modular do `work-tracker.py` ao ser invocado:
+O diagrama abaixo detalha o processamento modular do `work-tracker.py` ao ser invocado, com a nova ordenação cronológica e leitura de metadados:
 
 ```mermaid
 sequenceDiagram
     participant D as Desenvolvedor (Terminal)
     participant M as Makefile (.tracker/Makefile)
     participant W as work-tracker.py (Engine)
-    participant FS as Logs do Sistema (Claude/Gemini)
+    participant FS as Logs do Sistema (Claude JSONL / Gemini Overview)
     participant MD as TEMPO_DE_TRABALHO.md
     
     D->>M: make -f .tracker/Makefile track-time EXPORT=true
     M->>W: python3 work-tracker.py --export
     W->>W: Obter getpass.getuser() & socket.gethostname()
     W->>W: Calcular SHA-256 de identificação (masked_id)
-    W->>FS: Ler logs de ~/.claude/projects/ e ~/.gemini/antigravity/brain/
-    FS-->>W: timestamps (UTC)
+    W->>FS: Ler logs brutos (~/.claude/projects/ e ~/.gemini/antigravity/)
+    FS-->>W: Eventos brutos com timestamps e IDs de conversas
+    W->>W: Aplicar Filtro Anti-Poluição (Descartar pings vazios de sistema)
     W->>W: Converter timestamps para Brasília (UTC - 3h)
-    W->>W: Agrupar interações por Dia de Trabalho
-    W->>W: Calcular horas ativas individuais e combinadas por dia
+    W->>W: Concatenar e ordenar TODOS os eventos globalmente por data
+    W->>W: Injetar Gemini 3.1 Pro (High) como estado inicial se vazio
+    W->>W: Propagar estado ativo de LLMs (Cross-Tool)
+    W->>W: Calcular Gaps (Creditando ociosidade ao último ping)
+    W->>W: Agrupar Interações, Sessões Ativas e Horas Efetivas
     W->>MD: Ler conteúdo anterior
-    MD-->>W: Conteúdo Markdown
+    MD-->>W: Conteúdo Markdown histórico
     W->>W: Filtrar e remover bloco antigo do 'masked_id'
-    W->>MD: Sobrescrever Cabeçalho + Outros Devs + Novo Bloco Atualizado
-    W-->>D: Mensagem de Sucesso (Consola)
+    W->>MD: Sobrescrever Cabeçalho + Outros Devs + Nova Tabela Estendida
+    W-->>D: Mensagem de Sucesso (Console com Tabela Detalhada)
 ```
 
 ---

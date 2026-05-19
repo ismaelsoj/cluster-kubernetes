@@ -17,6 +17,7 @@ import argparse
 import socket
 import getpass
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 def parse_iso(dt_str):
     for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S %z"):
@@ -38,16 +39,25 @@ def to_brasilia(dt):
     return dt - timedelta(hours=3)
 
 def get_masked_identity(username, hostname):
-    # Combina usuário e máquina e gera um hash SHA-256 de 8 caracteres
     identity_str = f"{username}@{hostname}"
     h = hashlib.sha256(identity_str.encode('utf-8')).hexdigest()[:8]
     return f"dev-{h}"
+
+def format_hours(hours):
+    if hours < 0:
+        hours = 0
+    h = int(hours)
+    m = int(round((hours - h) * 60))
+    if m == 60:
+        h += 1
+        m = 0
+    return f"{h}h {m:02d}m"
 
 def analyze_claude_code(repo_root):
     project_dir_name = re.sub(r'[^a-zA-Z0-9]', '-', repo_root)
     claude_dir = os.path.expanduser(f"~/.claude/projects/{project_dir_name}")
     
-    timestamps = []
+    events = []
     total_events = 0
     
     if not os.path.isdir(claude_dir):
@@ -63,24 +73,46 @@ def analyze_claude_code(repo_root):
                         continue
                     try:
                         data = json.loads(line)
-                        total_events += 1
                         ts = data.get("timestamp")
-                        if ts:
-                            dt = parse_iso(ts)
-                            if dt:
-                                timestamps.append(dt)
+                        if not ts:
+                            continue
+                        dt = parse_iso(ts)
+                        if not dt:
+                            continue
+                        raw_model = data.get("message", {}).get("model")
+                        if not raw_model:
+                            raw_model = "Claude CLI (Unknown)"
+                            
+                        if "sonnet-4-6" in raw_model.lower() or "sonnet" in raw_model.lower():
+                            mapped_model = "Sonnet 4.6"
+                        elif "opus" in raw_model.lower():
+                            mapped_model = "Opus 4.7"
+                        elif "haiku" in raw_model.lower():
+                            mapped_model = "Haiku 4.5"
+                        else:
+                            mapped_model = raw_model
+                            
+                        events.append({
+                            "dt": dt,
+                            "tool": "Claude Code",
+                            "is_change": False,
+                            "model": None,
+                            "is_ping": True,
+                            "active_model": mapped_model
+                        })
+                        total_events += 1
                     except Exception:
                         pass
         except Exception:
             pass
             
-    return sorted(timestamps), len(files), total_events
+    return events, len(files), total_events
 
 def analyze_antigravity(repo_root):
     antigravity_dir = os.path.expanduser("~/.gemini/antigravity/brain")
-    timestamps = []
-    total_steps = 0
+    events = []
     conversations_found = 0
+    total_steps = 0
     
     if not os.path.isdir(antigravity_dir):
         return [], 0, 0
@@ -90,75 +122,97 @@ def analyze_antigravity(repo_root):
     
     for filepath in files:
         try:
-            belongs_to_repo = False
-            file_timestamps = []
-            
             with open(filepath, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    
-                    if repo_root in line:
-                        belongs_to_repo = True
-                        
-                    try:
-                        data = json.loads(line)
-                        created_at = data.get("created_at")
-                        if created_at:
-                            dt = parse_iso(created_at)
-                            if dt:
-                                file_timestamps.append(dt)
-                    except Exception:
-                        pass
+                content = f.read()
+                
+            belongs_to_repo = (repo_root in content)
+            has_user_input = ("USER_REQUEST" in content or "USER_EXPLICIT" in content)
             
-            if belongs_to_repo and file_timestamps:
-                timestamps.extend(file_timestamps)
-                total_steps += len(file_timestamps)
+            if belongs_to_repo and has_user_input:
                 conversations_found += 1
                 
+            lines = content.strip().split('\n')
+            
+            # Pass 1: Identificar o modelo inicial desta conversa olhando o primeiro USER_SETTINGS_CHANGE
+            first_dt = None
+            first_old_model = None
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    created_at = data.get("created_at")
+                    if created_at and not first_dt:
+                        first_dt = parse_iso(created_at)
+                        
+                    content_text = data.get("content", "")
+                    if "<USER_SETTINGS_CHANGE>" in content_text and first_old_model is None:
+                        match = re.search(r"changed setting `Model Selection` from (.*?) to (.*?)\.", content_text)
+                        if match:
+                            old_m = match.group(1).strip()
+                            first_old_model = old_m
+                except Exception:
+                    pass
+                    
+            if first_old_model and first_old_model != "None" and first_dt:
+                events.append({
+                    "dt": first_dt - timedelta(milliseconds=1),
+                    "tool": "Antigravity",
+                    "is_change": True,
+                    "model": first_old_model,
+                    "is_ping": False
+                })
+                
+            # Pass 2: Parsing normal de pings e mudanças
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    created_at = data.get("created_at")
+                    if not created_at:
+                        continue
+                        
+                    dt = parse_iso(created_at)
+                    if not dt:
+                        continue
+                    
+                    content_text = data.get("content", "")
+                    
+                    is_change = False
+                    new_model = None
+                    if "<USER_SETTINGS_CHANGE>" in content_text:
+                        match = re.search(r"changed setting `Model Selection` from .*? to (.*?)\.", content_text)
+                        if match:
+                            new_model = match.group(1).strip()
+                            is_change = True
+                            
+                    if is_change:
+                        events.append({
+                            "dt": dt,
+                            "tool": "Antigravity",
+                            "is_change": True,
+                            "model": new_model,
+                            "is_ping": False
+                        })
+                    
+                    if belongs_to_repo and has_user_input:
+                        events.append({
+                            "dt": dt,
+                            "tool": "Antigravity",
+                            "is_change": False,
+                            "model": None,
+                            "is_ping": True
+                        })
+                        total_steps += 1
+                except Exception:
+                    pass
         except Exception:
             pass
             
-    return sorted(timestamps), conversations_found, total_steps
-
-def calculate_active_time(timestamps, session_gap_minutes=45, default_interaction_minutes=15):
-    if not timestamps:
-        return 0.0, []
-        
-    sessions = []
-    current_session = [timestamps[0]]
-    
-    for t in timestamps[1:]:
-        last_t = current_session[-1]
-        gap = (t - last_t).total_seconds() / 60.0
-        if gap <= session_gap_minutes:
-            current_session.append(t)
-        else:
-            sessions.append(current_session)
-            current_session = [t]
-    sessions.append(current_session)
-    
-    total_hours = 0.0
-    session_details = []
-    
-    for i, sess in enumerate(sessions):
-        start = sess[0]
-        end = sess[-1]
-        duration_minutes = (end - start).total_seconds() / 60.0
-        if duration_minutes < default_interaction_minutes:
-            duration_minutes = default_interaction_minutes
-        
-        total_hours += duration_minutes / 60.0
-        session_details.append({
-            "session_num": i + 1,
-            "start": start,
-            "end": end,
-            "interactions": len(sess),
-            "hours": duration_minutes / 60.0
-        })
-        
-    return total_hours, session_details
+    return events, conversations_found, total_steps
 
 def main():
     parser = argparse.ArgumentParser(description="Calculador de tempo de trabalho de IA apartado e seguro.")
@@ -168,55 +222,82 @@ def main():
     
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     
-    # Identidade Real vs Mascarada
     username = getpass.getuser()
     hostname = socket.gethostname()
     masked_id = get_masked_identity(username, hostname)
     
-    # Horário atual em Brasília (GMT-3) baseado em UTC
     brasilia_now = datetime.utcnow() - timedelta(hours=3)
     brasilia_now_str = brasilia_now.strftime('%d/%m/%Y %H:%M:%S')
     
-    # Executa a auditoria
-    claude_times, claude_files, claude_events = analyze_claude_code(repo_root)
-    anti_times, anti_files, anti_steps = analyze_antigravity(repo_root)
+    claude_events, claude_files, claude_steps = analyze_claude_code(repo_root)
+    anti_events, anti_files, anti_steps = analyze_antigravity(repo_root)
     
-    # Conversão de todos os carimbos de data/hora para fuso horário de Brasília (GMT-3)
-    claude_br = sorted([to_brasilia(t.replace(tzinfo=None)) for t in claude_times if t])
-    anti_br = sorted([to_brasilia(t.replace(tzinfo=None)) for t in anti_times if t])
+    all_events = claude_events + anti_events
+    for ev in all_events:
+        ev["dt_br"] = to_brasilia(ev["dt"].replace(tzinfo=None))
+        
+    all_events.sort(key=lambda x: x["dt_br"])
     
-    # Agrupamento das horas por dia de trabalho
-    unique_dates = sorted(list(set(
-        [t.date() for t in claude_br] + [t.date() for t in anti_br]
-    )))
+    # Propagação cronológica de estado com fallback de fábrica
+    current_anti_model = "Gemini 3.1 Pro (High)"
     
-    daily_rows = []
-    total_anti_hours = 0.0
-    total_claude_hours = 0.0
-    total_comb_hours = 0.0
+    ping_events = []
+    for ev in all_events:
+        if ev["tool"] == "Antigravity":
+            if ev["is_change"]:
+                current_anti_model = ev["model"]
+            if ev["is_ping"]:
+                ev["active_model"] = current_anti_model
+                ping_events.append(ev)
+        else:
+            if ev["is_ping"]:
+                ping_events.append(ev)
+                
+    # Agrupar em sessões ativas
+    sessions = []
+    if ping_events:
+        current_session = [ping_events[0]]
+        for ev in ping_events[1:]:
+            last_ev = current_session[-1]
+            gap = (ev["dt_br"] - last_ev["dt_br"]).total_seconds() / 60.0
+            if gap <= args.gap:
+                current_session.append(ev)
+            else:
+                sessions.append(current_session)
+                current_session = [ev]
+        sessions.append(current_session)
+        
+    # Estatísticas diárias
+    daily_stats = defaultdict(lambda: defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0}))
+    total_hours = 0.0
     
-    for d in unique_dates:
-        claude_day = [t for t in claude_br if t.date() == d]
-        anti_day = [t for t in anti_br if t.date() == d]
-        combined_day = sorted(claude_day + anti_day)
+    for sess in sessions:
+        date_str = sess[0]["dt_br"].strftime("%d/%m/%Y")
         
-        c_hours, _ = calculate_active_time(claude_day, session_gap_minutes=args.gap)
-        a_hours, _ = calculate_active_time(anti_day, session_gap_minutes=args.gap)
-        comb_hours, _ = calculate_active_time(combined_day, session_gap_minutes=args.gap)
-        
-        total_anti_hours += a_hours
-        total_claude_hours += c_hours
-        total_comb_hours += comb_hours
-        
-        daily_rows.append({
-            "date_str": d.strftime("%d/%m/%Y"),
-            "claude_hours": c_hours,
-            "anti_hours": a_hours,
-            "combined_hours": comb_hours,
-            "anti_events": len(anti_day),
-            "claude_events": len(claude_day)
-        })
-        
+        models_in_session = set(ev["active_model"] for ev in sess)
+        for m in models_in_session:
+            daily_stats[date_str][m]["sessions"] += 1
+            
+        for ev in sess:
+            daily_stats[date_str][ev["active_model"]]["interactions"] += 1
+            
+        model_duration_minutes = defaultdict(float)
+        for i in range(len(sess) - 1):
+            gap = (sess[i+1]["dt_br"] - sess[i]["dt_br"]).total_seconds() / 60.0
+            model = sess[i]["active_model"]
+            model_duration_minutes[model] += gap
+            
+        session_duration = (sess[-1]["dt_br"] - sess[0]["dt_br"]).total_seconds() / 60.0
+        if session_duration < 15.0:
+            padding = 15.0 - session_duration
+            last_model = sess[-1]["active_model"]
+            model_duration_minutes[last_model] += padding
+            
+        for m, m_mins in model_duration_minutes.items():
+            h = m_mins / 60.0
+            daily_stats[date_str][m]["hours"] += h
+            total_hours += h
+
     if args.export:
         report_path = os.path.join(repo_root, ".tracker", "TEMPO_DE_TRABALHO.md")
         
@@ -229,53 +310,43 @@ def main():
         )
         
         blocks = []
-        
         try:
             if os.path.exists(report_path):
                 with open(report_path, "r", encoding="utf-8") as f:
                     content = f.read()
-                
                 if content:
                     raw_parts = re.split(r'\n\s*---\s*\n', content)
                     for part in raw_parts:
                         part_str = part.strip()
-                        if not part_str:
+                        if not part_str or part_str.startswith("# Registro de Tempo"):
                             continue
-                        
-                        if part_str.startswith("# Registro de Tempo"):
-                            # Ignora o cabeçalho antigo para usar o novo com a nota de anonimato
-                            continue
-                        
-                        # Verifica se é um bloco de desenvolvedor pelo ID Mascarado
                         match = re.match(r'## 👤 Desenvolvedor:\s+`([^`]+)`', part_str)
-                        if match:
-                            block_masked = match.group(1)
-                            # Se for o MESMO ID mascarado, substitui pela versão atualizada
-                            if block_masked == masked_id:
-                                continue
-                        
+                        if match and match.group(1) == masked_id:
+                            continue
                         blocks.append(part_str)
             
-            # Monta o novo bloco deste desenvolvedor
             new_block = (
                 f"## 👤 Desenvolvedor: `{masked_id}`\n\n"
                 f"* **Última Atualização:** {brasilia_now_str} (Horário de Brasília)\n"
-                f"* **Tempo Ativo Combinado (IA):** **{total_comb_hours:.2f} horas**\n"
-                f"* **Interações no Antigravity:** **{total_anti_hours:.2f} horas** ({anti_steps} passos em {anti_files} conversas)\n"
-                f"* **Sessões no Claude Code:** **{total_claude_hours:.2f} horas** ({claude_events} eventos em {claude_files} sessões)\n\n"
+                f"* **Tempo Ativo Combinado (IA):** **{format_hours(total_hours)}**\n"
+                f"* **Total de Interações:** **{len(ping_events)} comandos** em {len(sessions)} sessões\n\n"
                 f"### 🗓️ Detalhamento Diário das Horas (Brasília)\n\n"
-                f"| Dia de Trabalho | Tempo no Antigravity | Tempo no Claude Code | Tempo Combinado (Sem Sobreposição) | Eventos (Antigravity / Claude Code) |\n"
+                f"| Dia de Trabalho | Modelo LLM | Tempo Ativo | Sessões Ativas | Interações |\n"
                 f"| :---: | :---: | :---: | :---: | :---: |\n"
             )
-            for row in daily_rows:
-                new_block += (
-                    f"| {row['date_str']} | {row['anti_hours']:.2f} h | {row['claude_hours']:.2f} h | "
-                    f"**{row['combined_hours']:.2f} h** | {row['anti_events']} / {row['claude_events']} |\n"
-                )
             
+            for d in sorted(daily_stats.keys(), key=lambda x: datetime.strptime(x, "%d/%m/%Y")):
+                for m in sorted(daily_stats[d].keys()):
+                    h = daily_stats[d][m]["hours"]
+                    s = daily_stats[d][m]["sessions"]
+                    i = daily_stats[d][m]["interactions"]
+                    new_block += f"| {d} | **{m}** | {format_hours(h)} | {s} | {i} |\n"
+            
+            if not daily_stats:
+                new_block += f"| N/A | Nenhum | 0h 00m | 0 | 0 |\n"
+                
             blocks.append(new_block.strip())
             
-            # Escreve o arquivo consolidado
             with open(report_path, "w", encoding="utf-8") as f:
                 f.write(header)
                 for b in blocks:
@@ -287,7 +358,6 @@ def main():
             print(f"\033[91m✘ Erro ao atualizar métricas de tempo: {e}\033[0m")
             
     else:
-        # Imprime no terminal um layout elegante
         print("\033[1;35m" + "="*60 + "\033[0m")
         print(f"\033[1;37m RASTREADOR DE TEMPO: {username}@{hostname} \033[0m")
         print(f"\033[1;90m ID de Anonimato Externo: {masked_id}\033[0m")
@@ -295,11 +365,18 @@ def main():
         print(f" Repositório: \033[94m{repo_root}\033[0m")
         print(f" Data/Hora (Brasília): {brasilia_now_str}")
         print("-"*60)
-        print(f" \033[1mMétricas locais compiladas por Dia (Gap: {args.gap} min):\033[0m")
-        print(f"  • Tempo Ativo no Antigravity: \033[92m{total_anti_hours:.2f} horas\033[0m")
-        print(f"  • Tempo Ativo no Claude Code:  \033[92m{total_claude_hours:.2f} horas\033[0m")
+        print(f" \033[1mMétricas locais compiladas por Modelo (Gap: {args.gap} min):\033[0m")
+        
+        model_totals = defaultdict(float)
+        for d in daily_stats:
+            for m in daily_stats[d]:
+                model_totals[m] += daily_stats[d][m]["hours"]
+                
+        for m, h in sorted(model_totals.items()):
+            print(f"  • {m}: \033[92m{format_hours(h)}\033[0m")
+            
         print("-"*60)
-        print(f" \033[1;93m✔ TOTAL LOCAL COMBINADO ACUMULADO: {total_comb_hours:.2f} horas\033[0m")
+        print(f" \033[1;93m✔ TOTAL LOCAL COMBINADO ACUMULADO: {format_hours(total_hours)}\033[0m")
         print("\033[1;35m" + "="*60 + "\033[0m")
         print(" Dica: Execute \033[96mmake -f .tracker/Makefile track-time EXPORT=true\033[0m para anexar/atualizar.")
         print("\033[1;35m" + "="*60 + "\033[0m")

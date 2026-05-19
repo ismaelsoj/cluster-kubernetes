@@ -37,12 +37,12 @@ make -f .tracker/Makefile track-time EXPORT=true
 
 ## 🗓️ Estrutura do Relatório (Tabela Diária)
 
-Diferente do resumo de sessões sequenciais, o relatório exportado agora consolida as horas **por dia de trabalho ativo** no fuso de Brasília, mostrando a contribuição exata de cada ferramenta:
+Diferente do resumo de sessões sequenciais, o relatório exportado agora consolida as horas **por dia de trabalho ativo** no fuso de Brasília, mostrando a contribuição exata de cada modelo:
 
-*   **Tempo no Antigravity:** Horas ativas exclusivas na extensão de chat do VS Code/Cursor.
-*   **Tempo no Claude Code:** Horas ativas exclusivas na CLI do Claude Code.
-*   **Tempo Combinado (Sem sobreposição):** O total líquido trabalhado por dia (eliminando duplicidade caso você tenha alternado o uso de ambas as ferramentas em um mesmo bloco de tempo).
-*   **Eventos (Antigravity / Claude Code):** Volume de interações realizadas por dia em cada ferramenta.
+*   **Modelo LLM:** O rastreador extrai automaticamente (zero-config) qual modelo de inteligência artificial (Gemini ou Claude) estava em uso na janela de tempo.
+*   **Tempo Ativo:** O total líquido trabalhado naquele modelo (eliminando duplicidade e rateando ociosidade ao último ping), exibido em formato horas e minutos.
+*   **Sessões Ativas:** Agrupamentos lógicos (de até 45 min) em que aquele modelo esteve presente.
+*   **Interações:** O volume absoluto de comandos/prompts despachados para a IA.
 
 ---
 
