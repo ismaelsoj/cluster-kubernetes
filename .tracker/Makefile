@@ -13,9 +13,9 @@ help: ## Exibe os comandos disponíveis neste Makefile de métricas
 	  awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[35m%-12s\033[0m %s\n", $$1, $$2}'
 
 track-time: ## Rastreia o tempo ativo local (Claude Code + Antigravity) e anexa em .tracker/TEMPO_DE_TRABALHO.md com EXPORT=true
-	@if [ "$(EXPORT)" = "true" ]; then \
-	  python3 "$(REPO_ROOT)/.tracker/work-tracker.py" --export; \
-	  echo "Dica: Você pode commitar o arquivo .tracker/TEMPO_DE_TRABALHO.md para compartilhar suas horas!"; \
-	else \
-	  python3 "$(REPO_ROOT)/.tracker/work-tracker.py"; \
-	fi
+ifeq ($(EXPORT),true)
+	@python3 "$(REPO_ROOT)/.tracker/work-tracker.py" --export
+	@echo "Dica: Você pode commitar o arquivo .tracker/TEMPO_DE_TRABALHO.md para compartilhar suas horas!"
+else
+	@python3 "$(REPO_ROOT)/.tracker/work-tracker.py"
+endif

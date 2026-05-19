@@ -168,7 +168,11 @@ def analyze_antigravity(repo_root):
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
                 
-            belongs_to_repo = (repo_root in content)
+            # Normalizar caminhos para Windows/Linux/Mac e JSON escaped strings
+            repo_root_fwd = repo_root.replace('\\', '/')
+            repo_root_escaped = repo_root.replace('\\', '\\\\')
+            
+            belongs_to_repo = (repo_root in content) or (repo_root_fwd in content) or (repo_root_escaped in content)
             has_user_input = ("USER_REQUEST" in content or "USER_EXPLICIT" in content)
             
             if belongs_to_repo and has_user_input:
