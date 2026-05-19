@@ -37,7 +37,7 @@ context: []
 |---------|---------|---------------|--------------------|
 | Reflog presente, múltiplas branches | `.git/logs/HEAD` com checkouts entre `main` e `time-tracker` | Pings antes do checkout → `main`; após → `time-tracker` | N/A |
 | Reflog ausente ou vazio | Arquivo não existe | Todos os pings recebem branch `"main"` | fallback `"main"` |
-| Ping anterior a qualquer entrada de checkout | Timestamp menor que todo reflog | Branch `"Desconhecida"` | retorno explícito |
+| Ping anterior a qualquer entrada de checkout | Timestamp menor que todo reflog | Branch `"main"` | retorno explícito |
 | Linha corrompida no reflog | Linha sem timestamp válido | Linha ignorada, demais processadas | `try/except`, continua |
 | `--export` sem pings coletados | Nenhum evento | Tabela de branch exibe `N/A` (igual à tabela diária existente) | N/A |
 

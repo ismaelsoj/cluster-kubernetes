@@ -92,7 +92,7 @@ def get_branch_at(timeline, ping_dt):
         else:
             break
     if result is None:
-        return "Desconhecida"
+        return "main"
     return result
 
 
