@@ -1,0 +1,45 @@
+# Aplicação raiz (App-of-Apps pai) - cluster-kubernetes
+# Inicia o ciclo de vida GitOps governando os Applications filhos.
+#
+# Convenções importantes:
+# - Source = cluster/bootstrap, renderizado via Kustomize (existe kustomization.yaml).
+#   A kustomization NÃO inclui este root-app.yaml: o root-app é aplicado pelo
+#   cluster-up.sh e não gerencia a si próprio (evita OutOfSync cosmético).
+# - targetRevision: main é o valor canônico (CI/produção). O cluster-up.sh substitui
+#   em runtime para a branch local detectada (ARGO_TARGET_BRANCH).
+# - ignoreDifferences + RespectIgnoreDifferences: impedem que o root-app reverta o
+#   targetRevision dos filhos (infra-app, apps-app) para 'main' a cada sync,
+#   preservando o override de branch em dev local.
+# - Finalizer resources-finalizer.argocd.argoproj.io: limpeza em cascata se deletado.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: root-app
+    app.kubernetes.io/component: gitops-root
+    app.kubernetes.io/part-of: cluster-kubernetes
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ismaelsoj/cluster-kubernetes.git
+    targetRevision: main
+    path: cluster/bootstrap
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - RespectIgnoreDifferences=true
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jsonPointers:
+        - /spec/source/targetRevision

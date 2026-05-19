@@ -56,3 +56,15 @@ Registro centralizado de itens identificados em revisões/triagens que não pert
 
 - `k3d.yaml` sem resource limits (`memory`, `cpuCount`) definidos nos containers k3d — decisão arquitetural documentada ("configurar no Docker Desktop"), não é escopo dos scripts de automação
 - Containers k3d sem Docker healthcheck definido — pertence ao lifecycle management geral do cluster, não aos scripts de ciclo de vida
+
+## Deferred from: code review of 1-4-linter-yaml-pipeline-ci-readme (2026-05-18)
+
+- Output vazio de `kustomize build` (exit 0, 0 bytes) é indistinguível de stub intencional — diretórios de stubs de infraestrutura por design produzem 0 manifestos; o guard de `total_manifests > 0` mitiga no agregado mas não reporta qual diretório falhou silenciosamente. Avaliar em story futura de hardening do lint.
+
+## Deferred from: code review of 1-4-linter-yaml-pipeline-ci-readme (2026-05-18, segunda passagem)
+
+- ~~**[policy/kebab-case.rego:21-23]** `is_exception` com colon-check excessivamente amplo — `contains(val, ":")` isenta qualquer nome com `:`~~ (Descartado: A política real no repositório já utiliza uma lista estrita de correspondência exata para `exceptions`, eliminando qualquer risco de validações amplas ou vulneráveis).
+- ~~**[scripts/lint.sh:90-93, 112-115]** Docker fallback sensível ao diretório de chamada — `docker run --rm -v "$(pwd):/dir"` quebra se `lint.sh` for invocado fora da raiz do repositório.~~ (Implementado na Story 1.4 usando `$(git rev-parse --show-toplevel)` no volume)
+- **[policy/kebab-case.rego:9]** `kebab_case_pattern` rejeita nomes com ponto — operadores externos como cert-manager geram recursos com `.` no nome (ex: `cert-manager.io`). Não afeta escopo atual mas causará falsos positivos quando operadores forem integrados. Adicionar mecanismo de exceções por prefixo/sufixo em story futura.
+- ~~**[scripts/lint.sh:60]** Mensagem de erro pouco informativa quando diretórios de scan ausentes — se `cluster/bootstrap`, `cluster/infrastructure` e `cluster/apps` não existirem (clone raso, branch errado), `find` produz zero resultados silenciosamente e a mensagem de erro é genérica (`0 manifestos`).~~ (Implementado na Story 1.4 com loop de validação explícita de existência de diretórios obrigatórios no topo do script)
+- ~~**[.github/workflows/lint.yml:20]** Instalar `conftest` nativamente no runner do GitHub Actions para otimizar o tempo de execução e evitar o pull da imagem Docker a cada pipeline run.~~ (Implementado a pedido do dev em PR-review)

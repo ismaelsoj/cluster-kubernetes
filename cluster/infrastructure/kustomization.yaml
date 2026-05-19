@@ -1,0 +1,11 @@
+# Kustomization principal de infraestrutura - cluster-kubernetes
+# Agregador local que define a ordem de aplicação dos componentes de infraestrutura
+# governados pelo infra-app.yaml do ArgoCD (Safe-Prune: prune=false).
+# Ordem segue dependências por Sync Wave: namespaces (Wave 0) -> demais componentes.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespaces/base
+  - keycloak-auth/overlays/local
+  - kong-gateway/overlays/local

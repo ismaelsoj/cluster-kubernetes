@@ -25,3 +25,14 @@ bin/
 
 # Backups
 *.bak
+
+# Pasta temporária do Linter de YAML
+.tmp-lint/
+
+# Dumps de banco de dados
+*.sql
+
+# Chaves locais, certificados e credenciais sensíveis
+*.key
+*.pem
+*.crt

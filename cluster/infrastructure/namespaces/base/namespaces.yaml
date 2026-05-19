@@ -1,0 +1,26 @@
+# Namespaces de infraestrutura (Wave 0) - cluster-kubernetes
+# Define os namespaces fundamentais (keycloak-auth, kong-gateway) que precisam
+# existir antes dos componentes de infraestrutura serem aplicados pelo ArgoCD.
+# A annotation argocd.argoproj.io/sync-wave: "0" garante criação na primeira onda.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: keycloak-auth
+  labels:
+    app.kubernetes.io/name: keycloak-auth
+    app.kubernetes.io/component: identity-provider
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kong-gateway
+  labels:
+    app.kubernetes.io/name: kong-gateway
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"

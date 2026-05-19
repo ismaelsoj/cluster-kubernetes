@@ -1,7 +1,8 @@
 # Kustomization base - namespaces - cluster-kubernetes
 # Wave 0 — namespaces de infraestrutura são globais (sem overlays por ambiente)
-# Recursos (namespaces.yaml) serão adicionados no Épico 2
+# Inclui namespaces.yaml com a definição declarativa de keycloak-auth e kong-gateway.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources: []
+resources:
+  - namespaces.yaml

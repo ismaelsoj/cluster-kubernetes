@@ -1,0 +1,18 @@
+# Kustomization de bootstrap - cluster-kubernetes
+# Lista APENAS os Applications filhos governados pelo root-app.
+#
+# Decisão de design: root-app.yaml está neste diretório por organização, mas é
+# DELIBERADAMENTE excluído desta lista. O root-app é o "ponto de entrada" do
+# GitOps e é aplicado pelo cluster-up.sh — não deve gerenciar a si próprio
+# (App-of-Apps recursivo causa OutOfSync cosmético permanente quando
+# ARGO_TARGET_BRANCH != main, sem prejuízo funcional, mas suja a UI).
+#
+# Consequência: alterações em root-app.yaml não são auto-sincronizadas. Para
+# aplicá-las, re-execute `make up` (idempotente). Este é o padrão "bootstrap
+# out-of-band" comum em App-of-Apps.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - infra-app.yaml
+  - apps-app.yaml
