@@ -316,52 +316,56 @@ def main():
         sessions.append(current_session)
         
     # Estatísticas diárias
-    daily_stats = defaultdict(lambda: defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0}))
-    branch_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0})))
+    daily_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0})))
+    branch_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0}))))
     total_hours = 0.0
 
     for sess in sessions:
         date_str = sess[0]["dt_br"].strftime("%d/%m/%Y")
 
-        models_in_session = set(ev["active_model"] for ev in sess)
-        for m in models_in_session:
-            daily_stats[date_str][m]["sessions"] += 1
+        models_in_session = set((ev["tool"], ev["active_model"]) for ev in sess)
+        for t, m in models_in_session:
+            daily_stats[date_str][t][m]["sessions"] += 1
 
         branches_in_session = set(ev["branch"] for ev in sess)
         for b in branches_in_session:
-            models_in_branch_session = set(ev["active_model"] for ev in sess if ev["branch"] == b)
-            for m in models_in_branch_session:
-                branch_stats[date_str][b][m]["sessions"] += 1
+            tool_models_in_branch_session = set((ev["tool"], ev["active_model"]) for ev in sess if ev["branch"] == b)
+            for t, m in tool_models_in_branch_session:
+                branch_stats[date_str][b][t][m]["sessions"] += 1
 
         for ev in sess:
-            daily_stats[date_str][ev["active_model"]]["interactions"] += 1
-            branch_stats[date_str][ev["branch"]][ev["active_model"]]["interactions"] += 1
+            daily_stats[date_str][ev["tool"]][ev["active_model"]]["interactions"] += 1
+            branch_stats[date_str][ev["branch"]][ev["tool"]][ev["active_model"]]["interactions"] += 1
 
-        model_duration_minutes = defaultdict(float)
-        branch_model_duration_minutes = defaultdict(lambda: defaultdict(float))
+        tool_model_duration_minutes = defaultdict(lambda: defaultdict(float))
+        branch_tool_model_duration_minutes = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
         for i in range(len(sess) - 1):
             gap = (sess[i+1]["dt_br"] - sess[i]["dt_br"]).total_seconds() / 60.0
+            tool = sess[i]["tool"]
             model = sess[i]["active_model"]
             branch = sess[i]["branch"]
-            model_duration_minutes[model] += gap
-            branch_model_duration_minutes[branch][model] += gap
+            tool_model_duration_minutes[tool][model] += gap
+            branch_tool_model_duration_minutes[branch][tool][model] += gap
 
         session_duration = (sess[-1]["dt_br"] - sess[0]["dt_br"]).total_seconds() / 60.0
         if session_duration < 15.0:
             padding = 15.0 - session_duration
+            last_tool = sess[-1]["tool"]
             last_model = sess[-1]["active_model"]
             last_branch = sess[-1]["branch"]
-            model_duration_minutes[last_model] += padding
-            branch_model_duration_minutes[last_branch][last_model] += padding
+            tool_model_duration_minutes[last_tool][last_model] += padding
+            branch_tool_model_duration_minutes[last_branch][last_tool][last_model] += padding
 
-        for m, m_mins in model_duration_minutes.items():
-            h = m_mins / 60.0
-            daily_stats[date_str][m]["hours"] += h
-            total_hours += h
+        for t, tm_map in tool_model_duration_minutes.items():
+            for m, m_mins in tm_map.items():
+                h = m_mins / 60.0
+                daily_stats[date_str][t][m]["hours"] += h
+                total_hours += h
 
-        for b, bm_map in branch_model_duration_minutes.items():
-            for m, m_mins in bm_map.items():
-                branch_stats[date_str][b][m]["hours"] += m_mins / 60.0
+        for b, btm_map in branch_tool_model_duration_minutes.items():
+            for t, tm_map in btm_map.items():
+                for m, m_mins in tm_map.items():
+                    branch_stats[date_str][b][t][m]["hours"] += m_mins / 60.0
 
     if args.export:
         report_path = os.path.join(repo_root, ".tracker", "TEMPO_DE_TRABALHO.md")
@@ -395,36 +399,72 @@ def main():
                 f"* **Última Atualização:** {brasilia_now_str} (Horário de Brasília)\n"
                 f"* **Tempo Ativo Combinado (IA):** **{format_hours(total_hours)}**\n"
                 f"* **Total de Interações:** **{len(ping_events)} comandos** em {len(sessions)} sessões\n\n"
-                f"### 🗓️ Detalhamento Diário das Horas (Brasília)\n\n"
-                f"| Dia de Trabalho | Modelo LLM | Tempo Ativo | Sessões Ativas | Interações |\n"
-                f"| :---: | :---: | :---: | :---: | :---: |\n"
             )
-            
-            for d in sorted(daily_stats.keys(), key=lambda x: datetime.strptime(x, "%d/%m/%Y")):
-                for m in sorted(daily_stats[d].keys()):
-                    h = daily_stats[d][m]["hours"]
-                    s = daily_stats[d][m]["sessions"]
-                    i = daily_stats[d][m]["interactions"]
-                    new_block += f"| {d} | **{m}** | {format_hours(h)} | {s} | {i} |\n"
-            
-            if not daily_stats:
-                new_block += f"| N/A | Nenhum | 0h 00m | 0 | 0 |\n"
+
+            # Seção: Totais por Ferramenta (inserida ANTES da Tabela 1)
+            tool_totals = defaultdict(lambda: {"hours": 0.0, "interactions": 0})
+            for d in daily_stats:
+                for t in daily_stats[d]:
+                    for m in daily_stats[d][t]:
+                        tool_totals[t]["hours"] += daily_stats[d][t][m]["hours"]
+                        tool_totals[t]["interactions"] += daily_stats[d][t][m]["interactions"]
 
             new_block += (
+                f"### 🛠️ Totais por Ferramenta\n\n"
+                f"| Ferramenta | Tempo Ativo | Interações |\n"
+                f"| :---: | :---: | :---: |\n"
+            )
+            if tool_totals:
+                for t in sorted(tool_totals.keys()):
+                    th = tool_totals[t]["hours"]
+                    ti = tool_totals[t]["interactions"]
+                    new_block += f"| **{t}** | {format_hours(th)} | {ti} |\n"
+            else:
+                new_block += f"| Nenhuma | 0h 00m | 0 |\n"
+
+            # Tabela 1: Detalhamento Diário com coluna Ferramenta
+            new_block += (
+                f"\n### 🗓️ Detalhamento Diário das Horas (Brasília)\n\n"
+                f"| Dia de Trabalho | Ferramenta | Modelo LLM | Tempo Ativo | Sessões Ativas | Interações |\n"
+                f"| :---: | :---: | :---: | :---: | :---: | :---: |\n"
+            )
+
+            for d in sorted(daily_stats.keys(), key=lambda x: datetime.strptime(x, "%d/%m/%Y")):
+                for t in sorted(daily_stats[d].keys()):
+                    for m in sorted(daily_stats[d][t].keys()):
+                        h = daily_stats[d][t][m]["hours"]
+                        s = daily_stats[d][t][m]["sessions"]
+                        i = daily_stats[d][t][m]["interactions"]
+                        new_block += f"| {d} | **{t}** | {m} | {format_hours(h)} | {s} | {i} |\n"
+
+            if not daily_stats:
+                new_block += f"| N/A | Nenhuma | Nenhum | 0h 00m | 0 | 0 |\n"
+
+            # Tabela 2: Detalhamento por Branch com colunas Ferramentas + Modelos Utilizados
+            new_block += (
                 f"\n### 🌿 Detalhamento Diário por Branch / História (Brasília)\n\n"
-                f"| Dia de Trabalho | Branch Ativa | Modelos Utilizados | Tempo Ativo | Interações |\n"
-                f"| :---: | :---: | :---: | :---: | :---: |\n"
+                f"| Dia de Trabalho | Branch Ativa | Ferramentas | Modelos Utilizados | Tempo Ativo | Interações |\n"
+                f"| :---: | :---: | :---: | :---: | :---: | :---: |\n"
             )
 
             if branch_stats:
                 for d in sorted(branch_stats.keys(), key=lambda x: datetime.strptime(x, "%d/%m/%Y")):
                     for b in sorted(branch_stats[d].keys()):
-                        branch_hours = sum(branch_stats[d][b][m]["hours"] for m in branch_stats[d][b])
-                        branch_interactions = sum(branch_stats[d][b][m]["interactions"] for m in branch_stats[d][b])
-                        models_used = ", ".join(sorted(branch_stats[d][b].keys()))
-                        new_block += f"| {d} | `{b}` | {models_used} | {format_hours(branch_hours)} | {branch_interactions} |\n"
+                        branch_hours = sum(
+                            branch_stats[d][b][t][m]["hours"]
+                            for t in branch_stats[d][b]
+                            for m in branch_stats[d][b][t]
+                        )
+                        branch_interactions = sum(
+                            branch_stats[d][b][t][m]["interactions"]
+                            for t in branch_stats[d][b]
+                            for m in branch_stats[d][b][t]
+                        )
+                        tools_used = ", ".join(sorted(branch_stats[d][b].keys()))
+                        models_used = ", ".join(sorted({m for t in branch_stats[d][b].values() for m in t.keys()}))
+                        new_block += f"| {d} | `{b}` | {tools_used} | {models_used} | {format_hours(branch_hours)} | {branch_interactions} |\n"
             else:
-                new_block += f"| N/A | Nenhuma | Nenhum | 0h 00m | 0 |\n"
+                new_block += f"| N/A | Nenhuma | Nenhuma | Nenhum | 0h 00m | 0 |\n"
 
             blocks.append(new_block.strip())
             
@@ -446,15 +486,18 @@ def main():
         print(f" Repositório: \033[94m{repo_root}\033[0m")
         print(f" Data/Hora (Brasília): {brasilia_now_str}")
         print("-"*60)
-        print(f" \033[1mMétricas locais compiladas por Modelo (Gap: {args.gap} min):\033[0m")
-        
-        model_totals = defaultdict(float)
+        print(f" \033[1mMétricas locais compiladas por Ferramenta/Modelo (Gap: {args.gap} min):\033[0m")
+
+        tool_model_totals = defaultdict(lambda: defaultdict(float))
         for d in daily_stats:
-            for m in daily_stats[d]:
-                model_totals[m] += daily_stats[d][m]["hours"]
-                
-        for m, h in sorted(model_totals.items()):
-            print(f"  • {m}: \033[92m{format_hours(h)}\033[0m")
+            for t in daily_stats[d]:
+                for m in daily_stats[d][t]:
+                    tool_model_totals[t][m] += daily_stats[d][t][m]["hours"]
+
+        for t in sorted(tool_model_totals.keys()):
+            print(f"  [{t}]")
+            for m, h in sorted(tool_model_totals[t].items()):
+                print(f"   • {m}: \033[92m{format_hours(h)}\033[0m")
             
         print("-"*60)
         print(f" \033[1;93m✔ TOTAL LOCAL COMBINADO ACUMULADO: {format_hours(total_hours)}\033[0m")

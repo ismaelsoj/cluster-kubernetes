@@ -75,3 +75,11 @@ Registro centralizado de itens identificados em revisões/triagens que não pert
 
 - **Detached HEAD capturado como SHA de branch:** `build_branch_timeline` captura verbatim o alvo de cada checkout — em detached HEAD, o "nome de branch" é um SHA abreviado (ex: `a3f9c21`). O relatório exibirá o SHA como se fosse nome de branch. Adicionar pós-processamento: se o destino parecer um SHA (regex `^[0-9a-f]{7,40}$`), substituir por `"(detached HEAD)"`.
 - **Tempo inter-ping em sessões com troca de branch:** quando uma sessão atravessa um checkout (ambos os pings pertencem a branches diferentes), o gap de duração entre eles é inteiramente atribuído à branch do ping anterior. A branch posterior recebe apenas suas próprias interações, sem a fração de tempo que lhe seria proporcional. Corrigir exigiria interpolar o timestamp exato do checkout dentro do gap.
+
+## Deferred from: feature ferramenta-dimensao-relatorio (2026-05-19)
+
+### Diferido para melhoria futura do .tracker/work-tracker.py
+
+- **Sessões cruzando meia-noite:** `date_str = sess[0]["dt_br"].strftime(...)` atribui toda a sessão à data do primeiro evento. Sessões que cruzam meia-noite acumulam horas, sessões e interações do dia seguinte no dia anterior. Corrigir exigiria dividir a sessão no limite da meia-noite e distribuir a duração proporcionalmente.
+- **Antigravity change events sem `active_model`:** eventos de tipo `is_change=True` do Antigravity não possuem o campo `active_model`. O filtro `is_ping` os mantém fora do loop de sessões, mas a ausência do campo é um risco de KeyError se o filtro mudar. Adicionar `active_model: None` nesses eventos na coleta ou reforçar a guarda no loop.
+- **Inconsistência de padrão de guarda de tabelas vazias:** a Tabela 1 usa `for ... ; if not daily_stats:` (guarda após loop) enquanto a Tabela 2 usa `if branch_stats: for ... ; else:` (guarda antes). Ambas corretas hoje, mas o padrão divergente é armadilha de manutenção. Padronizar para o padrão `if/else` antes do loop.
