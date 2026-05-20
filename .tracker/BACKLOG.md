@@ -23,12 +23,10 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica ide
 
 ### BKL-002: Rastreamento de Tokens (Antigravity) — Inviável Atualmente
 - **Tipo:** Pesquisa / Limitação Técnica
-- **Origem:** Party Mode (investigação 2026-05-20)
-- **Status:** ⛔ Bloqueado — sem dados disponíveis
-- **Descrição:** Os logs `overview.txt` do Antigravity **não contêm** informações de tokens (`usage`, `token`, `cost`, `billing`). Os dados de consumo ficam:
-  - Nos arquivos `.pb` (Protocol Buffers criptografados — inacessíveis sem schema)
-  - Nos endpoints internos do backend da IDE (não persistidos localmente)
-- **Ação:** Monitorar atualizações do Antigravity que possam expor dados de uso nos logs. Até lá, o rastreamento de tokens fica restrito ao Claude Code.
+- **Origem:** Party Mode (investigação 2026-05-20) / Pesquisa Técnica (2026-05-20)
+- **Status:** ⛔ Inviável / Bloqueado
+- **Descrição:** Os novos logs `transcript.jsonl` do Antigravity, assim como o armazenamento binário em `.pb`, **não expõem** de forma acessível e local os dados de consumo de tokens.
+- **Ação:** Monitorar atualizações do Antigravity. Como sugestão de ação (Feature Request), recomendar aos desenvolvedores a inclusão da chave `"usage": {"input_tokens": X, "output_tokens": Y}` nos logs JSONL futuros. O script deve continuar medindo esforço baseado unicamente em tempo ativo. O rastreamento de tokens permanece restrito ao Claude Code.
 
 ### BKL-003: Export JSON/CSV
 - **Tipo:** Feature
@@ -44,11 +42,11 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica ide
 
 ### BKL-026: Antigravity trunca eventos de troca de modelo
 - **Tipo:** Bug (Upstream / Limitação Técnica)
-- **Origem:** Investigação de tracking (2026-05-20)
-- **Status:** ⛔ Bloqueado (Bug na plataforma Antigravity)
-- **Descrição:** O arquivo `overview.txt` gerado pelo Antigravity trunca entradas `USER_EXPLICIT` longas (acima de ~1024 caracteres) com a tag `<truncated N bytes>`. Como o evento `<USER_SETTINGS_CHANGE>` é adicionado no **final** do payload, logo após o bloco longo de `<ADDITIONAL_METADATA>` (que lista documentos abertos, histórico, etc.), ele frequentemente é cortado se houver muito contexto no momento da interação.
-- **Impacto:** O script de rastreamento perde o evento de mudança de modelo e passa a propagar incorretamente o último modelo conhecido, atribuindo horas ao LLM errado no relatório.
-- **Correção proposta:** Reportar bug para a equipe de desenvolvimento do Antigravity sugerindo mover o bloco `<USER_SETTINGS_CHANGE>` para o início do payload (antes dos metadados) ou logar mudanças de configurações de forma independente do corpo da mensagem.
+- **Origem:** Investigação de tracking (2026-05-20) / Pesquisa Técnica (2026-05-20)
+- **Status:** 🚀 Desbloqueado (Resolvido nativamente no novo Antigravity IDE)
+- **Descrição:** O truncamento de eventos longos ocorria no arquivo `overview.txt`. A nova atualização do Antigravity migrou a persistência para `transcript.jsonl` (em `~/.gemini/antigravity-ide/brain/`), que não aplica truncamento no payload `USER_EXPLICIT` e preserva integralmente a tag `<USER_SETTINGS_CHANGE>`.
+- **Impacto:** O rastreador atual perde o evento de mudança de modelo porque não lê o novo formato, propagando incorretamente o modelo antigo.
+- **Correção proposta:** Refatorar o script `work-tracker.py` para apontar para a nova pasta App Data (`~/.gemini/antigravity-ide/brain/`) e extrair as interações dos arquivos `transcript.jsonl`. Após essa correção, o BKL-026 pode ser fechado.
 
 ---
 
