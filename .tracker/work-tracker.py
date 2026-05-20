@@ -163,6 +163,16 @@ def parse_existing_developers_stats(content, current_masked_id):
         }
     return dev_stats
 
+def extract_repo_name(content):
+    match = re.search(r'Active Document:\s*(/\S+)', content)
+    if match:
+        path = match.group(1).strip().rstrip(')')
+        while path and path != '/':
+            if os.path.isdir(os.path.join(path, '.git')):
+                return os.path.basename(path)
+            path = os.path.dirname(path)
+    return "unknown"
+
 def build_branch_timeline(repo_root):
     reflog_path = os.path.join(repo_root, ".git", "logs", "HEAD")
     timeline = []
@@ -219,6 +229,11 @@ def analyze_claude_code(repo_root):
     files = glob.glob(os.path.join(claude_dir, "*.jsonl"))
     for filepath in files:
         try:
+            # Pré-varredura para encontrar o primeiro modelo da conversa.
+            # Entradas "user" e "queue-operation" não têm message.model — sem isso,
+            # cada turno do usuário vira "Unknown" mesmo sem troca de modelo.
+            first_model = None
+            lines_data = []
             with open(filepath, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
@@ -226,29 +241,38 @@ def analyze_claude_code(repo_root):
                         continue
                     try:
                         data = json.loads(line)
-                        ts = data.get("timestamp")
-                        if not ts:
-                            continue
-                        dt = parse_iso(ts)
-                        if not dt:
-                            continue
-                        raw_model = data.get("message", {}).get("model")
-                        if not raw_model:
-                            raw_model = "Claude CLI (Unknown)"
-                            
-                        mapped_model = normalize_model_name(raw_model)
-                            
-                        events.append({
-                            "dt": dt,
-                            "tool": "Claude Code",
-                            "is_change": False,
-                            "model": None,
-                            "is_ping": True,
-                            "active_model": mapped_model
-                        })
-                        total_events += 1
+                        lines_data.append(data)
+                        if first_model is None:
+                            raw = data.get("message", {}).get("model")
+                            if raw:
+                                first_model = normalize_model_name(raw)
                     except Exception:
                         pass
+
+            current_model = first_model or "Claude CLI (Unknown)"
+            for data in lines_data:
+                try:
+                    ts = data.get("timestamp")
+                    if not ts:
+                        continue
+                    dt = parse_iso(ts)
+                    if not dt:
+                        continue
+                    raw = data.get("message", {}).get("model")
+                    if raw:
+                        current_model = normalize_model_name(raw)
+
+                    events.append({
+                        "dt": dt,
+                        "tool": "Claude Code",
+                        "is_change": False,
+                        "model": None,
+                        "is_ping": True,
+                        "active_model": current_model
+                    })
+                    total_events += 1
+                except Exception:
+                    pass
         except Exception:
             pass
             
@@ -270,23 +294,26 @@ def analyze_antigravity(repo_root):
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
-                
+
+            repo_name = extract_repo_name(content)
+
             # Normalizar caminhos para Windows/Linux/Mac e JSON escaped strings
             repo_root_fwd = repo_root.replace('\\', '/')
             repo_root_escaped = repo_root.replace('\\', '\\\\')
-            
+
             belongs_to_repo = (repo_root in content) or (repo_root_fwd in content) or (repo_root_escaped in content)
             has_user_input = ("USER_REQUEST" in content or "USER_EXPLICIT" in content)
-            
+
             if belongs_to_repo and has_user_input:
                 conversations_found += 1
                 
             lines = content.strip().split('\n')
             
-            # Pass 1: Captura o "to" do primeiro USER_SETTINGS_CHANGE e o ancora 1ms antes do
-            # primeiro turno — propaga o modelo selecionado para os pings da conversa atual e
-            # cronologicamente para conversas seguintes. O "from" é ignorado pois o payload
-            # inicial da IDE usa "from None to <selected>".
+            # Pass 1: Determina o modelo inicial da conversa ancorado 1ms antes do primeiro turno.
+            # Quando a conversa começa com um modelo já selecionado (ex: Claude), a IDE não emite
+            # USER_SETTINGS_CHANGE inicial — só emite ao trocar. Por isso capturamos o "from" do
+            # primeiro evento de mudança como modelo inicial quando não é "None". O "to" é o modelo
+            # após a troca, emitido normalmente no Pass 2.
             first_dt = None
             first_active_model = None
             for line in lines:
@@ -301,10 +328,15 @@ def analyze_antigravity(repo_root):
 
                     content_text = data.get("content", "")
                     if "<USER_SETTINGS_CHANGE>" in content_text and first_active_model is None:
-                        match = re.search(r"changed setting `Model Selection` from .*? to (.*?)\.", content_text)
+                        match = re.search(r"changed setting `Model Selection` from (.*?) to (.*?)(?:\. No need|\.?\s*$)", content_text)
                         if match:
-                            new_m = match.group(1).strip()
-                            first_active_model = normalize_model_name(new_m)
+                            from_m = match.group(1).strip()
+                            to_m = match.group(2).strip()
+                            # Se "from" é um modelo real (não None), a sessão iniciou com ele
+                            if from_m and from_m.lower() not in ("none", ""):
+                                first_active_model = normalize_model_name(from_m)
+                            else:
+                                first_active_model = normalize_model_name(to_m)
                 except Exception:
                     pass
 
@@ -337,7 +369,7 @@ def analyze_antigravity(repo_root):
                     is_change = False
                     new_model = None
                     if "<USER_SETTINGS_CHANGE>" in content_text:
-                        match = re.search(r"changed setting `Model Selection` from .*? to (.*?)\.", content_text)
+                        match = re.search(r"changed setting `Model Selection` from .*? to (.*?)(?:\. No need|\.?\s*$)", content_text)
                         if match:
                             new_model = normalize_model_name(match.group(1).strip())
                             is_change = True
@@ -374,19 +406,19 @@ def main():
     args = parser.parse_args()
     
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    
+
     username = getpass.getuser()
     hostname = socket.gethostname()
     masked_id = get_masked_identity(username, hostname)
-    
+
     brasilia_now = datetime.utcnow() - timedelta(hours=3)
     brasilia_now_str = brasilia_now.strftime('%d/%m/%Y %H:%M:%S')
-    
+
     branch_timeline = build_branch_timeline(repo_root)
 
     claude_events, claude_files, claude_steps = analyze_claude_code(repo_root)
     anti_events, anti_files, anti_steps = analyze_antigravity(repo_root)
-    
+
     all_events = claude_events + anti_events
     for ev in all_events:
         ev["dt_br"] = to_brasilia(ev["dt"].replace(tzinfo=None))
@@ -452,6 +484,8 @@ def main():
         date_tool_model_mins = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
         date_branch_tool_model_mins = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(float))))
         for i in range(len(sess) - 1):
+            if sess[i]["tool"] != sess[i+1]["tool"]:
+                continue
             gap = (sess[i+1]["dt_br"] - sess[i]["dt_br"]).total_seconds() / 60.0
             ev_date = sess[i]["dt_br"].strftime("%d/%m/%Y")
             tool = sess[i]["tool"]
@@ -573,7 +607,7 @@ def main():
                     new_block += f"| **{t}** | {format_hours(th)} | {ti} |\n"
             else:
                 new_block += f"| Nenhuma | 0h 00m | 0 |\n"
- 
+
             # Tabela 1: Detalhamento Diário com coluna Ferramenta
             new_block += (
                 f"\n### 🗓️ Detalhamento Diário das Horas (Brasília)\n\n"
@@ -652,7 +686,7 @@ def main():
             print(f"  [{t}]")
             for m, h in sorted(tool_model_totals[t].items()):
                 print(f"   • {m}: \033[92m{format_hours(h)}\033[0m")
-            
+
         print("-"*60)
         print(f" \033[1;93m✔ TOTAL LOCAL COMBINADO ACUMULADO: {format_hours(total_hours)}\033[0m")
         print("\033[1;35m" + "="*60 + "\033[0m")
