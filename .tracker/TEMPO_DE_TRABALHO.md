@@ -9,63 +9,19 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 
 ## 📊 Resumo Geral Consolidado (Todos os Desenvolvedores)
 
-* **Tempo Total de Desenvolvimento:** **26h 19m**
+* **Tempo Total de Desenvolvimento:** **26h 00m**
 
 ### 🌿 Tempo Total por Branch
 
 | Branch / História | Tempo Ativo Total |
 | :--- | :---: |
 | `1-2-makefile-scripts` | **2h 20m** |
-| `1-3-bootstrap-argocd` | **1h 19m** |
+| `1-3-bootstrap-argocd` | **1h 16m** |
 | `1-4-linter-yaml-pipeline-ci-readme` | **2h 16m** |
-| `main` | **13h 21m** |
+| `main` | **13h 08m** |
 | `remotes/origin/1-2-makefile-scripts` | **0h 00m** |
 | `teste` | **0h 05m** |
-| `time-tracker` | **6h 57m** |
-
----
-
-## 👤 Desenvolvedor: `dev-4e707577`
-
-* **Última Atualização:** 19/05/2026 19:50:03 (Horário de Brasília)
-* **Tempo Ativo Combinado (IA):** **5h 58m**
-* **Total de Interações:** **1509 comandos** em 7 sessões
-
-### 🛠️ Totais por Ferramenta
-
-| Ferramenta | Tempo Ativo | Interações |
-| :---: | :---: | :---: |
-| **Antigravity** | 3h 25m | 596 |
-| **Claude Code** | 2h 32m | 913 |
-
-### 🗓️ Detalhamento Diário das Horas (Brasília)
-
-| Dia de Trabalho | Ferramenta | Modelo LLM | Tempo Ativo | Sessões Ativas | Interações |
-| :---: | :---: | :---: | :---: | :---: | :---: |
-| 17/05/2026 | **Antigravity** | Gemini 3.1 Pro (High) | 1h 29m | 3 | 171 |
-| 17/05/2026 | **Claude Code** | Claude CLI (Unknown) | 0h 04m | 1 | 107 |
-| 17/05/2026 | **Claude Code** | Claude Opus 4.7 | 0h 02m | 1 | 81 |
-| 17/05/2026 | **Claude Code** | Claude Sonnet 4.6 | 0h 07m | 1 | 18 |
-| 18/05/2026 | **Antigravity** | Gemini 3.1 Pro (High) | 0h 34m | 1 | 215 |
-| 18/05/2026 | **Claude Code** | Claude CLI (Unknown) | 0h 24m | 1 | 233 |
-| 18/05/2026 | **Claude Code** | Claude Opus 4.7 | 0h 55m | 1 | 94 |
-| 18/05/2026 | **Claude Code** | Claude Sonnet 4.6 | 0h 18m | 1 | 111 |
-| 19/05/2026 | **Antigravity** | Gemini 3.1 Pro (High) | 1h 23m | 2 | 210 |
-| 19/05/2026 | **Claude Code** | Claude CLI (Unknown) | 0h 16m | 2 | 125 |
-| 19/05/2026 | **Claude Code** | Claude Opus 4.7 | 0h 25m | 2 | 144 |
-
-### 🌿 Detalhamento Diário por Branch / História (Brasília)
-
-| Dia de Trabalho | Branch Ativa | Ferramentas | Modelos Utilizados | Tempo Ativo | Interações |
-| :---: | :---: | :---: | :---: | :---: | :---: |
-| 17/05/2026 | `1-2-makefile-scripts` | Antigravity | Gemini 3.1 Pro (High) | 0h 22m | 28 |
-| 17/05/2026 | `1-3-bootstrap-argocd` | Claude Code | Claude CLI (Unknown), Claude Opus 4.7 | 0h 03m | 145 |
-| 17/05/2026 | `main` | Antigravity, Claude Code | Claude CLI (Unknown), Claude Opus 4.7, Claude Sonnet 4.6, Gemini 3.1 Pro (High) | 1h 17m | 203 |
-| 17/05/2026 | `remotes/origin/1-2-makefile-scripts` | Antigravity | Gemini 3.1 Pro (High) | 0h 00m | 1 |
-| 18/05/2026 | `1-3-bootstrap-argocd` | Antigravity, Claude Code | Claude CLI (Unknown), Claude Opus 4.7, Gemini 3.1 Pro (High) | 1h 16m | 245 |
-| 18/05/2026 | `1-4-linter-yaml-pipeline-ci-readme` | Claude Code | Claude CLI (Unknown), Claude Sonnet 4.6 | 0h 35m | 262 |
-| 18/05/2026 | `main` | Antigravity | Gemini 3.1 Pro (High) | 0h 21m | 146 |
-| 19/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude CLI (Unknown), Claude Opus 4.7, Gemini 3.1 Pro (High) | 2h 04m | 479 |
+| `time-tracker` | **6h 55m** |
 
 ---
 
@@ -118,6 +74,47 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | 18/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Sonnet 4.6, Gemini 3 Flash | 1h 18m | 274 |
 | 19/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Sonnet 4.6, Gemini 3 Flash | 0h 57m | 461 |
 | 20/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Sonnet 4.6, Gemini 3 Flash | 2h 38m | 486 |
+
+---
+
+## 👤 Desenvolvedor: `dev-4e707577`
+
+* **Última Atualização:** 20/05/2026 13:39:49 (Horário de Brasília)
+* **Tempo Ativo Combinado (IA):** **5h 39m**
+* **Total de Interações:** **1509 comandos** em 7 sessões
+
+### 🛠️ Totais por Ferramenta
+
+| Ferramenta | Tempo Ativo | Interações |
+| :---: | :---: | :---: |
+| **Antigravity** | 3h 10m | 596 |
+| **Claude Code** | 2h 29m | 913 |
+
+### 🗓️ Detalhamento Diário das Horas (Brasília)
+
+| Dia de Trabalho | Ferramenta | Modelo LLM | Tempo Ativo | Sessões Ativas | Interações |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| 17/05/2026 | **Antigravity** | Gemini 3.1 Pro (High) | 1h 20m | 3 | 171 |
+| 17/05/2026 | **Claude Code** | Claude Opus 4.7 | 0h 05m | 1 | 158 |
+| 17/05/2026 | **Claude Code** | Claude Sonnet 4.6 | 0h 09m | 1 | 48 |
+| 18/05/2026 | **Antigravity** | Gemini 3.1 Pro (High) | 0h 29m | 1 | 215 |
+| 18/05/2026 | **Claude Code** | Claude Opus 4.7 | 1h 00m | 1 | 176 |
+| 18/05/2026 | **Claude Code** | Claude Sonnet 4.6 | 0h 35m | 1 | 262 |
+| 19/05/2026 | **Antigravity** | Gemini 3.1 Pro (High) | 1h 21m | 2 | 210 |
+| 19/05/2026 | **Claude Code** | Claude Opus 4.7 | 0h 41m | 2 | 269 |
+
+### 🌿 Detalhamento Diário por Branch / História (Brasília)
+
+| Dia de Trabalho | Branch Ativa | Ferramentas | Modelos Utilizados | Tempo Ativo | Interações |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| 17/05/2026 | `1-2-makefile-scripts` | Antigravity | Gemini 3.1 Pro (High) | 0h 22m | 28 |
+| 17/05/2026 | `1-3-bootstrap-argocd` | Claude Code | Claude Opus 4.7 | 0h 03m | 145 |
+| 17/05/2026 | `main` | Antigravity, Claude Code | Claude Opus 4.7, Claude Sonnet 4.6, Gemini 3.1 Pro (High) | 1h 09m | 203 |
+| 17/05/2026 | `remotes/origin/1-2-makefile-scripts` | Antigravity | Gemini 3.1 Pro (High) | 0h 00m | 1 |
+| 18/05/2026 | `1-3-bootstrap-argocd` | Antigravity, Claude Code | Claude Opus 4.7, Gemini 3.1 Pro (High) | 1h 13m | 245 |
+| 18/05/2026 | `1-4-linter-yaml-pipeline-ci-readme` | Claude Code | Claude Sonnet 4.6 | 0h 35m | 262 |
+| 18/05/2026 | `main` | Antigravity | Gemini 3.1 Pro (High) | 0h 17m | 146 |
+| 19/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Opus 4.7, Gemini 3.1 Pro (High) | 2h 02m | 479 |
 
 ---
 
