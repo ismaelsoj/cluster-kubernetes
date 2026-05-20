@@ -443,39 +443,45 @@ def main():
             for t, m in tool_models_in_branch_session:
                 branch_stats[date_str][b][t][m]["sessions"] += 1
 
+        # Interações e durações atribuídas à data real de cada ping (corrige sessões que atravessam meia-noite)
         for ev in sess:
-            daily_stats[date_str][ev["tool"]][ev["active_model"]]["interactions"] += 1
-            branch_stats[date_str][ev["branch"]][ev["tool"]][ev["active_model"]]["interactions"] += 1
+            ev_date = ev["dt_br"].strftime("%d/%m/%Y")
+            daily_stats[ev_date][ev["tool"]][ev["active_model"]]["interactions"] += 1
+            branch_stats[ev_date][ev["branch"]][ev["tool"]][ev["active_model"]]["interactions"] += 1
 
-        tool_model_duration_minutes = defaultdict(lambda: defaultdict(float))
-        branch_tool_model_duration_minutes = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+        date_tool_model_mins = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+        date_branch_tool_model_mins = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(float))))
         for i in range(len(sess) - 1):
             gap = (sess[i+1]["dt_br"] - sess[i]["dt_br"]).total_seconds() / 60.0
+            ev_date = sess[i]["dt_br"].strftime("%d/%m/%Y")
             tool = sess[i]["tool"]
             model = sess[i]["active_model"]
             branch = sess[i]["branch"]
-            tool_model_duration_minutes[tool][model] += gap
-            branch_tool_model_duration_minutes[branch][tool][model] += gap
+            date_tool_model_mins[ev_date][tool][model] += gap
+            date_branch_tool_model_mins[ev_date][branch][tool][model] += gap
 
         session_duration = (sess[-1]["dt_br"] - sess[0]["dt_br"]).total_seconds() / 60.0
         if session_duration < 15.0:
             padding = 15.0 - session_duration
+            last_ev_date = sess[-1]["dt_br"].strftime("%d/%m/%Y")
             last_tool = sess[-1]["tool"]
             last_model = sess[-1]["active_model"]
             last_branch = sess[-1]["branch"]
-            tool_model_duration_minutes[last_tool][last_model] += padding
-            branch_tool_model_duration_minutes[last_branch][last_tool][last_model] += padding
+            date_tool_model_mins[last_ev_date][last_tool][last_model] += padding
+            date_branch_tool_model_mins[last_ev_date][last_branch][last_tool][last_model] += padding
 
-        for t, tm_map in tool_model_duration_minutes.items():
-            for m, m_mins in tm_map.items():
-                h = m_mins / 60.0
-                daily_stats[date_str][t][m]["hours"] += h
-                total_hours += h
+        for d, tm_map in date_tool_model_mins.items():
+            for t, m_map in tm_map.items():
+                for m, m_mins in m_map.items():
+                    h = m_mins / 60.0
+                    daily_stats[d][t][m]["hours"] += h
+                    total_hours += h
 
-        for b, btm_map in branch_tool_model_duration_minutes.items():
-            for t, tm_map in btm_map.items():
-                for m, m_mins in tm_map.items():
-                    branch_stats[date_str][b][t][m]["hours"] += m_mins / 60.0
+        for d, btm_map in date_branch_tool_model_mins.items():
+            for b, tm_map in btm_map.items():
+                for t, m_map in tm_map.items():
+                    for m, m_mins in m_map.items():
+                        branch_stats[d][b][t][m]["hours"] += m_mins / 60.0
 
     if args.export:
         report_path = os.path.join(repo_root, ".tracker", "TEMPO_DE_TRABALHO.md")
