@@ -42,6 +42,14 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica ide
 - **Descrição:** Regex `(.*?)\.` em Pass 1/2 do Antigravity trunca nomes de modelo com ponto no nome de exibição. Payload `"to Gemini 3.1 Pro."` captura `"Gemini 3"`.
 - **Correção proposta:** Usar sentinela mais robusto: `(.*?)(?:\.\s|\.?$)` ou ancorar ao delimitador específico do payload da IDE.
 
+### BKL-026: Antigravity trunca eventos de troca de modelo
+- **Tipo:** Bug (Upstream / Limitação Técnica)
+- **Origem:** Investigação de tracking (2026-05-20)
+- **Status:** ⛔ Bloqueado (Bug na plataforma Antigravity)
+- **Descrição:** O arquivo `overview.txt` gerado pelo Antigravity trunca entradas `USER_EXPLICIT` longas (acima de ~1024 caracteres) com a tag `<truncated N bytes>`. Como o evento `<USER_SETTINGS_CHANGE>` é adicionado no **final** do payload, logo após o bloco longo de `<ADDITIONAL_METADATA>` (que lista documentos abertos, histórico, etc.), ele frequentemente é cortado se houver muito contexto no momento da interação.
+- **Impacto:** O script de rastreamento perde o evento de mudança de modelo e passa a propagar incorretamente o último modelo conhecido, atribuindo horas ao LLM errado no relatório.
+- **Correção proposta:** Reportar bug para a equipe de desenvolvimento do Antigravity sugerindo mover o bloco `<USER_SETTINGS_CHANGE>` para o início do payload (antes dos metadados) ou logar mudanças de configurações de forma independente do corpo da mensagem.
+
 ---
 
 ## 🥈 Prioridade Média — Melhorias de Qualidade Significativas
@@ -180,8 +188,8 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica ide
 | Tipo | Quantidade |
 |------|-----------|
 | Feature | 8 |
-| Bug / Bug potencial | 8 |
+| Bug / Bug potencial | 9 |
 | Dívida técnica | 6 |
-| Pesquisa / Bloqueado | 1 |
+| Pesquisa / Bloqueado | 2 |
 | Código morto | 1 |
 | Divergência de spec | 1 |

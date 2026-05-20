@@ -136,7 +136,8 @@ sequenceDiagram
 ## 7. Trabalho Diferido (Backlog Técnico)
 
 ### Prioridade Alta
-- **Regex `(.*?)\.` trunca nomes com ponto:** payload `"to Gemini 3.1 Pro."` captura `"Gemini 3"`. Precisa sentinela mais robusto.
+- **Antigravity trunca eventos de troca de modelo:** O arquivo `overview.txt` trunca entradas `USER_EXPLICIT` acima de ~1024 caracteres com `<truncated N bytes>`, perdendo a tag `<USER_SETTINGS_CHANGE>` que é adicionada no final do payload. Causa perda de eventos de troca de modelo quando o `ADDITIONAL_METADATA` é muito grande. Deve ser reportado à equipe do Antigravity. (BKL-026)
+- **Regex `(.*?)\.` trunca nomes com ponto:** payload `"to Gemini 3.1 Pro."` captura `"Gemini 3"`. Precisa sentinela mais robusto. (BKL-004)
 
 ### Prioridade Média
 - **Detached HEAD como SHA de branch:** checkout para SHA aparece como nome de branch no relatório. Adicionar pós-processamento com regex `^[0-9a-f]{7,40}$`.
