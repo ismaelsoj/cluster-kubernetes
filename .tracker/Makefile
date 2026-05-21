@@ -19,3 +19,6 @@ ifeq ($(EXPORT),true)
 else
 	@python3 "$(REPO_ROOT)/.tracker/work-tracker.py"
 endif
+
+bootstrap: ## Executa o script de bootstrap dos eventos legados (one-shot)
+	@python3 "$(REPO_ROOT)/.tracker/bootstrap_events.py"

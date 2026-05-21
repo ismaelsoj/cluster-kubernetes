@@ -43,7 +43,7 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica ide
 ### BKL-026: Antigravity trunca eventos de troca de modelo
 - **Tipo:** Bug (Upstream / Limitação Técnica)
 - **Origem:** Investigação de tracking (2026-05-20) / Pesquisa Técnica (2026-05-20)
-- **Status:** 🚀 Desbloqueado (Resolvido nativamente no novo Antigravity IDE)
+- **Status:** ✅ Concluído (Antigravity IDE integrado com transcript.jsonl)
 - **Descrição:** O truncamento de eventos longos ocorria no arquivo `overview.txt`. A nova atualização do Antigravity migrou a persistência para `transcript.jsonl` (em `~/.gemini/antigravity-ide/brain/`), que não aplica truncamento no payload `USER_EXPLICIT` e preserva integralmente a tag `<USER_SETTINGS_CHANGE>`.
 - **Impacto:** O rastreador atual perde o evento de mudança de modelo porque não lê o novo formato, propagando incorretamente o modelo antigo.
 - **Correção proposta:** Refatorar o script `work-tracker.py` para apontar para a nova pasta App Data (`~/.gemini/antigravity-ide/brain/`) e extrair as interações dos arquivos `transcript.jsonl`. Após essa correção, o BKL-026 pode ser fechado.
@@ -55,6 +55,7 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica ide
 ### BKL-005: Refatorar `main()` (296 linhas)
 - **Tipo:** Dívida técnica
 - **Origem:** Party Mode (Amelia, Winston)
+- **Status:** ✅ Concluído
 - **Descrição:** Separar em funções puras composáveis:
   - `collect_events()` → coleta de ambas as ferramentas
   - `merge_and_sort()` → mesclagem cronológica
@@ -66,6 +67,7 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica ide
 ### BKL-006: Testes Unitários
 - **Tipo:** Dívida técnica
 - **Origem:** Party Mode (Amelia)
+- **Status:** ✅ Concluído
 - **Descrição:** Criar suite de testes para:
   - `parse_iso()` — 4 formatos + fallback
   - `normalize_model_name()` — edge cases de normalização

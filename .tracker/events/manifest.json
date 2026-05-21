@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "developers": {
+    "dev-39d71ab2": {
+      "legacy_boundary": "2026-05-20T13:37:11"
+    },
+    "dev-4e707577": {
+      "legacy_boundary": "2026-05-20T13:39:49"
+    }
+  }
+}

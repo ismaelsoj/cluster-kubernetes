@@ -5,9 +5,7 @@
 Utilitário Apartado de Rastreamento de Tempo de Trabalho Ativo (Claude Code + Antigravity)
 Roda localmente de forma privada com fuso horário de Brasília (GMT-3), 
 mascara a identidade do desenvolvedor com hash SHA-256 para anonimato externo, 
-e gera tabelas agregadas detalhadas por dia de trabalho.
-"""
-
+e gera tabelas agregadas detalhadas por dia de trabalho."""
 import os
 import re
 import json
@@ -16,8 +14,14 @@ import hashlib
 import argparse
 import socket
 import getpass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+
+# Constantes do modelo de evento
+SCHEMA_VERSION = 1
+EVENTS_DIRNAME = "events"
+MANIFEST_NAME = "manifest.json"
+LEGACY_MODEL_LABEL = "Indeterminado (pré-migração)"
 
 def parse_iso(dt_str):
     for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S %z"):
@@ -60,8 +64,20 @@ def parse_hours_from_str(h_str):
     if m_h:
         hours += float(m_h.group(1))
     if m_m:
-        hours += float(m_m.group(1)) / 60.0
+        hours += float(m_m.group(2) if len(m_m.groups()) > 1 else m_m.group(1)) / 60.0
     return hours
+
+def date_to_iso(d_str):
+    parts = d_str.strip().split('/')
+    if len(parts) == 3:
+        return f"{parts[2]}-{parts[1]}-{parts[0]}"
+    return d_str
+
+def iso_to_date(iso_str):
+    parts = iso_str.strip().split('-')
+    if len(parts) == 3:
+        return f"{parts[2]}/{parts[1]}/{parts[0]}"
+    return iso_str
 
 def normalize_model_name(raw_model):
     if not raw_model:
@@ -70,6 +86,10 @@ def normalize_model_name(raw_model):
     # 1. Trata tipos não-string com segurança
     raw_model = str(raw_model).strip()
     if not raw_model or raw_model.lower() == "none":
+        return "None"
+
+    # Evita falsos positivos com strings de regex / código discutido nas próprias conversas
+    if any(char in raw_model for char in ('*', '?', '\\', '|', '[', ']')):
         return "None"
         
     # 2. Remove sufixos de datas de forma abrangente (ex: -20241022 ou -2024-10-22)
@@ -100,7 +120,6 @@ def normalize_model_name(raw_model):
         capitalized_words.append(w_cap)
         
     normalized = " ".join(capitalized_words)
-
     
     # 6. Garante prefixo "Claude" de forma case-insensitive e segura
     norm_lower = normalized.lower()
@@ -108,7 +127,6 @@ def normalize_model_name(raw_model):
         normalized = "Claude " + normalized
         
     return normalized
-
 
 def parse_existing_developers_stats(content, current_masked_id):
     parts = re.split(r'\n\s*---\s*\n', content)
@@ -201,7 +219,6 @@ def build_branch_timeline(repo_root):
     timeline.sort(key=lambda x: x[0])
     return timeline
 
-
 def get_branch_at(timeline, ping_dt):
     if not timeline:
         return "main"
@@ -214,7 +231,6 @@ def get_branch_at(timeline, ping_dt):
     if result is None:
         return "main"
     return result
-
 
 def analyze_claude_code(repo_root):
     project_dir_name = re.sub(r'[^a-zA-Z0-9]', '-', repo_root)
@@ -229,9 +245,6 @@ def analyze_claude_code(repo_root):
     files = glob.glob(os.path.join(claude_dir, "*.jsonl"))
     for filepath in files:
         try:
-            # Pré-varredura para encontrar o primeiro modelo da conversa.
-            # Entradas "user" e "queue-operation" não têm message.model — sem isso,
-            # cada turno do usuário vira "Unknown" mesmo sem troca de modelo.
             first_model = None
             lines_data = []
             with open(filepath, 'r', encoding='utf-8') as f:
@@ -279,7 +292,7 @@ def analyze_claude_code(repo_root):
     return events, len(files), total_events
 
 def analyze_antigravity(repo_root):
-    antigravity_dir = os.path.expanduser("~/.gemini/antigravity/brain")
+    antigravity_dir = os.path.expanduser("~/.gemini/antigravity-ide/brain")
     events = []
     conversations_found = 0
     total_steps = 0
@@ -287,7 +300,7 @@ def analyze_antigravity(repo_root):
     if not os.path.isdir(antigravity_dir):
         return [], 0, 0
         
-    pattern = os.path.join(antigravity_dir, "*", ".system_generated", "logs", "overview.txt")
+    pattern = os.path.join(antigravity_dir, "*", ".system_generated", "logs", "transcript.jsonl")
     files = glob.glob(pattern)
     
     for filepath in files:
@@ -310,10 +323,6 @@ def analyze_antigravity(repo_root):
             lines = content.strip().split('\n')
             
             # Pass 1: Determina o modelo inicial da conversa ancorado 1ms antes do primeiro turno.
-            # Quando a conversa começa com um modelo já selecionado (ex: Claude), a IDE não emite
-            # USER_SETTINGS_CHANGE inicial — só emite ao trocar. Por isso capturamos o "from" do
-            # primeiro evento de mudança como modelo inicial quando não é "None". O "to" é o modelo
-            # após a troca, emitido normalmente no Pass 2.
             first_dt = None
             first_active_model = None
             for line in lines:
@@ -326,13 +335,12 @@ def analyze_antigravity(repo_root):
                     if created_at and not first_dt:
                         first_dt = parse_iso(created_at)
 
-                    content_text = data.get("content", "")
+                    content_text = data.get("content") or ""
                     if "<USER_SETTINGS_CHANGE>" in content_text and first_active_model is None:
                         match = re.search(r"changed setting `Model Selection` from (.*?) to (.*?)(?:\. No need|\.?\s*$)", content_text)
                         if match:
                             from_m = match.group(1).strip()
                             to_m = match.group(2).strip()
-                            # Se "from" é um modelo real (não None), a sessão iniciou com ele
                             if from_m and from_m.lower() not in ("none", ""):
                                 first_active_model = normalize_model_name(from_m)
                             else:
@@ -364,7 +372,7 @@ def analyze_antigravity(repo_root):
                     if not dt:
                         continue
                     
-                    content_text = data.get("content", "")
+                    content_text = data.get("content") or ""
                     
                     is_change = False
                     new_model = None
@@ -399,65 +407,136 @@ def analyze_antigravity(repo_root):
             
     return events, conversations_found, total_steps
 
-def main():
-    parser = argparse.ArgumentParser(description="Calculador de tempo de trabalho de IA apartado e seguro.")
-    parser.add_argument("--export", action="store_true", help="Se definido, anexa/atualiza o relatório em formato Markdown.")
-    parser.add_argument("--gap", type=int, default=45, help="Intervalo máximo em minutos entre comandos para agrupar na mesma sessão.")
-    args = parser.parse_args()
+def load_manifest(events_dir):
+    manifest_path = os.path.join(events_dir, MANIFEST_NAME)
+    if os.path.exists(manifest_path):
+        try:
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"schema_version": SCHEMA_VERSION, "developers": {}}
+
+def emit_events(events_dir, masked_id, live_events):
+    file_name = f"dev-{masked_id}.jsonl" if not masked_id.startswith("dev-") else f"{masked_id}.jsonl"
+    file_path = os.path.join(events_dir, file_name)
     
-    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    legacy_events = []
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    ev = json.loads(line)
+                    if ev.get("legacy") is True:
+                        legacy_events.append(ev)
+        except Exception:
+            pass
 
-    username = getpass.getuser()
-    hostname = socket.gethostname()
-    masked_id = get_masked_identity(username, hostname)
+    live_hours = sum(ev["hours"] for ev in live_events if ev["event_type"] == "activity_daily")
+    live_interactions = sum(ev["interactions"] for ev in live_events if ev["event_type"] == "activity_daily")
+    live_sessions = sum(ev["sessions"] for ev in live_events if ev["event_type"] == "activity_daily")
 
-    brasilia_now = datetime.utcnow() - timedelta(hours=3)
-    brasilia_now_str = brasilia_now.strftime('%d/%m/%Y %H:%M:%S')
+    tz_br = timezone(timedelta(hours=-3))
+    now_br = datetime.now(tz=tz_br)
+    generated_at_str = now_br.isoformat()
+    last_updated_str = now_br.strftime('%d/%m/%Y %H:%M:%S')
 
-    branch_timeline = build_branch_timeline(repo_root)
+    live_summary = {
+        "event_type": "dev_summary",
+        "schema_version": SCHEMA_VERSION,
+        "developer": masked_id,
+        "scope": "live",
+        "total_hours": round(live_hours, 4),
+        "total_interactions": live_interactions,
+        "total_sessions": live_sessions,
+        "last_updated": last_updated_str,
+        "legacy": False,
+        "generated_at": generated_at_str
+    }
 
-    claude_events, claude_files, claude_steps = analyze_claude_code(repo_root)
-    anti_events, anti_files, anti_steps = analyze_antigravity(repo_root)
+    if not os.path.exists(events_dir):
+        os.makedirs(events_dir)
+        
+    with open(file_path, 'w', encoding='utf-8') as f:
+        for ev in legacy_events:
+            f.write(json.dumps(ev, ensure_ascii=False) + "\n")
+        f.write(json.dumps(live_summary, ensure_ascii=False) + "\n")
+        for ev in live_events:
+            f.write(json.dumps(ev, ensure_ascii=False) + "\n")
 
+def load_all_events(events_dir):
+    events = []
+    if os.path.exists(events_dir):
+        pattern = os.path.join(events_dir, "dev-*.jsonl")
+        files = glob.glob(pattern)
+        for filepath in files:
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        events.append(json.loads(line))
+            except Exception:
+                pass
+    return events
+
+def collect_events(repo_root):
+    claude_events, _, _ = analyze_claude_code(repo_root)
+    anti_events, _, _ = analyze_antigravity(repo_root)
     all_events = claude_events + anti_events
     for ev in all_events:
         ev["dt_br"] = to_brasilia(ev["dt"].replace(tzinfo=None))
-        
     all_events.sort(key=lambda x: x["dt_br"])
-    
-    # Propagação cronológica de estado com fallback de fábrica
+    return all_events
+
+def compute_sessions(events, gap_minutes, legacy_boundary, branch_timeline):
+    boundary_dt = None
+    if legacy_boundary:
+        if isinstance(legacy_boundary, str):
+            boundary_dt = datetime.strptime(legacy_boundary, "%Y-%m-%dT%H:%M:%S")
+        else:
+            boundary_dt = legacy_boundary
+
     current_anti_model = "Gemini 3.1 Pro (High)"
     
     ping_events = []
-    for ev in all_events:
+    for ev in events:
         if ev["tool"] == "Antigravity":
             if ev["is_change"]:
                 current_anti_model = ev["model"]
             if ev["is_ping"]:
+                if boundary_dt and ev["dt_br"] <= boundary_dt:
+                    continue
                 ev["active_model"] = current_anti_model
                 ping_events.append(ev)
         else:
             if ev["is_ping"]:
+                if boundary_dt and ev["dt_br"] <= boundary_dt:
+                    continue
                 ping_events.append(ev)
 
     for ev in ping_events:
         ev["branch"] = get_branch_at(branch_timeline, ev["dt_br"])
                 
-    # Agrupar em sessões ativas
     sessions = []
     if ping_events:
         current_session = [ping_events[0]]
         for ev in ping_events[1:]:
             last_ev = current_session[-1]
             gap = (ev["dt_br"] - last_ev["dt_br"]).total_seconds() / 60.0
-            if gap <= args.gap:
+            if gap <= gap_minutes:
                 current_session.append(ev)
             else:
                 sessions.append(current_session)
                 current_session = [ev]
         sessions.append(current_session)
-        
-    # Estatísticas diárias
+    return sessions, ping_events
+
+def aggregate_sessions(sessions):
     daily_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0})))
     branch_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0}))))
     total_hours = 0.0
@@ -475,7 +554,6 @@ def main():
             for t, m in tool_models_in_branch_session:
                 branch_stats[date_str][b][t][m]["sessions"] += 1
 
-        # Interações e durações atribuídas à data real de cada ping (corrige sessões que atravessam meia-noite)
         for ev in sess:
             ev_date = ev["dt_br"].strftime("%d/%m/%Y")
             daily_stats[ev_date][ev["tool"]][ev["active_model"]]["interactions"] += 1
@@ -517,181 +595,312 @@ def main():
                     for m, m_mins in m_map.items():
                         branch_stats[d][b][t][m]["hours"] += m_mins / 60.0
 
-    if args.export:
-        report_path = os.path.join(repo_root, ".tracker", "TEMPO_DE_TRABALHO.md")
-        
-        header = (
-            f"# Registro de Tempo de Desenvolvimento do Repositório (IA)\n\n"
-            f"Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramentas de Inteligência Artificial (Antigravity + Claude Code) coletados localmente por cada desenvolvedor de forma privada e colaborativa.\n\n"
-            f"> [!NOTE]\n"
-            f"> Por motivos de segurança e privacidade corporativa, as identidades dos desenvolvedores e de suas máquinas físicas foram mascaradas usando hashes SHA-256 determinísticos. Cada desenvolvedor pode checar seu ID anônimo no terminal local ao executar `make -f .tracker/Makefile track-time`.\n\n"
-            f"---\n\n"
-        )
-        
-        blocks = []
-        all_devs_stats = {}
-        try:
-            if os.path.exists(report_path):
-                with open(report_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                if content:
-                    raw_parts = re.split(r'\n\s*---\s*\n', content)
-                    for part in raw_parts:
-                        part_str = part.strip()
-                        if not part_str or part_str.startswith("# Registro de Tempo") or part_str.startswith("## 📊 Resumo Geral"):
-                            continue
-                        match = re.match(r'## 👤 Desenvolvedor:\s+`([^`]+)`', part_str)
-                        if match and match.group(1) == masked_id:
-                            continue
-                        blocks.append(part_str)
-                    
-                    all_devs_stats = parse_existing_developers_stats(content, masked_id)
-            
-            # Compute current developer branch stats
-            current_branch_hours = defaultdict(float)
-            for d in branch_stats:
-                for b in branch_stats[d]:
-                    for t in branch_stats[d][b]:
-                        for m in branch_stats[d][b][t]:
-                            current_branch_hours[b] += branch_stats[d][b][t][m]["hours"]
-            
-            all_devs_stats[masked_id] = {
-                "total_hours": total_hours,
-                "branch_hours": current_branch_hours
-            }
-            
-            global_total_hours = sum(d["total_hours"] for d in all_devs_stats.values())
-            global_branch_hours = defaultdict(float)
-            for d in all_devs_stats.values():
-                for b, h in d["branch_hours"].items():
-                    global_branch_hours[b] += h
-            
-            global_summary = (
-                f"## 📊 Resumo Geral Consolidado (Todos os Desenvolvedores)\n\n"
-                f"* **Tempo Total de Desenvolvimento:** **{format_hours(global_total_hours)}**\n\n"
-                f"### 🌿 Tempo Total por Branch\n\n"
-                f"| Branch / História | Tempo Ativo Total |\n"
-                f"| :--- | :---: |\n"
-            )
-            if global_branch_hours:
-                for b in sorted(global_branch_hours.keys()):
-                    bh = global_branch_hours[b]
-                    global_summary += f"| `{b}` | **{format_hours(bh)}** |\n"
-            else:
-                global_summary += f"| Nenhuma | **0h 00m** |\n"
-            
-            new_block = (
-                f"## 👤 Desenvolvedor: `{masked_id}`\n\n"
-                f"* **Última Atualização:** {brasilia_now_str} (Horário de Brasília)\n"
-                f"* **Tempo Ativo Combinado (IA):** **{format_hours(total_hours)}**\n"
-                f"* **Total de Interações:** **{len(ping_events)} comandos** em {len(sessions)} sessões\n\n"
-            )
- 
-            # Seção: Totais por Ferramenta (inserida ANTES da Tabela 1)
-            tool_totals = defaultdict(lambda: {"hours": 0.0, "interactions": 0})
-            for d in daily_stats:
-                for t in daily_stats[d]:
-                    for m in daily_stats[d][t]:
-                        tool_totals[t]["hours"] += daily_stats[d][t][m]["hours"]
-                        tool_totals[t]["interactions"] += daily_stats[d][t][m]["interactions"]
- 
-            new_block += (
-                f"### 🛠️ Totais por Ferramenta\n\n"
-                f"| Ferramenta | Tempo Ativo | Interações |\n"
-                f"| :---: | :---: | :---: |\n"
-            )
-            if tool_totals:
-                for t in sorted(tool_totals.keys()):
-                    th = tool_totals[t]["hours"]
-                    ti = tool_totals[t]["interactions"]
-                    new_block += f"| **{t}** | {format_hours(th)} | {ti} |\n"
-            else:
-                new_block += f"| Nenhuma | 0h 00m | 0 |\n"
+    return daily_stats, branch_stats, total_hours
 
-            # Tabela 1: Detalhamento Diário com coluna Ferramenta
-            new_block += (
-                f"\n### 🗓️ Detalhamento Diário das Horas (Brasília)\n\n"
-                f"| Dia de Trabalho | Ferramenta | Modelo LLM | Tempo Ativo | Sessões Ativas | Interações |\n"
-                f"| :---: | :---: | :---: | :---: | :---: | :---: |\n"
-            )
- 
-            for d in sorted(daily_stats.keys(), key=lambda x: datetime.strptime(x, "%d/%m/%Y")):
-                for t in sorted(daily_stats[d].keys()):
-                    for m in sorted(daily_stats[d][t].keys()):
-                        h = daily_stats[d][t][m]["hours"]
-                        s = daily_stats[d][t][m]["sessions"]
-                        i = daily_stats[d][t][m]["interactions"]
-                        new_block += f"| {d} | **{t}** | {m} | {format_hours(h)} | {s} | {i} |\n"
- 
-            if not daily_stats:
-                new_block += f"| N/A | Nenhuma | Nenhum | 0h 00m | 0 | 0 |\n"
- 
-            # Tabela 2: Detalhamento por Branch com colunas Ferramentas + Modelos Utilizados
-            new_block += (
-                f"\n### 🌿 Detalhamento Diário por Branch / História (Brasília)\n\n"
-                f"| Dia de Trabalho | Branch Ativa | Ferramentas | Modelos Utilizados | Tempo Ativo | Interações |\n"
-                f"| :---: | :---: | :---: | :---: | :---: | :---: |\n"
-            )
- 
-            if branch_stats:
-                for d in sorted(branch_stats.keys(), key=lambda x: datetime.strptime(x, "%d/%m/%Y")):
-                    for b in sorted(branch_stats[d].keys()):
-                        branch_hours = sum(
-                            branch_stats[d][b][t][m]["hours"]
-                            for t in branch_stats[d][b]
-                            for m in branch_stats[d][b][t]
-                        )
-                        branch_interactions = sum(
-                            branch_stats[d][b][t][m]["interactions"]
-                            for t in branch_stats[d][b]
-                            for m in branch_stats[d][b][t]
-                        )
-                        tools_used = ", ".join(sorted(branch_stats[d][b].keys()))
-                        models_used = ", ".join(sorted({m for t in branch_stats[d][b].values() for m in t.keys()}))
-                        new_block += f"| {d} | `{b}` | {tools_used} | {models_used} | {format_hours(branch_hours)} | {branch_interactions} |\n"
-            else:
-                new_block += f"| N/A | Nenhuma | Nenhuma | Nenhum | 0h 00m | 0 |\n"
- 
-            blocks.append(new_block.strip())
-            
-            with open(report_path, "w", encoding="utf-8") as f:
-                f.write(header)
-                f.write(global_summary.strip())
-                f.write("\n\n---\n\n")
-                for b in blocks:
-                    f.write(b)
-                    f.write("\n\n---\n\n")
+def build_live_events(daily_stats, branch_stats, masked_id):
+    live_events = []
+    tz_br = timezone(timedelta(hours=-3))
+    now_br = datetime.now(tz=tz_br)
+    generated_at_str = now_br.isoformat()
+
+    for d in sorted(daily_stats.keys(), key=lambda x: datetime.strptime(x, "%d/%m/%Y")):
+        date_iso = date_to_iso(d)
+        for t in sorted(daily_stats[d].keys()):
+            for m in sorted(daily_stats[d][t].keys()):
+                h = daily_stats[d][t][m]["hours"]
+                s = daily_stats[d][t][m]["sessions"]
+                i = daily_stats[d][t][m]["interactions"]
                 
-            print(f"\033[92m✔ Métricas de tempo atualizadas com sucesso no arquivo: {report_path}\033[0m")
-        except Exception as e:
-            print(f"\033[91m✘ Erro ao atualizar métricas de tempo: {e}\033[0m")
-            
+                live_events.append({
+                    "event_type": "activity_daily",
+                    "schema_version": SCHEMA_VERSION,
+                    "developer": masked_id,
+                    "date": date_iso,
+                    "tool": t,
+                    "model": m,
+                    "raw_model": m,
+                    "model_confidence": "confirmado",
+                    "hours": round(h, 4),
+                    "sessions": s,
+                    "interactions": i,
+                    "legacy": False,
+                    "generated_at": generated_at_str
+                })
+
+    for d in sorted(branch_stats.keys(), key=lambda x: datetime.strptime(x, "%d/%m/%Y")):
+        date_iso = date_to_iso(d)
+        for b in sorted(branch_stats[d].keys()):
+            branch_hours = sum(
+                branch_stats[d][b][t][m]["hours"]
+                for t in branch_stats[d][b]
+                for m in branch_stats[d][b][t]
+            )
+            branch_interactions = sum(
+                branch_stats[d][b][t][m]["interactions"]
+                for t in branch_stats[d][b]
+                for m in branch_stats[d][b][t]
+            )
+            tools_used = sorted(branch_stats[d][b].keys())
+            models_used = sorted({m for t in branch_stats[d][b].values() for m in t.keys()})
+
+            live_events.append({
+                "event_type": "activity_branch",
+                "schema_version": SCHEMA_VERSION,
+                "developer": masked_id,
+                "date": date_iso,
+                "branch": b,
+                "tools": tools_used,
+                "models": models_used,
+                "hours": round(branch_hours, 4),
+                "interactions": branch_interactions,
+                "legacy": False,
+                "generated_at": generated_at_str
+            })
+
+    return live_events
+
+def render_report(all_events):
+    header = (
+        f"# Registro de Tempo de Desenvolvimento do Repositório (IA)\n\n"
+        f"Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramentas de Inteligência Artificial (Antigravity + Claude Code) coletados localmente por cada desenvolvedor de forma privada e colaborativa.\n\n"
+        f"> [!NOTE]\n"
+        f"> Por motivos de segurança e privacidade corporativa, as identidades dos desenvolvedores e de suas máquinas físicas foram mascaradas usando hashes SHA-256 determinísticos. Cada desenvolvedor pode checar seu ID anônimo no terminal local ao executar `make -f .tracker/Makefile track-time`.\n\n"
+        f"---\n\n"
+    )
+
+    global_total_hours = 0.0
+    global_branch_hours = defaultdict(float)
+
+    devs_events = defaultdict(list)
+    for ev in all_events:
+        devs_events[ev["developer"]].append(ev)
+
+    for dev_id, dev_evs in devs_events.items():
+        dev_summaries = [ev for ev in dev_evs if ev["event_type"] == "dev_summary"]
+        global_total_hours += sum(ev["total_hours"] for ev in dev_summaries)
+        
+        for ev in dev_evs:
+            if ev["event_type"] == "activity_branch":
+                global_branch_hours[ev["branch"]] += ev["hours"]
+
+    global_summary = (
+        f"## 📊 Resumo Geral Consolidado (Todos os Desenvolvedores)\n\n"
+        f"* **Tempo Total de Desenvolvimento:** **{format_hours(global_total_hours)}**\n\n"
+        f"### 🌿 Tempo Total por Branch\n\n"
+        f"| Branch / História | Tempo Ativo Total |\n"
+        f"| :--- | :---: |\n"
+    )
+    if global_branch_hours:
+        for b in sorted(global_branch_hours.keys()):
+            bh = global_branch_hours[b]
+            global_summary += f"| `{b}` | **{format_hours(bh)}** |\n"
     else:
-        print("\033[1;35m" + "="*60 + "\033[0m")
-        print(f"\033[1;37m RASTREADOR DE TEMPO: {username}@{hostname} \033[0m")
-        print(f"\033[1;90m ID de Anonimato Externo: {masked_id}\033[0m")
-        print("\033[1;35m" + "="*60 + "\033[0m")
-        print(f" Repositório: \033[94m{repo_root}\033[0m")
-        print(f" Data/Hora (Brasília): {brasilia_now_str}")
-        print("-"*60)
-        print(f" \033[1mMétricas locais compiladas por Ferramenta/Modelo (Gap: {args.gap} min):\033[0m")
+        global_summary += f"| Nenhuma | **0h 00m** |\n"
 
-        tool_model_totals = defaultdict(lambda: defaultdict(float))
-        for d in daily_stats:
-            for t in daily_stats[d]:
-                for m in daily_stats[d][t]:
-                    tool_model_totals[t][m] += daily_stats[d][t][m]["hours"]
+    blocks = []
+    for dev_id in sorted(devs_events.keys()):
+        dev_evs = devs_events[dev_id]
+        
+        dev_summaries = [ev for ev in dev_evs if ev["event_type"] == "dev_summary"]
+        daily_events = [ev for ev in dev_evs if ev["event_type"] == "activity_daily"]
+        branch_events = [ev for ev in dev_evs if ev["event_type"] == "activity_branch"]
 
-        for t in sorted(tool_model_totals.keys()):
-            print(f"  [{t}]")
-            for m, h in sorted(tool_model_totals[t].items()):
-                print(f"   • {m}: \033[92m{format_hours(h)}\033[0m")
+        total_hours = sum(ev["total_hours"] for ev in dev_summaries)
+        total_interactions = sum(ev["total_interactions"] for ev in dev_summaries)
+        total_sessions = sum(ev["total_sessions"] for ev in dev_summaries)
 
-        print("-"*60)
-        print(f" \033[1;93m✔ TOTAL LOCAL COMBINADO ACUMULADO: {format_hours(total_hours)}\033[0m")
-        print("\033[1;35m" + "="*60 + "\033[0m")
-        print(" Dica: Execute \033[96mmake -f .tracker/Makefile track-time EXPORT=true\033[0m para anexar/atualizar.")
-        print("\033[1;35m" + "="*60 + "\033[0m")
+        last_updated = "N/A"
+        live_summary = [ev for ev in dev_summaries if ev["scope"] == "live"]
+        legacy_summary = [ev for ev in dev_summaries if ev["scope"] == "legacy"]
+        if live_summary:
+            last_updated = live_summary[0]["last_updated"]
+        elif legacy_summary:
+            last_updated = legacy_summary[0]["last_updated"]
+
+        tool_totals = defaultdict(lambda: {"hours": 0.0, "interactions": 0})
+        for ev in daily_events:
+            t = ev["tool"]
+            tool_totals[t]["hours"] += ev["hours"]
+            tool_totals[t]["interactions"] += ev["interactions"]
+
+        daily_grouped = defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0})
+        for ev in daily_events:
+            date_br = iso_to_date(ev["date"])
+            key = (date_br, ev["tool"], ev["model"])
+            daily_grouped[key]["hours"] += ev["hours"]
+            daily_grouped[key]["sessions"] += ev["sessions"]
+            daily_grouped[key]["interactions"] += ev["interactions"]
+
+        branch_grouped = defaultdict(lambda: {"tools": set(), "models": set(), "hours": 0.0, "interactions": 0})
+        for ev in branch_events:
+            date_br = iso_to_date(ev["date"])
+            key = (date_br, ev["branch"])
+            branch_grouped[key]["hours"] += ev["hours"]
+            branch_grouped[key]["interactions"] += ev["interactions"]
+            for t in ev["tools"]:
+                branch_grouped[key]["tools"].add(t)
+            for m in ev["models"]:
+                branch_grouped[key]["models"].add(m)
+
+        dev_summary_block = (
+            f"## 👤 Desenvolvedor: `{dev_id}`\n\n"
+            f"* **Última Atualização:** {last_updated} (Horário de Brasília)\n"
+            f"* **Tempo Ativo Combinado (IA):** **{format_hours(total_hours)}**\n"
+            f"* **Total de Interações:** **{total_interactions} comandos** em {total_sessions} sessões\n\n"
+        )
+
+        dev_summary_block += (
+            f"### 🛠️ Totais por Ferramenta\n\n"
+            f"| Ferramenta | Tempo Ativo | Interações |\n"
+            f"| :---: | :---: | :---: |\n"
+        )
+        if tool_totals:
+            for t in sorted(tool_totals.keys()):
+                th = tool_totals[t]["hours"]
+                ti = tool_totals[t]["interactions"]
+                dev_summary_block += f"| **{t}** | {format_hours(th)} | {ti} |\n"
+        else:
+            dev_summary_block += f"| Nenhuma | 0h 00m | 0 |\n"
+
+        dev_summary_block += (
+            f"\n### 🗓️ Detalhamento Diário das Horas (Brasília)\n\n"
+            f"| Dia de Trabalho | Ferramenta | Modelo LLM | Tempo Ativo | Sessões Ativas | Interações |\n"
+            f"| :---: | :---: | :---: | :---: | :---: | :---: |\n"
+        )
+        if daily_grouped:
+            for (d, t, m) in sorted(daily_grouped.keys(), key=lambda x: datetime.strptime(x[0], "%d/%m/%Y")):
+                h = daily_grouped[(d, t, m)]["hours"]
+                s = daily_grouped[(d, t, m)]["sessions"]
+                i = daily_grouped[(d, t, m)]["interactions"]
+                dev_summary_block += f"| {d} | **{t}** | {m} | {format_hours(h)} | {s} | {i} |\n"
+        else:
+            dev_summary_block += f"| N/A | Nenhuma | Nenhum | 0h 00m | 0 | 0 |\n"
+
+        dev_summary_block += (
+            f"\n### 🌿 Detalhamento Diário por Branch / História (Brasília)\n\n"
+            f"| Dia de Trabalho | Branch Ativa | Ferramentas | Modelos Utilizados | Tempo Ativo | Interações |\n"
+            f"| :---: | :---: | :---: | :---: | :---: | :---: |\n"
+        )
+        if branch_grouped:
+            for (d, b) in sorted(branch_grouped.keys(), key=lambda x: datetime.strptime(x[0], "%d/%m/%Y")):
+                bh = branch_grouped[(d, b)]["hours"]
+                bi = branch_grouped[(d, b)]["interactions"]
+                tools_used = ", ".join(sorted(branch_grouped[(d, b)]["tools"]))
+                models_used = ", ".join(sorted(branch_grouped[(d, b)]["models"]))
+                dev_summary_block += f"| {d} | `{b}` | {tools_used} | {models_used} | {format_hours(bh)} | {bi} |\n"
+        else:
+            dev_summary_block += f"| N/A | Nenhuma | Nenhuma | Nenhum | 0h 00m | 0 |\n"
+
+        blocks.append(dev_summary_block.strip())
+
+    report_str = header + global_summary.strip() + "\n\n---\n\n"
+    for b in blocks:
+        report_str += b + "\n\n---\n\n"
+    return report_str
+
+def show_console_report(username, hostname, masked_id, repo_root, brasilia_now_str, gap, dev_jsonl_path, daily_stats, live_total_hours):
+    # Modo console read-only
+    print("\033[1;35m" + "="*60 + "\033[0m")
+    print(f"\033[1;37m RASTREADOR DE TEMPO: {username}@{hostname} \033[0m")
+    print(f"\033[1;90m ID de Anonimato Externo: {masked_id}\033[0m")
+    print("\033[1;35m" + "="*60 + "\033[0m")
+    print(f" Repositório: \033[94m{repo_root}\033[0m")
+    print(f" Data/Hora (Brasília): {brasilia_now_str}")
+    print("-"*60)
+    print(f" \033[1mMétricas locais compiladas por Ferramenta/Modelo (Gap: {gap} min):\033[0m")
+
+    legacy_hours = 0.0
+    tool_model_totals = defaultdict(lambda: defaultdict(float))
+
+    if os.path.exists(dev_jsonl_path):
+        try:
+            with open(dev_jsonl_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    ev = json.loads(line)
+                    if ev.get("legacy") is True:
+                        if ev.get("event_type") == "dev_summary":
+                            legacy_hours = ev.get("total_hours", 0.0)
+                        elif ev.get("event_type") == "activity_daily":
+                            tool_model_totals[ev["tool"]][ev["model"]] += ev["hours"]
+        except Exception:
+            pass
+
+    for d in daily_stats:
+        for t in daily_stats[d]:
+            for m in daily_stats[d][t]:
+                tool_model_totals[t][m] += daily_stats[d][t][m]["hours"]
+
+    for t in sorted(tool_model_totals.keys()):
+        print(f"  [{t}]")
+        for m, h in sorted(tool_model_totals[t].items()):
+            print(f"   • {m}: \033[92m{format_hours(h)}\033[0m")
+
+    total_combined_hours = legacy_hours + live_total_hours
+    print("-"*60)
+    print(f" \033[1;93m✔ TOTAL LOCAL COMBINADO ACUMULADO: {format_hours(total_combined_hours)}\033[0m")
+    print("\033[1;35m" + "="*60 + "\033[0m")
+    print(" Dica: Execute \033[96mmake -f .tracker/Makefile track-time EXPORT=true\033[0m para anexar/atualizar.")
+    print("\033[1;35m" + "="*60 + "\033[0m")
+
+def export_markdown_report(events_dir, masked_id, live_events, repo_root):
+    # Se for exportar, emite os eventos (preserva legacy, substitui live)
+    emit_events(events_dir, masked_id, live_events)
+
+    # Carrega TODOS os eventos de todos os desenvolvedores
+    all_compiled_events = load_all_events(events_dir)
+
+    # Renderiza o relatório completo
+    report_content = render_report(all_compiled_events)
+
+    # Salva o relatório
+    report_path = os.path.join(repo_root, ".tracker", "TEMPO_DE_TRABALHO.md")
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(report_content)
+
+    print(f"\033[92m✔ Métricas de tempo atualizadas com sucesso no arquivo: {report_path}\033[0m")
+
+def main():
+    parser = argparse.ArgumentParser(description="Calculador de tempo de trabalho de IA apartado e seguro.")
+    parser.add_argument("--export", action="store_true", help="Se definido, anexa/atualiza o relatório em formato Markdown.")
+    parser.add_argument("--gap", type=int, default=45, help="Intervalo máximo em minutos entre comandos para agrupar na mesma sessão.")
+    args = parser.parse_args()
+    
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+    username = getpass.getuser()
+    hostname = socket.gethostname()
+    masked_id = get_masked_identity(username, hostname)
+
+    tz_br = timezone(timedelta(hours=-3))
+    now_br = datetime.now(tz=tz_br)
+    brasilia_now_str = now_br.strftime('%d/%m/%Y %H:%M:%S')
+
+    events_dir = os.path.join(repo_root, ".tracker", EVENTS_DIRNAME)
+    manifest = load_manifest(events_dir)
+    legacy_boundary = manifest.get("developers", {}).get(masked_id, {}).get("legacy_boundary")
+
+    branch_timeline = build_branch_timeline(repo_root)
+
+    # 1. Coletar eventos live do sistema
+    all_raw_events = collect_events(repo_root)
+
+    # 2. Computar sessões e pings
+    sessions, live_pings = compute_sessions(all_raw_events, args.gap, legacy_boundary, branch_timeline)
+
+    # 3. Agregar sessões do período live
+    daily_stats, branch_stats, live_total_hours = aggregate_sessions(sessions)
+
+    # 4. Construir eventos live estruturados
+    live_events = build_live_events(daily_stats, branch_stats, masked_id)
+
+    if args.export:
+        export_markdown_report(events_dir, masked_id, live_events, repo_root)
+    else:
+        dev_jsonl_path = os.path.join(events_dir, f"dev-{masked_id}.jsonl" if not masked_id.startswith("dev-") else f"{masked_id}.jsonl")
+        show_console_report(username, hostname, masked_id, repo_root, brasilia_now_str, args.gap, dev_jsonl_path, daily_stats, live_total_hours)
 
 if __name__ == "__main__":
     main()
