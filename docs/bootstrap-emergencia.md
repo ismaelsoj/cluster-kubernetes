@@ -54,20 +54,50 @@ Os segredos sensíveis nunca devem ser versionados ou armazenados no Git (NFR-S0
 ### 3.1. Secrets do Identity Provider e Banco de Dados (Namespace: `keycloak-auth`)
 
 *   **Secret de conexão com o Banco de Dados (PostgreSQL):**
+    
+    Substitua `<VALOR_USUARIO_DB>` e `<VALOR_SENHA_DB>` com suas credenciais reais:
+    
     ```bash
     kubectl create secret generic keycloak-db-secret \
       --namespace=keycloak-auth \
       --from-literal=database-user=<VALOR_USUARIO_DB> \
       --from-literal=database-password=<VALOR_SENHA_DB>
     ```
+    
+    **Exemplo concreto (para referência apenas — use seus próprios valores):**
+    ```bash
+    kubectl create secret generic keycloak-db-secret \
+      --namespace=keycloak-auth \
+      --from-literal=database-user=keycloak_user \
+      --from-literal=database-password=MySecurePostgresPass2026!
+    ```
+    
+    **Requisitos:**
+    - `database-user`: lowercase alphanumeric + underscore, min 3 caracteres
+    - `database-password`: mínimo 12 caracteres (recomendado 16+), sem espaços
 
 *   **Secret de administração do console Keycloak:**
+    
+    Substitua `<VALOR_ADMIN_USER>` e `<VALOR_ADMIN_PASSWORD>` com suas credenciais reais:
+    
     ```bash
     kubectl create secret generic keycloak-admin-secret \
       --namespace=keycloak-auth \
       --from-literal=admin-username=<VALOR_ADMIN_USER> \
       --from-literal=admin-password=<VALOR_ADMIN_PASSWORD>
     ```
+    
+    **Exemplo concreto (para referência apenas — use seus próprios valores):**
+    ```bash
+    kubectl create secret generic keycloak-admin-secret \
+      --namespace=keycloak-auth \
+      --from-literal=admin-username=admin_sre \
+      --from-literal=admin-password=MySecureAdminPass2026!
+    ```
+    
+    **Requisitos:**
+    - `admin-username`: lowercase alphanumeric + underscore, min 3 caracteres
+    - `admin-password`: mínimo 12 caracteres (recomendado 16+), sem espaços
 
 ### 3.2. Script Utilitário Local (Opcional)
 

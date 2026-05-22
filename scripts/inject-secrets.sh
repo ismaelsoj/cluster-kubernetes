@@ -8,11 +8,31 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 ENV_FILE="${REPO_ROOT}/.env"
 
+# Parse flags
+SKIP_IF_EXISTS=false
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --skip-if-exists) SKIP_IF_EXISTS=true; shift ;;
+    *) shift ;;
+  esac
+done
+
 # Variáveis padrão (conforme regras de nomenclatura kebab-case)
 NAMESPACE_KEYCLOAK="keycloak-auth"
 NAMESPACE_GATEWAY="kong-gateway"
 DB_USER="keycloak"
-ADMIN_USER="admin"
+ADMIN_USER="${ADMIN_USER:-admin}"
+
+# Pre-flight validation (P5)
+if ! command -v kubectl &>/dev/null; then
+  echo "❌ ERRO: kubectl não encontrado. Instale kubectl e tente novamente."
+  exit 1
+fi
+
+if ! kubectl get nodes &>/dev/null 2>&1; then
+  echo "❌ ERRO: Cluster não acessível via kubectl. Inicie o cluster e tente novamente."
+  exit 1
+fi
 
 # Carrega arquivo .env local se existir
 if [ -f "${ENV_FILE}" ]; then
@@ -28,14 +48,24 @@ if [ -t 0 ] && [ -t 1 ]; then
   IS_INTERACTIVE=true
 fi
 
+# Check --skip-if-exists (P11 logic)
+if [ "${SKIP_IF_EXISTS}" = true ]; then
+  if kubectl get secret keycloak-db-secret -n "${NAMESPACE_KEYCLOAK}" &>/dev/null 2>&1; then
+    echo "✓ Secrets já existem. Skipping injection."
+    exit 0
+  fi
+fi
+
 # 1. Obter ou gerar senha do PostgreSQL
 if [ -z "${DB_PASSWORD:-}" ]; then
   if [ "${IS_INTERACTIVE}" = true ]; then
+    { set +x; } 2>/dev/null || true  # Desabilita xtrace (P6)
     read -rsp "Digite a senha para o PostgreSQL (Pressione [Enter] para gerar uma automática): " DB_PASSWORD
     echo
+    set -x 2>/dev/null || true  # Re-abilita xtrace
   fi
   if [ -z "${DB_PASSWORD:-}" ]; then
-    DB_PASSWORD=$(openssl rand -base64 16 2>/dev/null || od -vAn -N16 -tx1 /dev/urandom | tr -d ' \n' | head -c 16)
+    DB_PASSWORD=$(openssl rand -base64 16 2>/dev/null || od -vAn -N16 /dev/urandom | base64 2>/dev/null | tr -d '\n' | head -c 24)
     echo "🔑 Senha do PostgreSQL gerada automaticamente."
   fi
 fi
@@ -43,21 +73,21 @@ fi
 # 2. Obter ou gerar senha do Admin Keycloak
 if [ -z "${ADMIN_PASSWORD:-}" ]; then
   if [ "${IS_INTERACTIVE}" = true ]; then
+    { set +x; } 2>/dev/null || true  # Desabilita xtrace (P6)
     read -rsp "Digite a senha do administrador Keycloak (Pressione [Enter] para gerar uma automática): " ADMIN_PASSWORD
     echo
+    set -x 2>/dev/null || true  # Re-abilita xtrace
   fi
   if [ -z "${ADMIN_PASSWORD:-}" ]; then
-    ADMIN_PASSWORD=$(openssl rand -base64 16 2>/dev/null || od -vAn -N16 -tx1 /dev/urandom | tr -d ' \n' | head -c 16)
+    ADMIN_PASSWORD=$(openssl rand -base64 16 2>/dev/null || od -vAn -N16 /dev/urandom | base64 2>/dev/null | tr -d '\n' | head -c 24)
     echo "🔑 Senha do Admin Keycloak gerada automaticamente."
   fi
 fi
 
-# 3. Garantir criação dos namespaces base (Wave 0)
-echo "==> Garantindo a criação dos namespaces base..."
-kubectl create namespace "${NAMESPACE_KEYCLOAK}" --dry-run=client -o yaml | kubectl apply -f -
-kubectl create namespace "${NAMESPACE_GATEWAY}" --dry-run=client -o yaml | kubectl apply -f -
+# Note: Namespaces are assumed to be created by ArgoCD Wave 0 (GitOps principle)
+# See docs/bootstrap-emergencia.md for bootstrap sequence
 
-# 4. Criar/Atualizar Secrets via kubectl no namespace keycloak-auth
+# 3. Criar/Atualizar Secrets via kubectl no namespace keycloak-auth
 echo "==> Injetando Secrets no namespace '${NAMESPACE_KEYCLOAK}'..."
 
 # Secret para conexão com PostgreSQL
@@ -74,20 +104,38 @@ kubectl create secret generic keycloak-admin-secret \
   --from-literal=admin-password="${ADMIN_PASSWORD}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-# 5. Persistir variáveis no arquivo .env local se não existirem
-if [ ! -f "${ENV_FILE}" ]; then
-  echo "# Configurações locais de Secrets - cluster-kubernetes" > "${ENV_FILE}"
+# 4. Persistir variáveis no arquivo .env local (P2, P4, P7, P8)
+# Validar .gitignore (P8)
+if ! grep -q '\.env' "${REPO_ROOT}/.gitignore" 2>/dev/null; then
+  echo "⚠️  AVISO: .env não está no .gitignore. Senhas podem ser commitadas!"
+  echo "Adicione '.env' ao .gitignore manualmente."
 fi
 
-# Adiciona apenas se não existirem no arquivo
-if ! grep -q "^DB_PASSWORD=" "${ENV_FILE}" 2>/dev/null; then
-  echo "DB_PASSWORD=\"${DB_PASSWORD}\"" >> "${ENV_FILE}"
-  echo "💾 Senha do PostgreSQL salva em .env"
-fi
+# Lock-file para evitar race conditions (P7)
+ENV_FILE_LOCK="${ENV_FILE}.lock"
+{
+  flock -x 9 || true
 
-if ! grep -q "^ADMIN_PASSWORD=" "${ENV_FILE}" 2>/dev/null; then
-  echo "ADMIN_PASSWORD=\"${ADMIN_PASSWORD}\"" >> "${ENV_FILE}"
-  echo "💾 Senha do Admin Keycloak salva em .env"
-fi
+  # Criar arquivo .env se não existir (P2: chmod 600)
+  if [ ! -f "${ENV_FILE}" ]; then
+    echo "# Configurações locais de Secrets - cluster-kubernetes" > "${ENV_FILE}"
+    chmod 600 "${ENV_FILE}"
+  fi
+
+  # Atomic update para DB_PASSWORD (P4)
+  if grep -v "^DB_PASSWORD=" "${ENV_FILE}" > "${ENV_FILE}.tmp" 2>/dev/null || echo "" > "${ENV_FILE}.tmp"; then
+    echo "DB_PASSWORD=\"${DB_PASSWORD}\"" >> "${ENV_FILE}.tmp"
+    mv "${ENV_FILE}.tmp" "${ENV_FILE}"
+    echo "💾 Senha do PostgreSQL salva em .env"
+  fi
+
+  # Atomic update para ADMIN_PASSWORD (P4)
+  if grep -v "^ADMIN_PASSWORD=" "${ENV_FILE}" > "${ENV_FILE}.tmp" 2>/dev/null || echo "" > "${ENV_FILE}.tmp"; then
+    echo "ADMIN_PASSWORD=\"${ADMIN_PASSWORD}\"" >> "${ENV_FILE}.tmp"
+    mv "${ENV_FILE}.tmp" "${ENV_FILE}"
+    echo "💾 Senha do Admin Keycloak salva em .env"
+  fi
+
+} 9>"${ENV_FILE_LOCK}"
 
 echo "🎉 Secrets injetados com sucesso sem salvar valores sensíveis no Git."
