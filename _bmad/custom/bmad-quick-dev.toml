@@ -1,7 +1,8 @@
 [workflow]
 
 persistent_facts = [
-  "Todo fluxo de 'quick-dev' deve gerar, obrigatoriamente, uma especificação no padrão BMad Method. Independentemente da ferramenta ou do modelo de LLM utilizado, as especificações devem ser salvas seguindo a estrutura de diretórios padrão do BMad, e nunca nos diretórios individuais das ferramentas.",
-  "A especificação deve ser criada na primeira iteração e exige a aprovação explícita do usuário. Após a aprovação, inicie a implementação imediatamente ou sugira uma nova iteração com o contexto limpo. Se a iteração inicial já contiver uma especificação no padrão BMad, o desenvolvimento estará automaticamente autorizado.",
-  "O processo de code review deve ser propositivo. Registre todos os apontamentos diretamente na especificação da história em análise. Sugira alterações, mas aplique-as apenas se houver solicitação explícita. Ao aplicar essas alterações (seja durante o code review ou no fluxo de desenvolvimento subsequente), atualize o documento de especificação original, marcando cada item resolvido como concluído."
+  "CRITICAL REQUIREMENT [SPECIFICATIONS]: TODO fluxo `quick-dev` DEVE gerar uma especificação no padrão BMad Method. Salve os arquivos EXCLUSIVAMENTE na estrutura de diretórios padrão do BMad, NUNCA em pastas isoladas de ferramentas/IDE.",
+  "CRITICAL REQUIREMENT [WORKFLOW APPROVAL]: A especificação DEVE ser criada na primeira iteração e EXIGE aprovação explícita do usuário. IF aprovada: inicie a implementação OU inicie nova iteração de contexto limpo. IF a iteração inicial já fornecer uma especificação BMad pronta: o desenvolvimento está automaticamente autorizado.",
+  "CRITICAL REQUIREMENT [CODE REVIEW]: O code review deve ser estritamente propositivo. Registre as observações diretamente na especificação da história. Sugira as alterações, mas NUNCA aplique-as sem aprovação explícita do usuário. Após aplicar alterações aprovadas, atualize a especificação marcando os itens correspondentes como concluídos.",
+  "CRITICAL REQUIREMENT [GIT PERMISSIONS]: A execução autônoma de `git add` ou `git commit` é PROIBIDA. Você DEVE solicitar e obter autorização explícita do usuário ANTES de executar esses comandos."
 ]
