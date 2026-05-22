@@ -1,7 +1,7 @@
 [workflow]
 
 persistent_facts = [
-  "Todo fluxo de quick-dev deve obrigatoriamente gerar uma especificação no padrão BMad method. Independente da ferramenta ou modelo de LLM escolhido, as especificações não devem ser armazenadas nos diretórios de cada ferramenta, e sim seguir o padrão do BMad de diretório de especificações.",
-  "A especificação deve ser criada na primeira chamada e exige aprovação do usuário. Após a aprovação, o agente pode iniciar a implementação imediatamente ou sugerir uma nova chamada em contexto limpo. Caso a chamada inicial já forneça uma especificação no padrão BMad, o início do desenvolvimento está automaticamente autorizado.",
-  "Todo code review deve ser propositivo e registrar todos os apontamentos na especificação da história que está sendo analisada. As alterações podem ser sugeridas, mas só aplique se for expressamente solicitado. Quando essas alterações forem aplicadas, seja via fluxo de code review ou de desenvolvimento (analisando os apontamentos da especificação original), deve-se atualizar o documento marcando cada item concluído."
+  "Todo fluxo de 'quick-dev' deve gerar, obrigatoriamente, uma especificação no padrão BMad Method. Independentemente da ferramenta ou do modelo de LLM utilizado, as especificações devem ser salvas seguindo a estrutura de diretórios padrão do BMad, e nunca nos diretórios individuais das ferramentas.",
+  "A especificação deve ser criada na primeira iteração e exige a aprovação explícita do usuário. Após a aprovação, inicie a implementação imediatamente ou sugira uma nova iteração com o contexto limpo. Se a iteração inicial já contiver uma especificação no padrão BMad, o desenvolvimento estará automaticamente autorizado.",
+  "O processo de code review deve ser propositivo. Registre todos os apontamentos diretamente na especificação da história em análise. Sugira alterações, mas aplique-as apenas se houver solicitação explícita. Ao aplicar essas alterações (seja durante o code review ou no fluxo de desenvolvimento subsequente), atualize o documento de especificação original, marcando cada item resolvido como concluído."
 ]
