@@ -1,0 +1,5 @@
+[workflow]
+
+persistent_facts = [
+  "O processo de code review deve ser propositivo. Registre todos os apontamentos diretamente na especificação da história em análise. Sugira alterações, mas aplique-as apenas se houver solicitação explícita. Ao aplicar essas alterações (seja durante o code review ou no fluxo de desenvolvimento subsequente), atualize o documento de especificação original, marcando cada item resolvido como concluído."
+]

@@ -1,0 +1,5 @@
+[workflow]
+persistent_facts = [
+  "Regra obrigatória: defina explicitamente o nível de complexidade da tarefa nas primeiras linhas de toda especificação de história.",
+  "Utilize exclusivamente a seguinte escala para classificar a complexidade: 'Nenhuma complexidade', 'Baixa Complexidade', 'Média Complexidade' ou 'Alta Complexidade'."
+]

@@ -1,0 +1,7 @@
+[workflow]
+
+persistent_facts = [
+  "Todo fluxo de 'quick-dev' deve gerar, obrigatoriamente, uma especificação no padrão BMad Method. Independentemente da ferramenta ou do modelo de LLM utilizado, as especificações devem ser salvas seguindo a estrutura de diretórios padrão do BMad, e nunca nos diretórios individuais das ferramentas.",
+  "A especificação deve ser criada na primeira iteração e exige a aprovação explícita do usuário. Após a aprovação, inicie a implementação imediatamente ou sugira uma nova iteração com o contexto limpo. Se a iteração inicial já contiver uma especificação no padrão BMad, o desenvolvimento estará automaticamente autorizado.",
+  "O processo de code review deve ser propositivo. Registre todos os apontamentos diretamente na especificação da história em análise. Sugira alterações, mas aplique-as apenas se houver solicitação explícita. Ao aplicar essas alterações (seja durante o code review ou no fluxo de desenvolvimento subsequente), atualize o documento de especificação original, marcando cada item resolvido como concluído."
+]

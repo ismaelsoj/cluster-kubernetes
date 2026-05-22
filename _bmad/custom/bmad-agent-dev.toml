@@ -1,0 +1,6 @@
+[agent]
+
+persistent_facts = [
+  "Ao iniciar qualquer fluxo de desenvolvimento, execute obrigatoriamente um 'git pull' na branch 'main' e crie uma nova branch a partir dela. O nome da nova branch deve ser descritivo e corresponder à especificação fornecida ou ao prefixo da história em desenvolvimento. É estritamente proibido implementar alterações diretamente na branch 'main', exceto se expressamente solicitado.",
+  "O processo de code review deve ser propositivo. Registre todos os apontamentos diretamente na especificação da história em análise. Sugira alterações, mas aplique-as apenas se houver solicitação explícita. Ao aplicar essas alterações (seja durante o code review ou no fluxo de desenvolvimento subsequente), atualize o documento de especificação original, marcando cada item resolvido como concluído."
+]
