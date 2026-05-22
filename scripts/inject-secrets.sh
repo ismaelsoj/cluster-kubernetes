@@ -84,8 +84,12 @@ if [ -z "${ADMIN_PASSWORD:-}" ]; then
   fi
 fi
 
-# Note: Namespaces are assumed to be created by ArgoCD Wave 0 (GitOps principle)
-# See docs/bootstrap-emergencia.md for bootstrap sequence
+# Bootstrap: criar namespaces antes da injeção de Secrets (idempotente via apply).
+# Em estado contínuo o ArgoCD Wave 0 gerencia esses namespaces. No bootstrap inicial,
+# eles precisam existir ANTES do ArgoCD ser instalado — exceção necessária ao GitOps.
+echo "==> Garantindo namespaces para injeção de Secrets..."
+kubectl create namespace "${NAMESPACE_KEYCLOAK}" --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace "${NAMESPACE_GATEWAY}" --dry-run=client -o yaml | kubectl apply -f -
 
 # 3. Criar/Atualizar Secrets via kubectl no namespace keycloak-auth
 echo "==> Injetando Secrets no namespace '${NAMESPACE_KEYCLOAK}'..."

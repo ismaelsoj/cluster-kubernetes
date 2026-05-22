@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-05-12"
-last_updated: "2026-05-22"  # story 1.5 concluída (code review + patches aplicados)
+last_updated: "2026-05-22"  # retrospectiva épico 1 concluída
 project: cluster-kubernetes
 project_key: NOKEY
 tracking_system: file-system
@@ -49,7 +49,7 @@ development_status:
   1-3-bootstrap-argocd-manifestos-app-of-apps: done
   1-4-linter-yaml-pipeline-ci-readme: done
   1-5-procedimento-secrets-documentacao-emergencia: done
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
   # --- Épico 2: Identidade, Persistência e Recuperação de Desastres ---
   epic-2: backlog
