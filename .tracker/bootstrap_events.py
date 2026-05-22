@@ -50,9 +50,15 @@ def main():
             jf_path = os.path.join(events_dir, jf)
             with open(jf_path, 'r', encoding='utf-8') as f:
                 for line in f:
-                    if '"legacy": true' in line or '"legacy":true' in line:
-                        print(f"Idempotency guard: legacy events found in {jf}. Aborting bootstrap.")
-                        sys.exit(0)
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        if json.loads(line).get("legacy") is True:
+                            print(f"Idempotency guard: legacy events found in {jf}. Aborting bootstrap.")
+                            sys.exit(0)
+                    except (json.JSONDecodeError, Exception):
+                        pass
 
     if not os.path.exists(events_dir):
         os.makedirs(events_dir)

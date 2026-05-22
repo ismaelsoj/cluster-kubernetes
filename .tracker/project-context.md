@@ -25,7 +25,7 @@ O **Rastreador de Tempo Ativo (IA)** é um micro-sistema analítico privado e of
 | Interface DX | GNU Make (Makefile apartado em `.tracker/Makefile`) |
 | Fuso Horário | Brasília GMT-3 (America/Sao_Paulo) |
 | Saída Analítica | Markdown GFM (GitHub Flavored Markdown) |
-| Fontes de Dados | `~/.claude/projects/*.jsonl` (Claude Code) + `~/.gemini/antigravity/brain/*/overview.txt` (Antigravity) |
+| Fontes de Dados | `~/.claude/projects/*.jsonl` (Claude Code) + `~/.gemini/antigravity-ide/brain/*/.system_generated/logs/transcript.jsonl` (Antigravity) |
 
 ---
 
@@ -33,23 +33,27 @@ O **Rastreador de Tempo Ativo (IA)** é um micro-sistema analítico privado e of
 
 ```text
 .tracker/
-├── Makefile                        # DX Interface: make -f .tracker/Makefile track-time [EXPORT=true]
+├── Makefile                        # DX Interface: make track-time / make bootstrap
 ├── README.md                       # Guia do desenvolvedor
 ├── BACKLOG.md                      # Backlog consolidado de melhorias e dívida técnica
 ├── work-tracker-architecture.md    # Documento de Decisões de Arquitetura (ADR)
-├── plano-de-implementacao-llm.md   # Plano de implementação do rastreamento por LLM
-├── work-tracker.py                 # Engine analítico (698 linhas)
-├── TEMPO_DE_TRABALHO.md            # Relatório colaborativo gerado automaticamente
+├── work-tracker.py                 # Analytics Engine: coleta, compute_sessions, render_report
+├── bootstrap_events.py             # Bootstrap one-shot: captura legado → eventos legacy JSONL
+├── TEMPO_DE_TRABALHO.md            # Relatório Markdown (renderização dos eventos)
 ├── project-context.md              # Este documento
+├── events/                         # Store de eventos por desenvolvedor
+│   ├── dev-<hash>.jsonl            # Eventos activity_daily / activity_branch / dev_summary
+│   └── manifest.json               # legacy_boundary por dev (datetime naive BRT ISO)
 ├── specs/                          # Especificações de features e bugfixes
+│   ├── spec-tracker-orientado-a-eventos.md
 │   ├── spec-branch-tracking-work-tracker.md
 │   ├── spec-tempo-total-desenvolvedores-e-branches.md
 │   ├── spec-ferramenta-dimensao-relatorio.md
 │   └── spec-fix-antigravity-model-extraction-regex.md
 ├── reviews/                        # Reviews e prompts de revisão
-│   └── review-tempo-total-desenvolvedores-prompt.md
-└── research/                       # Pesquisas técnicas
-    └── technical-identificar-modelo-llm-antigravity-research-2026-05-19.md
+├── research/                       # Pesquisas técnicas
+└── scratch/
+    └── test_tracker.py             # Testes unitários (unittest)
 ```
 
 ---
@@ -73,7 +77,15 @@ Identidade mascarada com hash determinístico de 8 caracteres: `dev-[hash]` calc
 
 ### ADR-05: Rastreamento Dinâmico por Modelo (LLM)
 - **Claude Code:** Mineração de `"model"` em JSONL sob `~/.claude/projects/`
-- **Antigravity:** Rastreamento de `<USER_SETTINGS_CHANGE>` em `overview.txt`
+- **Antigravity:** Rastreamento de `<USER_SETTINGS_CHANGE>` em `transcript.jsonl` (`~/.gemini/antigravity-ide/brain/*/.system_generated/logs/`); coerção `content = data.get("content") or ""` para entradas com `content: null`
+
+### ADR-07: Arquitetura Orientada a Eventos e Camada de Dados JSONL
+- Eventos (`activity_daily`, `activity_branch`, `dev_summary`) gravados em `.tracker/events/dev-<hash>.jsonl`
+- Eventos `legacy: true` capturados por `bootstrap_events.py` (one-shot, idempotente); nunca recomputados
+- Eventos `live` filtrados para `dt_br > legacy_boundary` (sem dupla contagem)
+- `TEMPO_DE_TRABALHO.md` é renderização pura via `render_report()`; nunca mais lido como dado
+- `model_confidence`: `"confirmado"` para Claude Code e Antigravity com detecção explícita; `"indeterminado"` para legado de Antigravity (fonte era `overview.txt` truncado)
+- Seam `emit_events()` projetado para receber `KafkaEventSink` no futuro (fora de escopo atual)
 
 ### ADR-06: Propagação Cronológica de Estado e Zero-Config
 - Modelo de fábrica padrão: `Gemini 3.1 Pro (High)`
@@ -113,22 +125,22 @@ sequenceDiagram
     participant D as Desenvolvedor
     participant M as Makefile
     participant W as work-tracker.py
-    participant FS as Logs Locais
+    participant FS as Logs Locais (Claude JSONL / Antigravity transcript.jsonl)
+    participant EV as .tracker/events/
     participant MD as TEMPO_DE_TRABALHO.md
-    
+
     D->>M: make -f .tracker/Makefile track-time EXPORT=true
     M->>W: python3 work-tracker.py --export
     W->>W: SHA-256(user@host) → masked_id
     W->>FS: Ler ~/.claude/projects/*.jsonl
-    W->>FS: Ler ~/.gemini/antigravity/brain/*/overview.txt
-    W->>W: Filtro anti-poluição
-    W->>W: UTC → Brasília (GMT-3)
-    W->>W: Concatenar + ordenar cronologicamente
-    W->>W: Propagar estado de modelo (ADR-06)
-    W->>W: Branch mapping via reflog
-    W->>W: Agrupar sessões (gap ≤ 45 min)
-    W->>MD: Ler blocos existentes de outros devs
-    W->>MD: Substituir bloco atual + gerar resumo global
+    W->>FS: Ler ~/.gemini/antigravity-ide/.../transcript.jsonl
+    W->>W: Filtro anti-poluição + UTC → Brasília (GMT-3)
+    W->>W: compute_sessions() — gap 45min, padding 15min
+    W->>W: build_live_events() — activity_daily / activity_branch
+    W->>EV: emit_events() — preserva legacy, reescreve live
+    EV-->>W: load_all_events() — todos os eventos
+    W->>W: render_report() — agrega eventos → Markdown
+    W->>MD: Gravar TEMPO_DE_TRABALHO.md
 ```
 
 ---
@@ -136,7 +148,7 @@ sequenceDiagram
 ## 7. Trabalho Diferido (Backlog Técnico)
 
 ### Prioridade Alta
-- **Antigravity trunca eventos de troca de modelo:** O arquivo `overview.txt` trunca entradas `USER_EXPLICIT` acima de ~1024 caracteres com `<truncated N bytes>`, perdendo a tag `<USER_SETTINGS_CHANGE>` que é adicionada no final do payload. Causa perda de eventos de troca de modelo quando o `ADDITIONAL_METADATA` é muito grande. Deve ser reportado à equipe do Antigravity. (BKL-026)
+- ~~**BKL-026 — Antigravity trunca eventos de troca de modelo:**~~ ✅ Resolvido — migrado para `transcript.jsonl` (sem truncamento).
 - **Regex `(.*?)\.` trunca nomes com ponto:** payload `"to Gemini 3.1 Pro."` captura `"Gemini 3"`. Precisa sentinela mais robusto. (BKL-004)
 
 ### Prioridade Média

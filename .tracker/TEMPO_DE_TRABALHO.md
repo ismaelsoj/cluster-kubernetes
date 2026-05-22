@@ -9,7 +9,7 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 
 ## 📊 Resumo Geral Consolidado (Todos os Desenvolvedores)
 
-* **Tempo Total de Desenvolvimento:** **30h 05m**
+* **Tempo Total de Desenvolvimento:** **30h 34m**
 
 ### 🌿 Tempo Total por Branch
 
@@ -22,7 +22,7 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | `main` | **13h 09m** |
 | `remotes/origin/1-2-makefile-scripts` | **0h 00m** |
 | `teste` | **0h 05m** |
-| `time-tracker` | **10h 56m** |
+| `time-tracker` | **11h 24m** |
 
 ---
 
@@ -85,16 +85,16 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 
 ## 👤 Desenvolvedor: `dev-4e707577`
 
-* **Última Atualização:** 21/05/2026 01:28:34 (Horário de Brasília)
-* **Tempo Ativo Combinado (IA):** **9h 26m**
-* **Total de Interações:** **2315 comandos** em 15 sessões
+* **Última Atualização:** 21/05/2026 23:59:59 (Horário de Brasília)
+* **Tempo Ativo Combinado (IA):** **9h 55m**
+* **Total de Interações:** **2567 comandos** em 16 sessões
 
 ### 🛠️ Totais por Ferramenta
 
 | Ferramenta | Tempo Ativo | Interações |
 | :---: | :---: | :---: |
 | **Antigravity** | 5h 55m | 1211 |
-| **Claude Code** | 3h 32m | 1104 |
+| **Claude Code** | 4h 01m | 1356 |
 
 ### 🗓️ Detalhamento Diário das Horas (Brasília)
 
@@ -117,7 +117,7 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | 21/05/2026 | **Antigravity** | Gemini 3.1 Pro (High) | 0h 04m | 0 | 12 |
 | 21/05/2026 | **Antigravity** | Gemini 3.5 Flash (Medium) | 0h 10m | 0 | 240 |
 | 21/05/2026 | **Claude Code** | Claude Opus 4.7 | 0h 58m | 0 | 162 |
-| 21/05/2026 | **Claude Code** | Claude Sonnet 4.6 | 0h 04m | 0 | 29 |
+| 21/05/2026 | **Claude Code** | Claude Sonnet 4.6 | 0h 33m | 1 | 281 |
 
 ### 🌿 Detalhamento Diário por Branch / História (Brasília)
 
@@ -132,7 +132,7 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | 18/05/2026 | `main` | Antigravity | Gemini 3.1 Pro (High) | 0h 17m | 146 |
 | 19/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Opus 4.7, Gemini 3.1 Pro (High) | 2h 02m | 479 |
 | 20/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Opus 4.7, Claude Sonnet 4.6, Claude Sonnet 4.6 (Thinking), Gemini 3.1 Pro (High), Gemini 3.5 Flash (High), Gemini 3.5 Flash (Medium) | 2h 31m | 363 |
-| 21/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Opus 4.7, Claude Sonnet 4.6, Gemini 3.1 Pro (High), Gemini 3.5 Flash (Medium) | 1h 16m | 443 |
+| 21/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Opus 4.7, Claude Sonnet 4.6, Gemini 3.1 Pro (High), Gemini 3.5 Flash (Medium) | 1h 45m | 695 |
 
 ---
 

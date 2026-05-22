@@ -71,7 +71,7 @@ O utilitário foi construído com foco em **zero dependências externas corporat
 *   **Contexto:** Diferentes assistentes de IA utilizam diferentes LLMs (ex: Gemini 3.1 Pro, Gemini 3 Flash, Sonnet 4.6, Opus 4.7) em momentos e contextos distintos. Para fins de auditoria de eficiência e custos, o time precisa de rastreamento tridimensional (tempo, data e modelo).
 *   **Decisão:**
     *   **Claude Code:** Minar diretamente as bases de dados locais em formato texto plano JSONL sob `~/.claude/projects/`, extraindo a chave `"model"` exata de cada turno de conversação de forma 100% determinística.
-    *   **Antigravity:** Rastrear alterações de configuração (`USER_SETTINGS_CHANGE`) nos históricos locais (`overview.txt`).
+    *   **Antigravity:** Rastrear alterações de configuração (`USER_SETTINGS_CHANGE`) nos logs locais (`~/.gemini/antigravity-ide/brain/*/.system_generated/logs/transcript.jsonl`), com coerção `content = data.get("content") or ""` para entradas com `content: null`.
 *   **Consequência:** Obtenção de relatórios analíticos tridimensionais detalhando com precisão comercial qual modelo de IA consumiu cada parcela do esforço de desenvolvimento.
 
 ### ADR-06: Propagação Cronológica de Estado e Zero-Config
@@ -83,6 +83,17 @@ O utilitário foi construído com foco em **zero dependências externas corporat
     *   **Assertividade nas Métricas:** Para justificar auditorias precisas, as saídas no painel e na tabela deverão separar claramente **Horas Efetivas**, **Número de Sessões** (grupos lógicos de esforço ininterrupto) e **Total de Interações** por cada modelo LLM diário.
 *   **Consequência:** Simplifica absolutamente a rotina do desenvolvedor por meio de uma arquitetura estritamente zero-config, eliminando qualquer dependência humana de manutenção de arquivos de calibração.
 
+### ADR-07: Arquitetura Orientada a Eventos e Camada de Dados JSONL
+*   **Status:** Aprovado
+*   **Contexto:** O relatório `TEMPO_DE_TRABALHO.md` era a própria fonte da verdade — relido por regex (`parse_existing_developers_stats`). Frágil e sem caminho de evolução. Adicionalmente, o Antigravity IDE migrou seus logs de `overview.txt` (com truncamento) para `transcript.jsonl` (sem truncamento, com `<USER_SETTINGS_CHANGE>` preservado).
+*   **Decisão:**
+    *   **Eventos como fonte canônica:** cada execução deriva **eventos de atividade** (`activity_daily`, `activity_branch`, `dev_summary`) gravados em JSONL (um por linha) em `.tracker/events/dev-<hash>.jsonl`.
+    *   **Eventos `legacy` vs `live`:** o bootstrap one-shot (`bootstrap_events.py`) captura o histórico do `TEMPO_DE_TRABALHO.md` como eventos `legacy: true`, congelados e nunca recomputados. Execuções subsequentes produzem apenas eventos `live: false`, filtrados para `dt_br > legacy_boundary`.
+    *   **Relatório como renderização:** `render_report()` agrega os eventos e gera o Markdown; `TEMPO_DE_TRABALHO.md` nunca mais é lido como dado.
+    *   **`model_confidence`:** eventos live do Antigravity com `USER_SETTINGS_CHANGE` detectado recebem `"confirmado"`; fallback de fábrica recebe `"confirmado"` por ADR-06; eventos legacy de Antigravity recebem `"indeterminado"` (fonte histórica era `overview.txt` truncado).
+    *   **Seam Kafka:** `emit_events()` é o único ponto de saída — projetado para receber um `KafkaEventSink` no futuro sem alterar o restante do pipeline (fora de escopo atual).
+*   **Consequência:** Separação total entre dados (JSONL) e apresentação (Markdown). Elimina `parse_existing_developers_stats`. Habilita auditoria por evento, multi-dev trivial e publicação futura em streaming.
+
 ---
 
 ## 4. Estrutura de Pastas e Componentes
@@ -91,11 +102,22 @@ A arquitetura de arquivos sob `.tracker/` está organizada de forma modular:
 
 ```text
 .tracker/
-├── Makefile            # DX Interface: Ponto de entrada de comandos make do desenvolvedor
-├── README.md           # Developer Guide: Instruções conceituais de quando e como utilizar
-├── work-tracker-architecture.md # Architecture Spec: Este documento formal de arquitetura BMad
-├── work-tracker.py     # Analytics Engine: Script em Python contendo os algoritmos de coleta e análise
-└── TEMPO_DE_TRABALHO.md# Collaborative Log: Arquivo Markdown contendo os dados por dia e modelo
+├── Makefile                    # DX Interface: make track-time / make bootstrap
+├── README.md                   # Developer Guide: instruções de uso
+├── work-tracker-architecture.md# Architecture Spec: este documento
+├── work-tracker.py             # Analytics Engine: coleta, compute_sessions, render_report
+├── bootstrap_events.py         # Bootstrap one-shot: captura legado → eventos legacy JSONL
+├── BACKLOG.md                  # Backlog consolidado de melhorias e dívida técnica
+├── TEMPO_DE_TRABALHO.md        # Relatório Markdown (renderização dos eventos)
+├── project-context.md          # Contexto consolidado do projeto
+├── events/                     # Store de eventos por desenvolvedor
+│   ├── dev-<hash>.jsonl        # Eventos activity_daily / activity_branch / dev_summary por dev
+│   └── manifest.json           # legacy_boundary por dev (datetime naive BRT ISO)
+├── specs/                      # Especificações de features e bugfixes
+├── reviews/                    # Prompts e resultados de code review
+├── research/                   # Pesquisas técnicas
+└── scratch/
+    └── test_tracker.py         # Testes unitários (unittest)
 ```
 
 ---
@@ -120,27 +142,23 @@ sequenceDiagram
     participant D as Desenvolvedor (Terminal)
     participant M as Makefile (.tracker/Makefile)
     participant W as work-tracker.py (Engine)
-    participant FS as Logs do Sistema (Claude JSONL / Gemini Overview)
+    participant FS as Logs do Sistema (Claude JSONL / Antigravity transcript.jsonl)
+    participant EV as .tracker/events/ (Store JSONL)
     participant MD as TEMPO_DE_TRABALHO.md
-    
+
     D->>M: make -f .tracker/Makefile track-time EXPORT=true
     M->>W: python3 work-tracker.py --export
-    W->>W: Obter getpass.getuser() & socket.gethostname()
     W->>W: Calcular SHA-256 de identificação (masked_id)
-    W->>FS: Ler logs brutos (~/.claude/projects/ e ~/.gemini/antigravity/)
-    FS-->>W: Eventos brutos com timestamps e IDs de conversas
-    W->>W: Aplicar Filtro Anti-Poluição (Descartar pings vazios de sistema)
-    W->>W: Converter timestamps para Brasília (UTC - 3h)
-    W->>W: Concatenar e ordenar TODOS os eventos globalmente por data
-    W->>W: Injetar Gemini 3.1 Pro (High) como estado inicial se vazio
-    W->>W: Propagar estado ativo de LLMs (Cross-Tool)
-    W->>W: Calcular Gaps (Creditando ociosidade ao último ping)
-    W->>W: Agrupar Interações, Sessões Ativas e Horas Efetivas
-    W->>MD: Ler conteúdo anterior
-    MD-->>W: Conteúdo Markdown histórico
-    W->>W: Filtrar e remover bloco antigo do 'masked_id'
-    W->>MD: Sobrescrever Cabeçalho + Outros Devs + Nova Tabela Estendida
-    W-->>D: Mensagem de Sucesso (Console com Tabela Detalhada)
+    W->>FS: Ler logs brutos (~/.claude/projects/ e ~/.gemini/antigravity-ide/)
+    FS-->>W: Pings brutos com timestamps, modelos e IDs de conversas
+    W->>W: Filtro Anti-Poluição + Converter para Brasília (UTC-3)
+    W->>W: compute_sessions() — gap 45min, padding 15min, midnight crossing
+    W->>W: build_live_events() — activity_daily / activity_branch por dev
+    W->>EV: emit_events() — preserva linhas legacy, reescreve live
+    EV-->>W: load_all_events() — todos os eventos (legacy + live)
+    W->>W: render_report() — agrega eventos → Markdown
+    W->>MD: Gravar TEMPO_DE_TRABALHO.md
+    W-->>D: ✔ Métricas de tempo atualizadas
 ```
 
 ---

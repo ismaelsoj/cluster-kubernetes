@@ -423,17 +423,17 @@ def emit_events(events_dir, masked_id, live_events):
     
     legacy_events = []
     if os.path.exists(file_path):
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
                     ev = json.loads(line)
                     if ev.get("legacy") is True:
                         legacy_events.append(ev)
-        except Exception:
-            pass
+                except json.JSONDecodeError:
+                    pass
 
     live_hours = sum(ev["hours"] for ev in live_events if ev["event_type"] == "activity_daily")
     live_interactions = sum(ev["interactions"] for ev in live_events if ev["event_type"] == "activity_daily")
@@ -442,7 +442,13 @@ def emit_events(events_dir, masked_id, live_events):
     tz_br = timezone(timedelta(hours=-3))
     now_br = datetime.now(tz=tz_br)
     generated_at_str = now_br.isoformat()
-    last_updated_str = now_br.strftime('%d/%m/%Y %H:%M:%S')
+    live_daily = [ev for ev in live_events if ev["event_type"] == "activity_daily"]
+    if live_daily:
+        max_date_iso = max(ev["date"] for ev in live_daily)
+        max_dt = datetime.strptime(max_date_iso, "%Y-%m-%d")
+        last_updated_str = max_dt.strftime('%d/%m/%Y') + " 23:59:59"
+    else:
+        last_updated_str = "N/A"
 
     live_summary = {
         "event_type": "dev_summary",

@@ -79,6 +79,7 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica ide
 ### BKL-007: Persistência JSON canônica (separar dados de apresentação)
 - **Tipo:** Feature / Arquitetura
 - **Origem:** Party Mode (Winston)
+- **Status:** ✅ Atendido — arquitetura orientada a eventos implementa camada de dados JSONL canônica em `.tracker/events/`; `TEMPO_DE_TRABALHO.md` passa a ser renderização pura.
 - **Descrição:** Persistir dados em `.tracker/data.json` como formato canônico e gerar Markdown como view. Eliminaria toda a complexidade de `parse_existing_developers_stats()` (regex parsing do próprio output) e tornaria consolidação multi-dev trivial (deep merge de JSONs).
 - **Trade-off:** Mudança arquitetural significativa. O Markdown atual como fonte da verdade funciona, mas é frágil. Qualquer mudança no layout de tabela quebra a re-ingestão.
 

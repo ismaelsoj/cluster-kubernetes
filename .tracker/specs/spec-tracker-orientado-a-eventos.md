@@ -214,6 +214,20 @@ legados reproduzem a Tabela 2 verbatim (listas `tools`/`models` como no Markdown
 - Filtro de janela `legacy_boundary` (sem dupla contagem).
 - `emit_events()` — preserva linhas `legacy`, substitui `live`.
 
+## Review Findings
+
+- [x] [Review][Decision→Patch] AC#5 idempotency: `last_updated` agora deriva da data máxima dos `activity_daily` live events (formato `DD/MM/YYYY 23:59:59`); `generated_at` permanece runtime stamp (não exibido no Markdown). Opção (a) escolhida. [`work-tracker.py:emit_events`]
+- [x] [Review][Patch] Guard de idempotência do bootstrap corrigido: `json.loads(line).get("legacy") is True` com `except (json.JSONDecodeError, Exception): pass` por linha. [`.tracker/bootstrap_events.py:51-55`]
+- [x] [Review][Patch] `emit_events`: try/except movido para dentro do loop — parse error em uma linha não aborta leitura das demais; apenas a linha problemática é ignorada. [`.tracker/work-tracker.py:emit_events`]
+- [x] [Review][Patch] BKL-007 marcado como `✅ Atendido` no `BACKLOG.md` com justificativa da camada JSONL canônica. [`.tracker/BACKLOG.md`]
+- [x] [Review][Patch] `work-tracker-architecture.md` atualizado: ADR-05 corrigido (`transcript.jsonl`), diagrama Mermaid refatorado, estrutura de pastas completa, ADR-07 adicionado. [`.tracker/work-tracker-architecture.md`]
+- [x] [Review][Patch] `project-context.md` atualizado: Stack, estrutura de arquivos, ADR-05, ADR-07 (novo), diagrama Mermaid e seção de trabalho diferido. [`.tracker/project-context.md`]
+- [x] [Review][Defer] `parse_hours_from_str`: rama `group(2)` nunca alcançada (regex tem 1 grupo) — dead code confuso mas funcionalmente idêntico ao original. [`.tracker/work-tracker.py:67`, `.tracker/bootstrap_events.py:17`] — deferred, pre-existing
+- [x] [Review][Defer] `dev-` prefix check sempre cai no branch else — `if not masked_id.startswith("dev-")` é sempre False; branch `"dev-{masked_id}.jsonl"` nunca é executado. [`.tracker/work-tracker.py:421,902`] — deferred, pre-existing
+- [x] [Review][Defer] Console report: subtotais por ferramenta podem divergir do total exibido — `tool_model_totals` acumula horas legacy de `activity_daily`, mas `total_combined_hours` usa `legacy_hours` do `dev_summary` (rounding pode diferir). Cosmético, sem impacto nos dados. [`.tracker/work-tracker.py:show_console_report`] — deferred, pre-existing
+- [x] [Review][Defer] Ausência de warning quando path antigo do Antigravity existe mas o novo não — UX improvement, não é crash. [`.tracker/work-tracker.py:analyze_antigravity`] — deferred, pre-existing
+- [x] [Review][Defer] `model_confidence: "confirmado"` atribuído ao modelo padrão de fábrica ADR-06 — quando não há `USER_SETTINGS_CHANGE` no transcript, o fallback `"Gemini 3.1 Pro (High)"` é rotulado como "confirmado" embora seja inferido. Necessita novo nível `"inferido"` na spec. [`.tracker/work-tracker.py:build_live_events`] — deferred, pre-existing
+
 ## Suggested Review Order
 
 1. **Constantes e schema** [`.tracker/work-tracker.py`] — verificar `SCHEMA_VERSION`,
