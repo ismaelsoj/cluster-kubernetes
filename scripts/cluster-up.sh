@@ -122,6 +122,7 @@ if k3d cluster get "${CLUSTER_NAME}" &>/dev/null; then
   if kubectl get nodes >/dev/null 2>&1; then
     echo "Cluster operacional. Reconciliando bootstrap GitOps (idempotente)..."
     kubectl get nodes
+    bash "${REPO_ROOT}/scripts/inject-secrets.sh"
     install_argocd
     apply_bootstrap_apps
     echo ""
@@ -164,9 +165,10 @@ echo ""
 echo "Cluster provisionado com sucesso!"
 kubectl get nodes
 
-# ─── Bootstrap GitOps (Story 1.3) ─────────────────────────────────────────────
-# Instala o ArgoCD e aplica o root-app (App-of-Apps) para iniciar a sincronização
-# recursiva da infraestrutura e das aplicações de negócio.
+# ─── Bootstrap GitOps (Story 1.3/1.5) ─────────────────────────────────────────
+# A sequência de recuperação/bootstrap segue:
+# criar namespaces + injetar Secrets (1.5) -> instalar ArgoCD (1.3) -> aplicar root-app (1.3)
+bash "${REPO_ROOT}/scripts/inject-secrets.sh"
 install_argocd
 apply_bootstrap_apps
 

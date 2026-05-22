@@ -9,7 +9,7 @@ REPO_ROOT := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
 
 export CLUSTER_NAME ?= cluster-kubernetes
 
-.PHONY: up up-force down token lint status help
+.PHONY: up up-force down token lint status secrets help
 
 help: ## Exibe esta ajuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -35,3 +35,6 @@ lint: ## Valida todos os manifestos YAML
 
 status: ## Exibe status dos componentes e URLs locais
 	@bash "$(REPO_ROOT)/scripts/status.sh"
+
+secrets: ## Injeta/atualiza os Secrets de infraestrutura no cluster
+	@bash "$(REPO_ROOT)/scripts/inject-secrets.sh"

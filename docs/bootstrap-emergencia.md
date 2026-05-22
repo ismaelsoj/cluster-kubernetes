@@ -1,11 +1,118 @@
 # Guia de Bootstrap de Emergência - cluster-kubernetes
 
-> Esqueleto inicial — Story 1.5 documenta a sequência com placeholders.
-> Story 3.4 refina com comandos e nomes reais de Secrets.
+Este guia documenta o procedimento de recuperação do cluster em cenários de desastre ou reconstrução do "Dia Zero" (Bootstrap de Emergência).
 
-## Sequência de Recuperação (Visão Geral)
+> [!NOTE]
+> Este documento é o esqueleto inicial com placeholders (conforme a Story 1.5) e será refinado com comandos e testes de endpoints na Story 3.4.
+> Nenhum segredo (senha, chave privada) deve ser persistido no repositório Git.
 
-1. Criar namespaces base
-2. Injetar Secrets manualmente via `kubectl create secret`
-3. Instalar ArgoCD
-4. Aplicar `cluster/bootstrap/root-app.yaml` — ArgoCD assume via Sync Waves
+## Sequência de Recuperação
+
+A reconstrução da plataforma a partir do zero deve seguir rigorosamente a sequência abaixo para garantir a conformidade GitOps e evitar erros de sincronização:
+
+1. **Inicialização do Cluster Local (K3d)**
+2. **Criação Prévia dos Namespaces**
+3. **Injeção Manual dos Secrets**
+4. **Instalação do ArgoCD**
+5. **Aplicação do root-app.yaml (Orquestrador do GitOps)**
+
+---
+
+## 1. Inicialização do Cluster Local (K3d)
+
+Para provisionar a infraestrutura de contêineres local com as configurações recomendadas e limites de recursos adequados, execute:
+
+```bash
+make up
+```
+
+Ou, se preferir inicializar manualmente usando a especificação `k3d.yaml` da raiz do repositório:
+
+```bash
+k3d cluster create --config k3d.yaml
+```
+
+---
+
+## 2. Criação Prévia dos Namespaces
+
+Antes de iniciar a reconciliação automática pelo ArgoCD, os namespaces fundamentais da infraestrutura devem ser criados previamente. Isso evita falhas de dependência na aplicação dos segredos e componentes.
+
+Crie os namespaces obrigatórios executando:
+
+```bash
+kubectl create namespace keycloak-auth
+kubectl create namespace kong-gateway
+```
+
+---
+
+## 3. Injeção Manual dos Secrets
+
+Os segredos sensíveis nunca devem ser versionados ou armazenados no Git (NFR-S02 / FR22). Em cenários de emergência, o SRE deve injetar os Secrets no cluster de forma estática antes de aplicar a governança do ArgoCD.
+
+### 3.1. Secrets do Identity Provider e Banco de Dados (Namespace: `keycloak-auth`)
+
+*   **Secret de conexão com o Banco de Dados (PostgreSQL):**
+    ```bash
+    kubectl create secret generic keycloak-db-secret \
+      --namespace=keycloak-auth \
+      --from-literal=database-user=<VALOR_USUARIO_DB> \
+      --from-literal=database-password=<VALOR_SENHA_DB>
+    ```
+
+*   **Secret de administração do console Keycloak:**
+    ```bash
+    kubectl create secret generic keycloak-admin-secret \
+      --namespace=keycloak-auth \
+      --from-literal=admin-username=<VALOR_ADMIN_USER> \
+      --from-literal=admin-password=<VALOR_ADMIN_PASSWORD>
+    ```
+
+### 3.2. Script Utilitário Local (Opcional)
+
+Para acelerar o processo e evitar erros de digitação, você pode utilizar o script utilitário interativo:
+
+```bash
+make secrets
+```
+
+Ou diretamente:
+
+```bash
+./scripts/inject-secrets.sh
+```
+
+> [!WARNING]
+> O script lê os valores de um arquivo local `.env` (ignorado no Git) ou os solicita de forma interativa. Em ambientes não-interativos, ele gera senhas seguras automaticamente e as exibe. NUNCA envie ou comite o arquivo `.env` gerado.
+
+---
+
+## 4. Instalação do ArgoCD
+
+Com os namespaces criados e os Secrets injetados, instale o ArgoCD de forma idempotente. A instalação utiliza a versão estável e imutável definida nas especificações (`v3.4.2` por padrão) com suporte a manifestos grandes via *Server-Side Apply*:
+
+```bash
+kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -n argocd --server-side=true --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.4.2/manifests/install.yaml
+```
+
+Aguarde o ArgoCD ficar totalmente pronto:
+
+```bash
+kubectl wait --for=condition=Available --namespace argocd --timeout=180s deployment/argocd-server
+```
+
+---
+
+## 5. Aplicação do root-app.yaml (Orquestrador do GitOps)
+
+Aplique a governança recursiva do ArgoCD (padrão App-of-Apps).
+Substitua temporariamente a branch de destino (`targetRevision`) no manifesto para coincidir com a sua branch de desenvolvimento local (o script `cluster-up.sh` faz isso de forma transparente, mas o SRE pode fazê-lo manualmente se necessário):
+
+```bash
+# Substitua <BRANCH_DESEJADA> pelo branch de trabalho (ex: main ou feature/sua-feature)
+sed "s|targetRevision: main|targetRevision: <BRANCH_DESEJADA>|" cluster/bootstrap/root-app.yaml | kubectl apply -f -
+```
+
+Uma vez aplicado o `root-app.yaml`, o ArgoCD iniciará a sincronização em cascata de todos os recursos do repositório respeitando rigorosamente as ordens das **Sync Waves** declaradas.

@@ -1,5 +1,5 @@
 # generated: 2026-05-12
-# last_updated: 2026-05-12
+# last_updated: 2026-05-22
 # project: cluster-kubernetes
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-05-12"
-last_updated: "2026-05-18"  # story 1.4 alterada para adotar Conftest (OPA) via proposta de mudança aprovada
+last_updated: "2026-05-22"  # story 1.5 em review
 project: cluster-kubernetes
 project_key: NOKEY
 tracking_system: file-system
@@ -48,7 +48,7 @@ development_status:
   1-2-makefile-scripts-automacao-local: done
   1-3-bootstrap-argocd-manifestos-app-of-apps: done
   1-4-linter-yaml-pipeline-ci-readme: done
-  1-5-procedimento-secrets-documentacao-emergencia: backlog
+  1-5-procedimento-secrets-documentacao-emergencia: review
   epic-1-retrospective: optional
 
   # --- Épico 2: Identidade, Persistência e Recuperação de Desastres ---
