@@ -9,7 +9,7 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 
 ## 📊 Resumo Geral Consolidado (Todos os Desenvolvedores)
 
-* **Tempo Total de Desenvolvimento:** **29h 47m**
+* **Tempo Total de Desenvolvimento:** **30h 05m**
 
 ### 🌿 Tempo Total por Branch
 
@@ -18,24 +18,25 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | `1-2-makefile-scripts` | **2h 20m** |
 | `1-3-bootstrap-argocd` | **1h 16m** |
 | `1-4-linter-yaml-pipeline-ci-readme` | **2h 16m** |
+| `bmad-custom` | **0h 05m** |
 | `main` | **13h 09m** |
 | `remotes/origin/1-2-makefile-scripts` | **0h 00m** |
 | `teste` | **0h 05m** |
-| `time-tracker` | **10h 42m** |
+| `time-tracker` | **10h 56m** |
 
 ---
 
 ## 👤 Desenvolvedor: `dev-39d71ab2`
 
-* **Última Atualização:** 21/05/2026 14:34:27 (Horário de Brasília)
-* **Tempo Ativo Combinado (IA):** **20h 21m**
-* **Total de Interações:** **3621 comandos** em 11 sessões
+* **Última Atualização:** 21/05/2026 21:52:31 (Horário de Brasília)
+* **Tempo Ativo Combinado (IA):** **20h 40m**
+* **Total de Interações:** **3697 comandos** em 14 sessões
 
 ### 🛠️ Totais por Ferramenta
 
 | Ferramenta | Tempo Ativo | Interações |
 | :---: | :---: | :---: |
-| **Antigravity** | 14h 34m | 1587 |
+| **Antigravity** | 14h 53m | 1663 |
 | **Claude Code** | 5h 46m | 2034 |
 
 ### 🗓️ Detalhamento Diário das Horas (Brasília)
@@ -56,6 +57,9 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | 19/05/2026 | **Claude Code** | Claude Sonnet 4.6 | 0h 40m | 0 | 415 |
 | 20/05/2026 | **Antigravity** | Indeterminado (pré-migração) | 0h 52m | 1 | 85 |
 | 20/05/2026 | **Claude Code** | Claude Sonnet 4.6 | 1h 46m | 2 | 401 |
+| 21/05/2026 | **Antigravity** | Claude Sonnet 4.6 (Thinking) | 0h 00m | 1 | 19 |
+| 21/05/2026 | **Antigravity** | Gemini 3.1 Pro (High) | 0h 04m | 1 | 2 |
+| 21/05/2026 | **Antigravity** | Gemini 3.5 Flash (High) | 0h 14m | 1 | 55 |
 
 ### 🌿 Detalhamento Diário por Branch / História (Brasília)
 
@@ -73,6 +77,9 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | 18/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Sonnet 4.6, Gemini 3 Flash | 1h 18m | 274 |
 | 19/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Sonnet 4.6, Gemini 3 Flash | 0h 57m | 461 |
 | 20/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Sonnet 4.6, Gemini 3 Flash | 2h 38m | 486 |
+| 21/05/2026 | `bmad-custom` | Antigravity | Claude Sonnet 4.6 (Thinking), Gemini 3.5 Flash (High) | 0h 05m | 20 |
+| 21/05/2026 | `main` | Antigravity | Gemini 3.5 Flash (High) | 0h 00m | 2 |
+| 21/05/2026 | `time-tracker` | Antigravity | Gemini 3.1 Pro (High), Gemini 3.5 Flash (High) | 0h 14m | 54 |
 
 ---
 
