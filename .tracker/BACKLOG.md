@@ -48,6 +48,14 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica ide
 - **Impacto:** O rastreador atual perde o evento de mudança de modelo porque não lê o novo formato, propagando incorretamente o modelo antigo.
 - **Correção proposta:** Refatorar o script `work-tracker.py` para apontar para a nova pasta App Data (`~/.gemini/antigravity-ide/brain/`) e extrair as interações dos arquivos `transcript.jsonl`. Após essa correção, o BKL-026 pode ser fechado.
 
+### BKL-027: Escrita não-atômica em `emit_events()` — risco de perda de dados
+- **Tipo:** Bug (Integridade de Dados)
+- **Origem:** Code Review Gauntlet (2026-05-21)
+- **Status:** ✅ Concluído
+- **Descrição:** `emit_events()` abre o arquivo com `open(file_path, 'w')`, que trunca o arquivo imediatamente. Legacy events são escritos primeiro; se o processo crashar durante a escrita, eles são perdidos permanentemente (sem rollback).
+- **Correção aplicada:** Escrita em arquivo temporário (`file_path + ".tmp"`) finalizada com `os.replace(tmp, file_path)` — operação atômica garantida pelo SO no mesmo filesystem.
+- **Impacto:** Alta — é o único ponto do sistema onde dados `legacy` imutáveis podem ser destruídos sem aviso.
+
 ---
 
 ## 🥈 Prioridade Média — Melhorias de Qualidade Significativas
@@ -112,6 +120,18 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica ide
 - **Origem:** Party Mode (Amelia)
 - **Descrição:** Linha 487: `if sess[i]["tool"] != sess[i+1]["tool"]: continue`. Quando dev alterna Antigravity → Claude Code → Antigravity, os gaps entre ferramentas são perdidos. O tempo total reportado é menor que o real.
 - **Impacto:** Subestimação do tempo de trabalho em sessões com alternância frequente de ferramenta.
+
+### BKL-028: `load_all_events()` sem try/except por linha — arquivo corrompido aborta leitura
+- **Tipo:** Bug
+- **Origem:** Code Review Gauntlet (2026-05-21)
+- **Descrição:** O `except Exception: pass` em `load_all_events()` está no nível do arquivo, não da linha. Uma única linha JSONL malformada interrompe a leitura do arquivo inteiro. `emit_events()` foi corrigido no último review para ter try/except por linha — `load_all_events()` ficou com o padrão antigo.
+- **Correção proposta:** Envolver `json.loads(line)` em try/except `json.JSONDecodeError` dentro do loop, idêntico ao padrão já adotado em `emit_events()`.
+
+### BKL-029: `last_updated_str` hardcodado como `"23:59:59"` é semanticamente incorreto
+- **Tipo:** Bug (menor)
+- **Origem:** Code Review Gauntlet (2026-05-21)
+- **Descrição:** Introduzido no último code review (commit 190d455): `last_updated_str = max_dt.strftime('%d/%m/%Y') + " 23:59:59"`. O campo afirma que a última atividade foi às 23:59:59 do dia, o que é falso. O timestamp real de geração está em `generated_at`.
+- **Correção proposta:** Usar `generated_at_str` para `last_updated`, ou renomear o campo para `last_active_date` e remover o componente de hora.
 
 ---
 
@@ -189,7 +209,7 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica ide
 | Tipo | Quantidade |
 |------|-----------|
 | Feature | 8 |
-| Bug / Bug potencial | 9 |
+| Bug / Bug potencial | 12 |
 | Dívida técnica | 6 |
 | Pesquisa / Bloqueado | 2 |
 | Código morto | 1 |

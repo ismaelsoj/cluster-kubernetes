@@ -446,9 +446,9 @@ def emit_events(events_dir, masked_id, live_events):
     if live_daily:
         max_date_iso = max(ev["date"] for ev in live_daily)
         max_dt = datetime.strptime(max_date_iso, "%Y-%m-%d")
-        last_updated_str = max_dt.strftime('%d/%m/%Y') + " 23:59:59"
+        last_active_date_str = max_dt.strftime('%d/%m/%Y')
     else:
-        last_updated_str = "N/A"
+        last_active_date_str = "N/A"
 
     live_summary = {
         "event_type": "dev_summary",
@@ -458,20 +458,22 @@ def emit_events(events_dir, masked_id, live_events):
         "total_hours": round(live_hours, 4),
         "total_interactions": live_interactions,
         "total_sessions": live_sessions,
-        "last_updated": last_updated_str,
+        "last_active_date": last_active_date_str,
         "legacy": False,
         "generated_at": generated_at_str
     }
 
     if not os.path.exists(events_dir):
         os.makedirs(events_dir)
-        
-    with open(file_path, 'w', encoding='utf-8') as f:
+
+    tmp_path = file_path + ".tmp"
+    with open(tmp_path, 'w', encoding='utf-8') as f:
         for ev in legacy_events:
             f.write(json.dumps(ev, ensure_ascii=False) + "\n")
         f.write(json.dumps(live_summary, ensure_ascii=False) + "\n")
         for ev in live_events:
             f.write(json.dumps(ev, ensure_ascii=False) + "\n")
+    os.replace(tmp_path, file_path)
 
 def load_all_events(events_dir):
     events = []
@@ -485,7 +487,10 @@ def load_all_events(events_dir):
                         line = line.strip()
                         if not line:
                             continue
-                        events.append(json.loads(line))
+                        try:
+                            events.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            pass
             except Exception:
                 pass
     return events
@@ -715,13 +720,25 @@ def render_report(all_events):
         total_interactions = sum(ev["total_interactions"] for ev in dev_summaries)
         total_sessions = sum(ev["total_sessions"] for ev in dev_summaries)
 
-        last_updated = "N/A"
+        last_active_date = "N/A"
         live_summary = [ev for ev in dev_summaries if ev["scope"] == "live"]
         legacy_summary = [ev for ev in dev_summaries if ev["scope"] == "legacy"]
         if live_summary:
-            last_updated = live_summary[0]["last_updated"]
+            # Support both old "last_updated" (with time) and new "last_active_date" (date only)
+            ev = live_summary[0]
+            if "last_active_date" in ev:
+                last_active_date = ev["last_active_date"]
+            elif "last_updated" in ev:
+                # Extract date portion from old format "DD/MM/YYYY HH:MM:SS"
+                last_active_date = ev["last_updated"].split()[0]
         elif legacy_summary:
-            last_updated = legacy_summary[0]["last_updated"]
+            # Support both old "last_updated" (with time) and new "last_active_date" (date only)
+            ev = legacy_summary[0]
+            if "last_active_date" in ev:
+                last_active_date = ev["last_active_date"]
+            elif "last_updated" in ev:
+                # Extract date portion from old format "DD/MM/YYYY HH:MM:SS"
+                last_active_date = ev["last_updated"].split()[0]
 
         tool_totals = defaultdict(lambda: {"hours": 0.0, "interactions": 0})
         for ev in daily_events:
@@ -750,7 +767,7 @@ def render_report(all_events):
 
         dev_summary_block = (
             f"## 👤 Desenvolvedor: `{dev_id}`\n\n"
-            f"* **Última Atualização:** {last_updated} (Horário de Brasília)\n"
+            f"* **Última Data Ativa:** {last_active_date} (Horário de Brasília)\n"
             f"* **Tempo Ativo Combinado (IA):** **{format_hours(total_hours)}**\n"
             f"* **Total de Interações:** **{total_interactions} comandos** em {total_sessions} sessões\n\n"
         )

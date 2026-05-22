@@ -9,7 +9,7 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 
 ## 📊 Resumo Geral Consolidado (Todos os Desenvolvedores)
 
-* **Tempo Total de Desenvolvimento:** **30h 34m**
+* **Tempo Total de Desenvolvimento:** **30h 57m**
 
 ### 🌿 Tempo Total por Branch
 
@@ -22,13 +22,13 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | `main` | **13h 09m** |
 | `remotes/origin/1-2-makefile-scripts` | **0h 00m** |
 | `teste` | **0h 05m** |
-| `time-tracker` | **11h 24m** |
+| `time-tracker` | **11h 47m** |
 
 ---
 
 ## 👤 Desenvolvedor: `dev-39d71ab2`
 
-* **Última Atualização:** 21/05/2026 21:52:31 (Horário de Brasília)
+* **Última Data Ativa:** 21/05/2026 (Horário de Brasília)
 * **Tempo Ativo Combinado (IA):** **20h 40m**
 * **Total de Interações:** **3697 comandos** em 14 sessões
 
@@ -85,16 +85,16 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 
 ## 👤 Desenvolvedor: `dev-4e707577`
 
-* **Última Atualização:** 21/05/2026 23:59:59 (Horário de Brasília)
-* **Tempo Ativo Combinado (IA):** **9h 55m**
-* **Total de Interações:** **2567 comandos** em 16 sessões
+* **Última Data Ativa:** 21/05/2026 (Horário de Brasília)
+* **Tempo Ativo Combinado (IA):** **10h 17m**
+* **Total de Interações:** **2882 comandos** em 17 sessões
 
 ### 🛠️ Totais por Ferramenta
 
 | Ferramenta | Tempo Ativo | Interações |
 | :---: | :---: | :---: |
 | **Antigravity** | 5h 55m | 1211 |
-| **Claude Code** | 4h 01m | 1356 |
+| **Claude Code** | 4h 23m | 1671 |
 
 ### 🗓️ Detalhamento Diário das Horas (Brasília)
 
@@ -116,8 +116,9 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | 20/05/2026 | **Claude Code** | Claude Sonnet 4.6 | 0h 00m | 1 | 0 |
 | 21/05/2026 | **Antigravity** | Gemini 3.1 Pro (High) | 0h 04m | 0 | 12 |
 | 21/05/2026 | **Antigravity** | Gemini 3.5 Flash (Medium) | 0h 10m | 0 | 240 |
+| 21/05/2026 | **Claude Code** | Claude Haiku 4.5 | 0h 07m | 1 | 168 |
 | 21/05/2026 | **Claude Code** | Claude Opus 4.7 | 0h 58m | 0 | 162 |
-| 21/05/2026 | **Claude Code** | Claude Sonnet 4.6 | 0h 33m | 1 | 281 |
+| 21/05/2026 | **Claude Code** | Claude Sonnet 4.6 | 0h 49m | 1 | 428 |
 
 ### 🌿 Detalhamento Diário por Branch / História (Brasília)
 
@@ -132,7 +133,7 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | 18/05/2026 | `main` | Antigravity | Gemini 3.1 Pro (High) | 0h 17m | 146 |
 | 19/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Opus 4.7, Gemini 3.1 Pro (High) | 2h 02m | 479 |
 | 20/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Opus 4.7, Claude Sonnet 4.6, Claude Sonnet 4.6 (Thinking), Gemini 3.1 Pro (High), Gemini 3.5 Flash (High), Gemini 3.5 Flash (Medium) | 2h 31m | 363 |
-| 21/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Opus 4.7, Claude Sonnet 4.6, Gemini 3.1 Pro (High), Gemini 3.5 Flash (Medium) | 1h 45m | 695 |
+| 21/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Haiku 4.5, Claude Opus 4.7, Claude Sonnet 4.6, Gemini 3.1 Pro (High), Gemini 3.5 Flash (Medium) | 2h 07m | 1010 |
 
 ---
 

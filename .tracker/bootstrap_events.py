@@ -90,13 +90,13 @@ def main():
         
         dev_id = dev_match.group(1).strip()
         
-        # Parse last updated
-        lu_match = re.search(r'\*\s*\*\*Última Atualização:\*\*\s*(.*?)\s*(?:\(|$)', part_str)
+        # Parse last active date
+        lu_match = re.search(r'\*\s*\*\*Última Data Ativa:\*\*\s*(.*?)\s*(?:\(|$)', part_str)
         if not lu_match:
-            print(f"Warning: Could not parse last updated for dev {dev_id}")
+            print(f"Warning: Could not parse last active date for dev {dev_id}")
             continue
-        last_updated_str = lu_match.group(1).strip()
-        legacy_boundary = datetime_to_iso(last_updated_str)
+        last_active_date_str = lu_match.group(1).strip()
+        legacy_boundary = datetime_to_iso(last_active_date_str)
         
         # Parse combined hours
         ch_match = re.search(r'\*\s*\*\*Tempo Ativo Combinado \(IA\):\*\*\s*\*\*([^*]+)\*\*', part_str)
@@ -197,7 +197,7 @@ def main():
             "total_hours": total_hours,
             "total_interactions": total_interactions,
             "total_sessions": total_sessions,
-            "last_updated": last_updated_str,
+            "last_active_date": last_active_date_str,
             "legacy": True,
             "generated_at": generated_at_str
         }

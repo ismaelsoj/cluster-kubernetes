@@ -36,3 +36,8 @@ bin/
 *.key
 *.pem
 *.crt
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
