@@ -99,6 +99,12 @@ _Este arquivo contém regras críticas e padrões que agentes de IA devem seguir
 - **Ingress blindado:** o objeto `Ingress` pertence à Base Kustomize da plataforma. Desenvolvedores preenchem apenas variáveis via overlay — nunca manipulam a estrutura do Ingress diretamente.
 - **Anotações do Kong via Boilerplate:** Rate Limiting e autenticação fluem exclusivamente através de `annotations` declaradas no `Ingress`. Nenhuma configuração dinâmica via Admin API do Kong.
 
+### Rastreabilidade de Modelos (LLM Logging)
+
+- **Registro Universal de Autoria:** Todo e qualquer arquivo gerado, editado ou analisado por um agente de IA — incluindo documentações, pesquisas técnicas, PRDs, especificações de histórias e implementações — DEVE conter o registro explícito de qual modelo LLM executou a tarefa.
+- **Formato em Artefatos de Texto/Markdown:** Adicione uma indicação clara no rodapé do documento ou na seção pertinente (ex: "Registro do Agente"). Formato esperado: `Autoria/Implementação: Gemini 1.5 Pro`.
+- **Revisão e Múltiplos Agentes:** Caso o fluxo envolva revisão (ex: Code Review) ou múltiplas iterações por agentes diferentes, o modelo que realizou a revisão/adição deve ser registrado logo abaixo do autor original. Formato esperado: `Revisão: Claude 3.5 Sonnet`.
+
 ### Isolamento do Domínio do Tracker (.tracker/)
 
 - **Escopo Sob Demanda Estrito:** A pasta `.tracker/` contém scripts locais (`work-tracker.py`), logs e documentação interna de tempo ativo dos desenvolvedores. Ela é visível e rastreável pelas IAs **exclusivamente quando houver solicitação explícita do desenvolvedor humano** para analisar, depurar ou realizar manutenção no rastreador.
