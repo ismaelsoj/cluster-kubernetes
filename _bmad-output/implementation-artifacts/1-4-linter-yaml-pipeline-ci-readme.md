@@ -1,5 +1,7 @@
 # Story 1.4: Linter YAML, Pipeline CI e README
 
+**Complexidade:** Média Complexidade
+
 Status: done
 
 <!-- Note: A validação é opcional. Execute validate-create-story para checagem de qualidade antes do dev-story. -->

@@ -1,5 +1,7 @@
 # Story 1.2: Makefile e Scripts de Automação Local
 
+**Complexidade:** Média Complexidade
+
 Status: done
 
 ## Story

@@ -1,5 +1,7 @@
 # Story 1.3: Bootstrap do ArgoCD e Manifestos App-of-Apps
 
+**Complexidade:** Média Complexidade
+
 Status: done
 
 ## Story

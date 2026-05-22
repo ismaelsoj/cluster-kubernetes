@@ -128,6 +128,8 @@ O Engenheiro de Plataforma possui o repositório GitOps completo, provisiona/des
 
 ### Story 1.1: Scaffold do Repositório e Configuração k3d
 
+**Complexidade:** Média Complexidade
+
 Como um Engenheiro de Plataforma,
 Eu quero criar a estrutura completa de diretórios do repositório GitOps e o arquivo `k3d.yaml`,
 Para que a fundação esteja estabelecida com limites de recursos definidos.
@@ -142,6 +144,8 @@ Para que a fundação esteja estabelecida com limites de recursos definidos.
 **E** nomenclatura `kebab-case` em todos os diretórios
 
 ### Story 1.2: Makefile e Scripts de Automação Local
+
+**Complexidade:** Média Complexidade
 
 Como um Desenvolvedor,
 Eu quero provisionar e destruir o cluster k3d com `make up` / `make down` (nativamente no macOS/Linux ou via WSL2 no Windows),
@@ -164,6 +168,8 @@ Para que eu trabalhe com a infraestrutura sem conhecer os detalhes do Kubernetes
 
 ### Story 1.3: Bootstrap ArgoCD e Manifestos App-of-Apps
 
+**Complexidade:** Média Complexidade
+
 Como um Engenheiro de Plataforma,
 Eu quero que o ArgoCD seja instalado automaticamente e aplique manifestos a partir do Git,
 Para que a infraestrutura seja governada por GitOps com proteção contra deleção acidental.
@@ -181,6 +187,8 @@ Para que a infraestrutura seja governada por GitOps com proteção contra deleç
 **E** nenhum segredo em texto plano nos manifestos (NFR-S02)
 
 ### Story 1.4: Linter YAML, Pipeline CI e README
+
+**Complexidade:** Média Complexidade
 
 Como um Engenheiro de Plataforma,
 Eu quero validação automática de todos os manifestos,
@@ -202,6 +210,8 @@ Para que erros de nomenclatura, labels ausentes ou tags `latest` sejam detectado
 **Então** lista pré-requisitos (Docker, kubectl, k3d), comando `make up` e link para Contrato do Desenvolvedor
 
 ### Story 1.5: Procedimento de Secrets e Documentação de Emergência
+
+**Complexidade:** Baixa Complexidade
 
 Como um SRE,
 Eu quero procedimento documentado para injetar Secrets e guia de recuperação,
@@ -226,6 +236,8 @@ Identity Provider operacional com PriorityClass máxima, tokens M2M Client Crede
 
 ### Story 2.1: Manifestos Kustomize do PostgreSQL (Wave 1)
 
+**Complexidade:** Baixa Complexidade
+
 Como um Engenheiro de Plataforma,
 Eu quero o PostgreSQL deployado via GitOps no namespace `keycloak-auth`,
 Para que o Keycloak tenha repositório de estado isolado por NetworkPolicies.
@@ -240,6 +252,8 @@ Para que o Keycloak tenha repositório de estado isolado por NetworkPolicies.
 **E** YAML inicia com comentário pt-BR
 
 ### Story 2.2: Manifestos Kustomize do Keycloak (Wave 2)
+
+**Complexidade:** Média Complexidade
 
 Como um Engenheiro de Plataforma,
 Eu quero o Keycloak deployado via GitOps conectado ao PostgreSQL,
@@ -256,6 +270,8 @@ Para que a plataforma tenha Identity Provider centralizado com prioridade máxim
 
 ### Story 2.3: Configuração do Realm e Client M2M
 
+**Complexidade:** Baixa Complexidade
+
 Como um Administrador da Plataforma,
 Eu quero Realm pré-configurado com Client M2M,
 Para que eu emita tokens de longo TTL sem configuração manual repetitiva.
@@ -270,6 +286,8 @@ Para que eu emita tokens de longo TTL sem configuração manual repetitiva.
 **E** `curl` contra endpoint de token retorna JWT válido (validação precoce)
 
 ### Story 2.4: Procedimento de Backup/Restore do PostgreSQL
+
+**Complexidade:** Baixa Complexidade
 
 Como um SRE,
 Eu quero procedimento testado de backup e restauração do banco do Keycloak,
@@ -296,6 +314,8 @@ Todo tráfego interceptado pelo Kong com TLS, JWKS, Rate Limit default e Priorit
 
 ### Story 3.1: Manifestos Kustomize do Kong DB-Less (Wave 3)
 
+**Complexidade:** Média Complexidade
+
 Como um Engenheiro de Plataforma,
 Eu quero o Kong deployado em modo DB-Less via GitOps, interceptando todo tráfego de entrada,
 Para que exista ponto único de controle com prioridade máxima.
@@ -309,6 +329,8 @@ Para que exista ponto único de controle com prioridade máxima.
 **E** labels obrigatórios, overlays para 3 ambientes
 
 ### Story 3.2: TLS, Validação JWKS e Rate Limit Default
+
+**Complexidade:** Alta Complexidade
 
 Como um Engenheiro de Plataforma,
 Eu quero TLS na borda, validação JWKS local e Rate Limit conservador por padrão,
@@ -334,6 +356,8 @@ Para que requisições sem token sejam bloqueadas e o Gateway sobreviva a quedas
 
 ### Story 3.3: Script de Token e Feedback Estruturado do Terminal
 
+**Complexidade:** Baixa Complexidade
+
 Como um Desenvolvedor,
 Eu quero token M2M funcional e resumo de status no terminal após `make up`,
 Para que eu teste minha API imediatamente.
@@ -354,6 +378,8 @@ Para que eu teste minha API imediatamente.
 
 ### Story 3.4: Refinamento do Bootstrap de Emergência
 
+**Complexidade:** Baixa Complexidade
+
 Como um SRE,
 Eu quero documentação de recuperação com dados reais da infraestrutura completa,
 Para que eu reconstrua a plataforma do zero com comandos verificados.
@@ -372,6 +398,8 @@ Para que eu reconstrua a plataforma do zero com comandos verificados.
 Dev deploya APIs de ponta a ponta via Boilerplate padronizado com validação JWT interna via Sidecar oauth2-proxy.
 
 ### Story 4.1: Base Kustomize do Boilerplate e CONTRACT.md
+
+**Complexidade:** Média Complexidade
 
 Como um Desenvolvedor,
 Eu quero template padronizado com documentação clara das variáveis,
@@ -394,6 +422,8 @@ Para que eu instancie uma API sem entender a estrutura interna do Ingress.
 **Então** labels obrigatórios, probes, tag imutável, comentários pt-BR presentes
 
 ### Story 4.2: Overlays por Ambiente, Rate Limiting e Bypass de Swagger
+
+**Complexidade:** Média Complexidade
 
 Como um Desenvolvedor,
 Eu quero configurar minha API para diferentes ambientes com Rate Limit personalizável,
@@ -423,6 +453,8 @@ Para que eu tenha controle granular sem comprometer segurança em produção.
 
 ### Story 4.3: API de Teste e Homologação End-to-End
 
+**Complexidade:** Baixa Complexidade
+
 Como um Engenheiro de Plataforma,
 Eu quero deployar API de teste usando o Boilerplate para validar o fluxo completo,
 Para que eu confirme que o template funciona antes de abrir para as equipes.
@@ -444,6 +476,8 @@ Para que eu confirme que o template funciona antes de abrir para as equipes.
 *⚠️ Checkpoint: "Boilerplate funcional — aguardando camada de segurança interna"*
 
 ### Story 4.4: Sidecar oauth2-proxy para Deep Security
+
+**Complexidade:** Alta Complexidade
 
 Como um Engenheiro de Plataforma,
 Eu quero Sidecar oauth2-proxy em cada pod de API, validando JWT e fazendo introspecção,
@@ -468,6 +502,8 @@ Para que a segurança Zero-Trust seja garantida em profundidade.
 **Então** Sidecar faz fallback para cache JWKS local
 
 ### Story 4.5: Contrato do Desenvolvedor
+
+**Complexidade:** Baixa Complexidade
 
 Como um Desenvolvedor recém-chegado,
 Eu quero documentação centralizada sobre como deployar minha API,

@@ -1,5 +1,7 @@
 # Story 1.1: Scaffold do Repositório e Configuração k3d
 
+**Complexidade:** Média Complexidade
+
 Status: done
 
 ## Story
