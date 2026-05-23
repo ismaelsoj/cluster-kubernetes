@@ -37,8 +37,8 @@
 - Formato: `Autoria/Implementação: <modelo>` no rodapé ou seção pertinente.
 - Em caso de revisão por outro agente: `Revisão: <modelo>` abaixo do autor original.
 
-## Isolamento de Domínios
+## Isolamento de Domínios e Otimização de Contexto
 
-- A pasta `.tracker/` é **invisível** para tarefas de infraestrutura Kubernetes.
-- Agentes só devem acessar `.tracker/` mediante solicitação explícita do desenvolvedor.
-- Menção espontânea a `.tracker/` em contexto de infraestrutura é uma **violação de escopo semântico**.
+- A pasta `.tracker/` é **invisível** para tarefas de infraestrutura Kubernetes. Agentes só devem acessá-la mediante solicitação explícita. Menção espontânea é violação de escopo semântico.
+- A pasta `_bmad-output/implementation-artifacts/archive/` contém histórias concluídas. **NUNCA** leia ou vasculhe arquivos dentro desta pasta para buscar contexto de projeto.
+- Evite ler os arquivos originais em `_bmad-output/planning-artifacts/`. Utilize sempre as versões otimizadas em `_bmad-output/distillate/` como sua fonte da verdade.

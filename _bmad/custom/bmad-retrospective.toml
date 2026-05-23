@@ -1,0 +1,7 @@
+[workflow]
+persistent_facts = [
+  "CRITICAL REQUIREMENT [ARCHIVE COMPLETED WORK]: Como último passo obrigatório da retrospectiva, você DEVE arquivar fisicamente os artefatos. Mova os arquivos das histórias já implementadas do épico atual (e o próprio arquivo da retrospectiva, quando concluído) para a pasta `_bmad-output/implementation-artifacts/archive/` (criando-a se não existir). Isso mantém o contexto da IDE limpo para os próximos workflows."
+]
+
+# Regras globais (GIT WORKFLOW, GIT PERMISSIONS)
+# migradas para /AGENTS.md — aplicam-se automaticamente a todos os agentes.

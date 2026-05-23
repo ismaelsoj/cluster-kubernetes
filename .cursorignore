@@ -1,0 +1,9 @@
+# Ignorar artefatos de planejamento densos (a IA deve ler o _bmad-output/distillate/ em vez disso)
+_bmad-output/planning-artifacts/*.md
+_bmad-output/planning-artifacts/**/*.md
+
+# Ignorar histórias concluídas e arquivadas
+_bmad-output/implementation-artifacts/archive/
+
+# Manter o tracker fora do contexto passivo para evitar ruído de logs
+.tracker/
