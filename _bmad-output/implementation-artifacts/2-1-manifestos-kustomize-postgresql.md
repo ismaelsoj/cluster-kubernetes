@@ -91,12 +91,22 @@ Para o PostgreSQL 18.4, o `readinessProbe` e o `livenessProbe` mais confiáveis 
 - **Resultado Esperado:** Deve listar `POSTGRES_USER` e `POSTGRES_PASSWORD` (lidas do secret).
 
 **5. Validação da NetworkPolicy (Zero-Trust):**
-- Teste conexão autorizada (Simulando Keycloak):
-  - `kubectl run test-db-auth -n keycloak-auth --rm -it --image=postgres:18.4 --labels="app.kubernetes.io/name=keycloak" -- sh -c "pg_isready -h postgres-service -U keycloak"`
-  - **Resultado Esperado:** `postgres-service:5432 - accepting connections`
-- Teste conexão bloqueada (Pod não-autorizado):
-  - `kubectl run test-db-blocked -n keycloak-auth --rm -it --image=postgres:18.4 --labels="app.kubernetes.io/name=qualquer-outro" -- sh -c "pg_isready -h postgres-service -U keycloak"`
-  - **Resultado Esperado:** A conexão ficará travada (timeout) indicando bloqueio correto pela NetworkPolicy.
+- Teste de conexão autorizada (Simulando Keycloak):
+  1. Suba o pod persistente com o label correto:
+     `kubectl run test-db-auth -n keycloak-auth --image=postgres:18.4 --labels="app.kubernetes.io/name=keycloak" -- sleep 3600`
+  2. Execute o teste de conexão (deve responder imediatamente):
+     `kubectl exec -it test-db-auth -n keycloak-auth -- pg_isready -h postgres-service -U keycloak -t 5`
+     **Resultado Esperado:** `postgres-service:5432 - accepting connections`
+  3. Exclua o pod temporário:
+     `kubectl delete pod test-db-auth -n keycloak-auth`
+- Teste de conexão bloqueada (Pod não-autorizado):
+  1. Suba o pod persistente com um label não autorizado:
+     `kubectl run test-db-blocked -n keycloak-auth --image=postgres:18.4 --labels="app.kubernetes.io/name=qualquer-outro" -- sleep 3600`
+  2. Execute o teste de conexão com timeout de 5 segundos (deve retornar falha por timeout):
+     `kubectl exec -it test-db-blocked -n keycloak-auth -- pg_isready -h postgres-service -U keycloak -t 5`
+     **Resultado Esperado:** `postgres-service:5432 - no response` (exit code 2) após 5 segundos, provando o bloqueio da NetworkPolicy.
+  3. Exclua o pod temporário:
+     `kubectl delete pod test-db-blocked -n keycloak-auth`
 
 ## Tasks/Subtasks
 
@@ -160,6 +170,7 @@ Para o PostgreSQL 18.4, o `readinessProbe` e o `livenessProbe` mais confiáveis 
 - `2026-05-22 22:38:49-03:00`: Conclusão da implementação dos recursos base e atualização de overlays. Validação do Kustomize bem-sucedida.
 - `2026-05-22 22:53:00-03:00`: Correção do mountPath do volume do Postgres (/var/lib/postgresql) devido a erro de compatibilidade de inicialização da imagem Postgres 18+ detectado nos logs do container.
 - `2026-05-22 23:05:00-03:00`: Ajustados comandos de liveness e readiness probes com shell (/bin/sh -c) para sanar erro de falta da role "postgres" nos logs do container.
+- `2026-05-22 23:13:00-03:00`: Atualizado o Plano de Validação Manual da NetworkPolicy na especificação da história para utilizar comandos robustos de teste (sleep + exec + timeout) evitando travamento de terminal local.
 
 ## Status
 review
