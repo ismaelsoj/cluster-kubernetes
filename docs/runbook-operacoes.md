@@ -68,9 +68,31 @@ kubectl rollout status deployment/keycloak-deployment -n keycloak-auth
 ### Verificar health manualmente de dentro do cluster
 
 ```bash
+# Health e métricas ficam na porta 9000 (management interface do Keycloak 26+)
 kubectl exec -n keycloak-auth deploy/keycloak-deployment -- \
-  curl -sf http://localhost:8080/health/ready
+  curl -sf http://localhost:9000/health/ready
 ```
+
+### Acessar o Keycloak no navegador local
+
+> **Contexto:** Traefik está desabilitado no k3d (Kong DB-less assume o roteamento na Wave 3).
+> Enquanto o Kong não for implantado, use port-forward para acessar o Keycloak diretamente.
+
+```bash
+# Port-forward: expõe o serviço na porta 8090 local (evita conflito com o 8080 do k3d)
+kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80
+
+# Em outro terminal, acesse via navegador ou curl:
+open http://localhost:8090          # painel web do Keycloak
+curl http://localhost:8090/health/ready   # retorna {"status":"UP",...}
+```
+
+> Após implantar o Kong (Wave 3), o acesso externo passará pela porta 8080 do host
+> (mapeada no k3d para a porta 80 do loadbalancer). Nesse caso, adicione ao `/etc/hosts`:
+> ```
+> 127.0.0.1 keycloak.local
+> ```
+> E acesse `http://keycloak.local:8080`.
 
 ### Checar PriorityClass do pod
 
