@@ -11,6 +11,9 @@ metadata:
     app.kubernetes.io/part-of: cluster-kubernetes
   annotations:
     argocd.argoproj.io/sync-wave: "2"
+    # Keycloak 26 escreve em /opt/keycloak/lib/quarkus/ na augmentation do Quarkus a cada boot.
+    # readOnlyRootFilesystem requer imagem pré-compilada com --optimized (fora do escopo do MVP).
+    ignore-check.kube-linter.io/no-read-only-root-fs: "Keycloak augmentation grava em /opt/keycloak/lib/quarkus — aplicavel apos imagem customizada com kc.sh build --optimized"
 spec:
   replicas: 1
   selector:
@@ -34,9 +37,8 @@ spec:
         - name: keycloak
           image: quay.io/keycloak/keycloak:26.6.2
           args:
-            - start-dev
+            - start
           securityContext:
-            readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop:
