@@ -84,7 +84,7 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
           volumeMounts:
-            - mountPath: /var/lib/postgresql/data
+            - mountPath: /var/lib/postgresql
               name: postgres-data
             - mountPath: /var/run/postgresql
               name: postgres-run
