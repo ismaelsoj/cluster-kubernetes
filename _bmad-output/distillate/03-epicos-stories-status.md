@@ -24,7 +24,7 @@
 ## Épico 2: Identidade, Persistência e Recuperação de Desastres — BACKLOG
 
 - 2.1 PostgreSQL (Wave 1): Baixa Complexidade — deploy GitOps em `keycloak-auth`, sync-wave:"1", tag imutável postgres:18.4, NetworkPolicy restringindo acesso, probes, labels, comentário pt-BR
-- 2.2 Keycloak (Wave 2): Média — sync-wave:"2", tag keycloak:26.2.1, conectado ao PostgreSQL via Secret, PriorityClass máxima, healthcheck público, logs JSON, overlays 3 ambientes, Ingress local
+- 2.2 Keycloak (Wave 2): Média — sync-wave:"2", tag keycloak:26.6.2, conectado ao PostgreSQL via Secret, PriorityClass máxima, healthcheck público, logs JSON, overlays 3 ambientes, Ingress local
 - 2.3 Realm + Client M2M: Baixa — realm-config.json com chaves locais distintas de prod, Client client_credentials (FR06), TTL configurável (FR07), revogação manual (FR08), Event Listeners (FR09)
 - 2.4 Backup/Restore PostgreSQL: Baixa — pg_dump/pg_restore testado (FR23), fixture de dados de teste documentado
 

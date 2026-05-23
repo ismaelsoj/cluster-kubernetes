@@ -1,0 +1,18 @@
+# PriorityClass do Keycloak - prioridade máxima para garantir imunidade a eviction
+# Recurso cluster-scoped (não pertence a namespace) — parte da Wave 2 do Keycloak
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: keycloak-critical
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: identity-provider
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+value: 1000000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Prioridade máxima para o Keycloak — Identity Provider crítico da plataforma"
+
+# Autoria/Implementação: claude-sonnet-4-6

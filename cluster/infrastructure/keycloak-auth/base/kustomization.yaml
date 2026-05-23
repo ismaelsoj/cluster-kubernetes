@@ -6,10 +6,16 @@ kind: Kustomization
 namespace: keycloak-auth
 
 resources:
+  # Wave 1 — PostgreSQL (banco de dados do Keycloak)
   - postgresql-pvc.yaml
   - postgresql-deployment.yaml
   - postgresql-service.yaml
   - postgresql-networkpolicy.yaml
+  # Wave 2 — Keycloak (Identity Provider OIDC)
+  - keycloak-priorityclass.yaml
+  - keycloak-deployment.yaml
+  - keycloak-service.yaml
+  - keycloak-ingress.yaml
 
 # Autoria/Implementação: Gemini 3.5 Flash
 # Revisão: claude-sonnet-4-6
