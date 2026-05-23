@@ -130,12 +130,15 @@ Para o PostgreSQL 18.4, o `readinessProbe` e o `livenessProbe` mais confiáveis 
 - Falha na inicialização (CrashLoopBackOff) do pod do Postgres em runtime no cluster k3d local:
   - Sintomas: Logs reportavam incompatibilidade com montagem direta em `/var/lib/postgresql/data` introduzida na versão 18+ do Postgres (que exige montagem em `/var/lib/postgresql` para isolamento de upgrades via pg_upgrade). O erro de `chmod` em `/var/run/postgresql` ocorreu apenas como warning e não abortou a execução.
   - Solução: Ajustado o `mountPath` do volume `postgres-data` no container de `/var/lib/postgresql/data` para `/var/lib/postgresql`.
+- Logs repetidos de erro `FATAL: role "postgres" does not exist` nas exec probes de liveness/readiness:
+  - Sintomas: O Kubernetes não realiza expansão de variáveis de ambiente do tipo `$(VAR_NAME)` em exec probes nativas que rodam diretamente o binário (sem shell). Com isso, o comando `pg_isready` era executado de forma incorreta e tentava autenticar com o usuário do SO (`postgres`), o qual não foi criado no banco (já que `POSTGRES_USER` foi injetado como `keycloak`).
+  - Solução: Encapsulados os comandos de probe usando `/bin/sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'`.
 
 ### Completion Notes
 - Criados manifestos base para o PostgreSQL (deployment, service e networkpolicy) sob `cluster/infrastructure/keycloak-auth/base/`.
 - Configurado namespace `keycloak-auth` e sync-wave `"1"` em todos os recursos.
 - Configurada a injeção de secrets de banco de dados (`keycloak-db-secret`) via variáveis de ambiente `POSTGRES_USER` e `POSTGRES_PASSWORD`.
-- Configurados liveness e readiness probes utilizando `pg_isready` conforme recomendado para PostgreSQL 18.4.
+- Configurados liveness e readiness probes utilizando `pg_isready` executados via `/bin/sh -c` para expandir corretamente as credenciais do banco.
 - NetworkPolicy limitando o acesso da porta 5432 apenas para pods com a label `app.kubernetes.io/name: keycloak` no namespace `keycloak-auth`.
 - Corrigida a conformidade de segurança do Deployment com as diretrizes do `kube-linter`: adicionados securityContexts seguros no Pod e no Container, limites e requisições de recursos de CPU e memória, e volumes `emptyDir` para as pastas temporárias de escrita (/tmp e /var/run/postgresql).
 - Ajustado o `mountPath` do volume do banco de dados para `/var/lib/postgresql` para conformidade com a imagem oficial do Postgres 18+.
@@ -156,6 +159,7 @@ Para o PostgreSQL 18.4, o `readinessProbe` e o `livenessProbe` mais confiáveis 
 - `2026-05-22 22:35:00-03:00`: Correção das violações de segurança e recursos apontadas pelo `kube-linter` e atualização das notas de implementação.
 - `2026-05-22 22:38:49-03:00`: Conclusão da implementação dos recursos base e atualização de overlays. Validação do Kustomize bem-sucedida.
 - `2026-05-22 22:53:00-03:00`: Correção do mountPath do volume do Postgres (/var/lib/postgresql) devido a erro de compatibilidade de inicialização da imagem Postgres 18+ detectado nos logs do container.
+- `2026-05-22 23:05:00-03:00`: Ajustados comandos de liveness e readiness probes com shell (/bin/sh -c) para sanar erro de falta da role "postgres" nos logs do container.
 
 ## Status
 review
