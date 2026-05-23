@@ -52,8 +52,8 @@ development_status:
   epic-1-retrospective: done
 
   # --- Épico 2: Identidade, Persistência e Recuperação de Desastres ---
-  epic-2: backlog
-  2-1-manifestos-kustomize-postgresql: backlog
+  epic-2: in-progress
+  2-1-manifestos-kustomize-postgresql: review
   2-2-manifestos-kustomize-keycloak: backlog
   2-3-configuracao-realm-client-m2m: backlog
   2-4-procedimento-backup-restore-postgresql: backlog

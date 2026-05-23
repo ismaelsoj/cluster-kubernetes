@@ -34,8 +34,9 @@
 ## Rastreabilidade de Autoria (LLM)
 
 - Todo artefato gerado ou editado por IA DEVE registrar explicitamente qual modelo LLM executou a tarefa.
-- Formato: `Autoria/Implementação: <modelo>` no rodapé ou seção pertinente.
-- Em caso de revisão por outro agente: `Revisão: <modelo>` abaixo do autor original.
+  - Formato: `Autoria/Implementação: <modelo>` no rodapé ou seção pertinente.
+  - Em caso de revisão por outro agente: `Revisão: <modelo>` abaixo do autor original.
+- O **Change Log** de todas as especificações de histórias (em `_bmad-output/implementation-artifacts/`) DEVE conter data e hora no fuso horário de Brasília (UTC-3), no formato `AAAA-MM-DD HH:MM:SS-03:00` (ex: `2026-05-22 22:38:49-03:00`).
 
 ## Isolamento de Domínios e Otimização de Contexto
 

@@ -1,5 +1,7 @@
 [workflow]
 persistent_facts = [
   "CRITICAL REQUIREMENT [COMPLEXITY]: Você DEVE definir explicitamente o nível de complexidade da tarefa nas linhas iniciais de TODA especificação de história. NUNCA omita esta classificação.",
-  "CRITICAL REQUIREMENT [COMPLEXITY SCALE]: A classificação DEVE usar EXCLUSIVAMENTE um destes quatro valores exatos: 'Nenhuma complexidade', 'Baixa Complexidade', 'Média Complexidade' ou 'Alta Complexidade'."
+  "CRITICAL REQUIREMENT [COMPLEXITY SCALE]: A classificação DEVE usar EXCLUSIVAMENTE um destes quatro valores exatos: 'Nenhuma complexidade', 'Baixa Complexidade', 'Média Complexidade' ou 'Alta Complexidade'.",
+  "CRITICAL REQUIREMENT [MANUAL VALIDATION]: TODA história DEVE conter uma seção chamada 'Plano de Validação Manual' com os comandos exatos (ex: kubectl, curl, make) e os resultados esperados para que o desenvolvedor humano possa testar a funcionalidade implementada.",
+  "CRITICAL REQUIREMENT [CHANGE LOG TIMESTAMPS]: O 'Change Log' de TODA história DEVE conter data e hora no fuso horário de Brasília (UTC-3) no formato 'AAAA-MM-DD HH:MM:SS-03:00' (ex: 2026-05-22 22:38:49-03:00) para garantir a rastreabilidade precisa."
 ]

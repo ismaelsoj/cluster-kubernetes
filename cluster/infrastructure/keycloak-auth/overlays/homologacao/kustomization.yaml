@@ -5,3 +5,5 @@ kind: Kustomization
 
 resources:
   - ../../base
+
+# Autoria/Implementação: Gemini 3.5 Flash

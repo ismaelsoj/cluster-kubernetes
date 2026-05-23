@@ -1,0 +1,25 @@
+# Service do banco de dados PostgreSQL - keycloak-auth
+# Fornece acesso de rede ao banco de dados dentro do namespace
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: keycloak-auth
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgresql
+  selector:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: database
+
+# Autoria/Implementação: Gemini 3.5 Flash
