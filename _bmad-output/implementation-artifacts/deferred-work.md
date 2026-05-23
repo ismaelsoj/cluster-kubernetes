@@ -92,6 +92,14 @@ Registro centralizado de itens identificados em revisões/triagens que não pert
 - **`re.search` captura apenas o primeiro `<USER_SETTINGS_CHANGE>` por linha JSON:** se uma única entry contiver múltiplas trocas, somente a primeira é vista. Pre-existente. Migrar para `re.finditer` se necessário.
 - **`-\d{8}\b` na normalização pode comer sufixos numéricos não-data legítimos:** ex. `model-12345678-beta` perde `-12345678`. Nenhum modelo dos dados atuais (Claude/Gemini) sofre — latente. Refinar para padrão de data real (`-20\d{6}\b`) se relevante no futuro.
 
+## Deferred from: code review of 2-1-manifestos-kustomize-postgresql (2026-05-22)
+
+- **Memory limit 256Mi para produção** — Overlays `homologacao` e `production` estão vazios; os limites da base (256Mi RAM / 500m CPU) são adequados para dev local mas insuficientes para carga real do Keycloak. Adicionar patches de recursos por ambiente em story futura de hardening dos overlays.
+- **Overlays idênticos sem diferenciação por ambiente** — Todos os três overlays referenciam apenas a base, sem patches. Diferenciação (resources, replicas, storageClass) é escopo de stories futuras conforme ambientes forem definidos.
+- **`infra-app` hardcoded para overlay `local`** — O ArgoCD aplica sempre o overlay local para todos os ambientes. Requer decisão de arquitetura sobre como selecionar overlay por ambiente no App-of-Apps.
+- **Race condition: ArgoCD sync antes do Secret `keycloak-db-secret`** — Se o bootstrap falhar silenciosamente ao criar o Secret, o Deployment entra em `CreateContainerConfigError`. Mitigação estrutural (ExternalSecret ou InitContainer de guarda) pertence ao processo de bootstrap.
+- **Dependência frágil namespace via Wave ordering** — `CreateNamespace=false` no `infra-app` + Wave 0 cria o namespace. Se Wave 0 falhar, Wave 1 falha sem mensagem clara. Endereçar em hardening do bootstrap.
+
 ## Deferred from: code review of 1-5-procedimento-secrets-documentacao-emergencia (2026-05-22)
 
 ### Diferido para melhoria de segurança de geração de senhas (Story 3.x ou cross-story)

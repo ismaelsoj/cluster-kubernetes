@@ -3,7 +3,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: postgres-deployment
+  name: postgresql-deployment
   namespace: keycloak-auth
   labels:
     app.kubernetes.io/name: postgresql
@@ -88,10 +88,12 @@ spec:
               name: postgres-tmp
       volumes:
         - name: postgres-data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: postgresql-pvc
         - name: postgres-run
           emptyDir: {}
         - name: postgres-tmp
           emptyDir: {}
 
 # Autoria/Implementação: Gemini 3.5 Flash
+# Revisão: claude-sonnet-4-6

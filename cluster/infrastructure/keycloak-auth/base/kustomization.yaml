@@ -6,8 +6,10 @@ kind: Kustomization
 namespace: keycloak-auth
 
 resources:
-  - postgres-deployment.yaml
-  - postgres-service.yaml
-  - postgres-networkpolicy.yaml
+  - postgresql-pvc.yaml
+  - postgresql-deployment.yaml
+  - postgresql-service.yaml
+  - postgresql-networkpolicy.yaml
 
 # Autoria/Implementação: Gemini 3.5 Flash
+# Revisão: claude-sonnet-4-6

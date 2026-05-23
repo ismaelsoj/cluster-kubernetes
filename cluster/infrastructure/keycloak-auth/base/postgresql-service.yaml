@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres-service
+  name: postgresql-service
   namespace: keycloak-auth
   labels:
     app.kubernetes.io/name: postgresql
@@ -23,3 +23,4 @@ spec:
     app.kubernetes.io/component: database
 
 # Autoria/Implementação: Gemini 3.5 Flash
+# Revisão: claude-sonnet-4-6

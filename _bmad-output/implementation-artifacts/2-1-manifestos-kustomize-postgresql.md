@@ -122,6 +122,20 @@ Para o PostgreSQL 18.4, o `readinessProbe` e o `livenessProbe` mais confiáveis 
 - [x] Validar manifestos locais com linting
   - [x] Executar o linter local (`make lint`) e verificar conformidade das políticas Conftest e Kube-linter.
 
+### Review Findings
+
+- [x] [Review][Decision] Volume de dados PostgreSQL usa `emptyDir` (efêmero) em vez de PVC — Resolvido: adicionado `postgresql-pvc.yaml` (1Gi ReadWriteOnce) e atualizado Deployment para referenciar o PVC.
+- [x] [Review][Decision] Validade e compatibilidade da tag `postgres:18.4` — Descartado: tag confirmada pelo desenvolvedor como testada e funcional no cluster k3d local.
+- [x] [Review][Patch] NetworkPolicy: ausência de regra `Egress` deixa o pod do PostgreSQL com saída irrestrita — Corrigido: adicionado `Egress` ao `policyTypes` (deny-all por padrão). [cluster/infrastructure/keycloak-auth/base/postgresql-networkpolicy.yaml]
+- [x] [Review][Patch] NetworkPolicy: `podSelector` do Keycloak incompleto — Corrigido: adicionado `namespaceSelector` (keycloak-auth) e `app.kubernetes.io/component: identity-provider`. [cluster/infrastructure/keycloak-auth/base/postgresql-networkpolicy.yaml]
+- [x] [Review][Patch] `startupProbe` ausente no container postgres — Descartado: CrashLoopBackOff foi causado pelo mountPath incorreto (já corrigido), não por timing de probe.
+- [x] [Review][Patch] Inconsistência de naming: recursos nomeados `postgres-*` enquanto label é `postgresql` — Corrigido: todos os arquivos e nomes de recursos renomeados para `postgresql-*`. [cluster/infrastructure/keycloak-auth/base/]
+- [x] [Review][Defer] Memory limit 256Mi pode ser insuficiente em ambientes não-locais — Overlays `homologacao` e `production` deveriam sobrescrever com valores adequados à carga real do Keycloak. Pré-existente (overlays intencionalmente mínimos no MVP). [cluster/infrastructure/keycloak-auth/base/postgres-deployment.yaml:41] — deferred, pre-existing
+- [x] [Review][Defer] Overlays `local`, `homologacao` e `production` são idênticos (apenas referenciam a base) — Sem patches por ambiente. Esperado para o MVP; diferenciação por ambiente é escopo de stories futuras. [cluster/infrastructure/keycloak-auth/overlays/] — deferred, pre-existing
+- [x] [Review][Defer] `infra-app` hardcoded para overlay `local` — O path de infraestrutura não seleciona ambiente dinamicamente. Pré-existente na arquitetura do App-of-Apps. — deferred, pre-existing
+- [x] [Review][Defer] Race condition: ArgoCD pode sincronizar o Deployment antes do Secret `keycloak-db-secret` ser criado pelo `inject-secrets.sh` — Falha silenciosa com `CreateContainerConfigError`. Mitigação estrutural pertence ao processo de bootstrap, não a esta story. — deferred, pre-existing
+- [x] [Review][Defer] Dependência frágil do namespace via Wave ordering (`CreateNamespace=false` no `infra-app`) — Se Wave 0 falhar, Wave 1 tenta aplicar recursos num namespace inexistente. Pré-existente na arquitetura. — deferred, pre-existing
+
 ## Dev Agent Record
 
 ### Implementation Plan
@@ -156,9 +170,10 @@ Para o PostgreSQL 18.4, o `readinessProbe` e o `livenessProbe` mais confiáveis 
 - Validada a compilação do Kustomize localmente via `kubectl kustomize`.
 
 ## File List
-- `cluster/infrastructure/keycloak-auth/base/postgres-deployment.yaml`
-- `cluster/infrastructure/keycloak-auth/base/postgres-service.yaml`
-- `cluster/infrastructure/keycloak-auth/base/postgres-networkpolicy.yaml`
+- `cluster/infrastructure/keycloak-auth/base/postgresql-pvc.yaml`
+- `cluster/infrastructure/keycloak-auth/base/postgresql-deployment.yaml`
+- `cluster/infrastructure/keycloak-auth/base/postgresql-service.yaml`
+- `cluster/infrastructure/keycloak-auth/base/postgresql-networkpolicy.yaml`
 - `cluster/infrastructure/keycloak-auth/base/kustomization.yaml`
 - `cluster/infrastructure/keycloak-auth/overlays/local/kustomization.yaml`
 - `cluster/infrastructure/keycloak-auth/overlays/homologacao/kustomization.yaml`
@@ -171,8 +186,10 @@ Para o PostgreSQL 18.4, o `readinessProbe` e o `livenessProbe` mais confiáveis 
 - `2026-05-22 22:53:00-03:00`: Correção do mountPath do volume do Postgres (/var/lib/postgresql) devido a erro de compatibilidade de inicialização da imagem Postgres 18+ detectado nos logs do container.
 - `2026-05-22 23:05:00-03:00`: Ajustados comandos de liveness e readiness probes com shell (/bin/sh -c) para sanar erro de falta da role "postgres" nos logs do container.
 - `2026-05-22 23:13:00-03:00`: Atualizado o Plano de Validação Manual da NetworkPolicy na especificação da história para utilizar comandos robustos de teste (sleep + exec + timeout) evitando travamento de terminal local.
+- `2026-05-22 23:30:00-03:00`: Code review aplicado (claude-sonnet-4-6): adicionado PVC (postgresql-pvc.yaml), NetworkPolicy com Egress deny-all e namespaceSelector+component no seletor do Keycloak, renomeados todos os recursos e arquivos de `postgres-*` para `postgresql-*`.
 
 ## Status
-review
+done
 
 Autoria/Implementação: Gemini 3.5 Flash
+Revisão: claude-sonnet-4-6

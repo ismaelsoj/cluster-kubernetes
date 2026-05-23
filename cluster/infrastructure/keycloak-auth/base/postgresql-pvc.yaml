@@ -1,0 +1,22 @@
+# PersistentVolumeClaim para os dados do PostgreSQL - keycloak-auth
+# Garante persistência dos dados do Keycloak entre restarts do pod
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-pvc
+  namespace: keycloak-auth
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+# Autoria/Implementação: Gemini 3.5 Flash
+# Revisão: claude-sonnet-4-6
