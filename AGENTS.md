@@ -10,7 +10,7 @@
 ## Contexto do Projeto
 
 - Repositório GitOps para cluster Kubernetes local (k3d + ArgoCD + Kong + Keycloak).
-- Stack e regras de implementação detalhadas em `_bmad-output/project-context.md` — leia antes de implementar qualquer código.
+- Stack e regras de implementação detalhadas em `_bmad-output/distillate/_index.md` — leia antes de implementar qualquer código.
 
 ## Git Workflow
 

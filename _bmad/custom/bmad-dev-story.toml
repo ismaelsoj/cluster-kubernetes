@@ -1,3 +1,9 @@
+[workflow]
+persistent_facts = [
+  "CRITICAL REQUIREMENT [IMPLEMENTATION RULES]: Você DEVE ler e seguir estritamente as regras definidas em `_bmad-output/distillate/01-regras-implementacao.md` antes de implementar qualquer código.",
+  "CRITICAL REQUIREMENT [DEFERRED WORK]: Verifique `_bmad-output/distillate/04-trabalho-diferido.md` para garantir que itens diferidos associados à sua story sejam endereçados."
+]
+
 # Regras globais (GIT WORKFLOW, GIT PERMISSIONS)
 # migradas para /AGENTS.md — aplicam-se automaticamente a todos os agentes.
 #

@@ -1,3 +1,9 @@
+[workflow]
+persistent_facts = [
+  "CRITICAL REQUIREMENT [IMPLEMENTATION RULES]: Você DEVE avaliar o código estritamente contra as regras definidas em `_bmad-output/distillate/01-regras-implementacao.md`.",
+  "CRITICAL REQUIREMENT [DEFERRED WORK]: Verifique e documente novos itens em `_bmad-output/distillate/04-trabalho-diferido.md` caso identifique problemas fora do escopo imediato da story."
+]
+
 # Regra global (CODE REVIEW propositivo)
 # migrada para /AGENTS.md — aplica-se automaticamente a todos os agentes.
 #
