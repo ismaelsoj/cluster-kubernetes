@@ -2,7 +2,7 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Você DEVE definir explicitamente o nível de
 
 # Story 2.1: manifestos-kustomize-postgresql
 
-**Status:** review
+**Status:** done
 **Complexidade:** Baixa Complexidade
 
 ## Story Foundation
@@ -25,9 +25,10 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Você DEVE definir explicitamente o nível de
   cluster/infrastructure/keycloak-auth/
   ├── base/
   │   ├── kustomization.yaml
-  │   ├── postgres-deployment.yaml
-  │   ├── postgres-service.yaml
-  │   └── postgres-networkpolicy.yaml
+  │   ├── postgresql-pvc.yaml
+  │   ├── postgresql-deployment.yaml
+  │   ├── postgresql-service.yaml
+  │   └── postgresql-networkpolicy.yaml
   └── overlays/
       ├── local/
       ├── homologacao/
@@ -49,9 +50,10 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Você DEVE definir explicitamente o nível de
 
 **Arquivos Modificados/Criados:**
 - `[NEW] cluster/infrastructure/keycloak-auth/base/kustomization.yaml`
-- `[NEW] cluster/infrastructure/keycloak-auth/base/postgres-deployment.yaml`
-- `[NEW] cluster/infrastructure/keycloak-auth/base/postgres-service.yaml`
-- `[NEW] cluster/infrastructure/keycloak-auth/base/postgres-networkpolicy.yaml`
+- `[NEW] cluster/infrastructure/keycloak-auth/base/postgresql-pvc.yaml`
+- `[NEW] cluster/infrastructure/keycloak-auth/base/postgresql-deployment.yaml`
+- `[NEW] cluster/infrastructure/keycloak-auth/base/postgresql-service.yaml`
+- `[NEW] cluster/infrastructure/keycloak-auth/base/postgresql-networkpolicy.yaml`
 - `[NEW] cluster/infrastructure/keycloak-auth/overlays/local/kustomization.yaml`
 - `[NEW] cluster/infrastructure/keycloak-auth/overlays/homologacao/kustomization.yaml`
 - `[NEW] cluster/infrastructure/keycloak-auth/overlays/production/kustomization.yaml`
@@ -78,42 +80,43 @@ Para o PostgreSQL 18.4, o `readinessProbe` e o `livenessProbe` mais confiáveis 
 
 **3. Validação dos Recursos no Kubernetes:**
 - Verifique os pods: `kubectl get pods -n keycloak-auth`
-- **Resultado Esperado:** O pod `postgres-deployment-*` deve estar com status `Running` e `Ready (1/1)`.
+- **Resultado Esperado:** O pod `postgresql-deployment-*` deve estar com status `Running` e `Ready (1/1)`.
 - Verifique os serviços e rede: `kubectl get svc,networkpolicy -n keycloak-auth`
-- **Resultado Esperado:** O `postgres-service` e a policy `postgres-networkpolicy` devem estar listados.
+- **Resultado Esperado:** O `postgresql-service` e a policy `postgresql-networkpolicy` devem estar listados.
 
 **4. Verificação de Saúde e Injeção de Segredos:**
 - Verifique os logs e descreva o pod: 
   - `kubectl logs -l app.kubernetes.io/name=postgresql -n keycloak-auth`
   - `kubectl describe pod -l app.kubernetes.io/name=postgresql -n keycloak-auth | grep -E "Liveness|Readiness"`
 - **Resultado Esperado:** O banco iniciou (e exibe as mensagens normais de "database system is ready to accept connections"). Nenhuma probe deve estar falhando.
-- Valide as variáveis: `kubectl exec -it deployment/postgres-deployment -n keycloak-auth -- env | grep POSTGRES`
+- Valide as variáveis: `kubectl exec -it deployment/postgresql-deployment -n keycloak-auth -- env | grep POSTGRES`
 - **Resultado Esperado:** Deve listar `POSTGRES_USER` e `POSTGRES_PASSWORD` (lidas do secret).
 
 **5. Validação da NetworkPolicy (Zero-Trust):**
 - Teste de conexão autorizada (Simulando Keycloak):
-  1. Suba o pod persistente com o label correto:
-     `kubectl run test-db-auth -n keycloak-auth --image=postgres:18.4 --labels="app.kubernetes.io/name=keycloak" -- sleep 3600`
+  1. Suba o pod persistente com os dois labels obrigatórios (`name=keycloak` AND `component=identity-provider`):
+     `kubectl run test-db-auth -n keycloak-auth --image=postgres:18.4 --labels="app.kubernetes.io/name=keycloak,app.kubernetes.io/component=identity-provider" -- sleep 3600`
   2. Execute o teste de conexão (deve responder imediatamente):
-     `kubectl exec -it test-db-auth -n keycloak-auth -- pg_isready -h postgres-service -U keycloak -t 5`
-     **Resultado Esperado:** `postgres-service:5432 - accepting connections`
+     `kubectl exec -it test-db-auth -n keycloak-auth -- pg_isready -h postgresql-service -U keycloak -t 5`
+     **Resultado Esperado:** `postgresql-service:5432 - accepting connections`
   3. Exclua o pod temporário:
      `kubectl delete pod test-db-auth -n keycloak-auth`
 - Teste de conexão bloqueada (Pod não-autorizado):
-  1. Suba o pod persistente com um label não autorizado:
-     `kubectl run test-db-blocked -n keycloak-auth --image=postgres:18.4 --labels="app.kubernetes.io/name=qualquer-outro" -- sleep 3600`
+  1. Suba o pod persistente com label incompleto (sem `component=identity-provider`):
+     `kubectl run test-db-blocked -n keycloak-auth --image=postgres:18.4 --labels="app.kubernetes.io/name=keycloak" -- sleep 3600`
   2. Execute o teste de conexão com timeout de 5 segundos (deve retornar falha por timeout):
-     `kubectl exec -it test-db-blocked -n keycloak-auth -- pg_isready -h postgres-service -U keycloak -t 5`
-     **Resultado Esperado:** `postgres-service:5432 - no response` (exit code 2) após 5 segundos, provando o bloqueio da NetworkPolicy.
+     `kubectl exec -it test-db-blocked -n keycloak-auth -- pg_isready -h postgresql-service -U keycloak -t 5`
+     **Resultado Esperado:** `postgresql-service:5432 - no response` (exit code 2) após 5 segundos, provando o bloqueio da NetworkPolicy.
   3. Exclua o pod temporário:
      `kubectl delete pod test-db-blocked -n keycloak-auth`
 
 ## Tasks/Subtasks
 
 - [x] Implementar os manifestos da base do PostgreSQL
-  - [x] Criar `cluster/infrastructure/keycloak-auth/base/postgres-deployment.yaml` com imagem `postgres:18.4`, probes (pg_isready), variáveis de ambiente lendo do Secret `keycloak-db-secret`, sync-wave: "1", labels e comentário descritivo em pt-BR.
-  - [x] Criar `cluster/infrastructure/keycloak-auth/base/postgres-service.yaml` com sync-wave: "1", labels e comentário descritivo em pt-BR.
-  - [x] Criar `cluster/infrastructure/keycloak-auth/base/postgres-networkpolicy.yaml` com sync-wave: "1", restrição de entrada para o Keycloak, labels e comentário descritivo em pt-BR.
+  - [x] Criar `cluster/infrastructure/keycloak-auth/base/postgresql-pvc.yaml` com storage 1Gi ReadWriteOnce, sync-wave: "1", labels e comentário descritivo em pt-BR.
+  - [x] Criar `cluster/infrastructure/keycloak-auth/base/postgresql-deployment.yaml` com imagem `postgres:18.4`, probes (pg_isready), variáveis de ambiente lendo do Secret `keycloak-db-secret`, sync-wave: "1", labels e comentário descritivo em pt-BR.
+  - [x] Criar `cluster/infrastructure/keycloak-auth/base/postgresql-service.yaml` com sync-wave: "1", labels e comentário descritivo em pt-BR.
+  - [x] Criar `cluster/infrastructure/keycloak-auth/base/postgresql-networkpolicy.yaml` com sync-wave: "1", restrição de entrada para o Keycloak (namespaceSelector + podSelector), Egress deny-all, labels e comentário descritivo em pt-BR.
   - [x] Atualizar `cluster/infrastructure/keycloak-auth/base/kustomization.yaml` declarando os recursos acima.
 - [x] Criar/validar os overlays para os três ambientes
   - [x] Validar `cluster/infrastructure/keycloak-auth/overlays/local/kustomization.yaml`
@@ -139,10 +142,11 @@ Para o PostgreSQL 18.4, o `readinessProbe` e o `livenessProbe` mais confiáveis 
 ## Dev Agent Record
 
 ### Implementation Plan
-- Criar a base do PostgreSQL (`postgres-deployment`, `postgres-service`, `postgres-networkpolicy`) no namespace `keycloak-auth`.
+- Criar a base do PostgreSQL (`postgresql-pvc`, `postgresql-deployment`, `postgresql-service`, `postgresql-networkpolicy`) no namespace `keycloak-auth`.
+- O PVC provisionará 1Gi ReadWriteOnce para persistência dos dados entre restarts.
 - O deployment usará a imagem imutável `postgres:18.4`, lerá o usuário/senha do Secret existente `keycloak-db-secret` injetado pelo setup de bootstrap, configurará o `sync-wave: "1"`, liveness/readiness probes utilizando `pg_isready -U $POSTGRES_USER` e os labels obrigatórios.
 - O service exporá a porta `5432` do PostgreSQL.
-- O networkpolicy restringirá a entrada permitindo tráfego somente do Keycloak (que terá a label `app.kubernetes.io/name: keycloak`).
+- O networkpolicy restringirá a entrada permitindo tráfego somente do Keycloak (`app.kubernetes.io/name: keycloak` + `app.kubernetes.io/component: identity-provider` no namespace `keycloak-auth`), com Egress deny-all.
 - Executar `make lint` para validar.
 
 ### Debug Log
@@ -187,6 +191,7 @@ Para o PostgreSQL 18.4, o `readinessProbe` e o `livenessProbe` mais confiáveis 
 - `2026-05-22 23:05:00-03:00`: Ajustados comandos de liveness e readiness probes com shell (/bin/sh -c) para sanar erro de falta da role "postgres" nos logs do container.
 - `2026-05-22 23:13:00-03:00`: Atualizado o Plano de Validação Manual da NetworkPolicy na especificação da história para utilizar comandos robustos de teste (sleep + exec + timeout) evitando travamento de terminal local.
 - `2026-05-22 23:30:00-03:00`: Code review aplicado (claude-sonnet-4-6): adicionado PVC (postgresql-pvc.yaml), NetworkPolicy com Egress deny-all e namespaceSelector+component no seletor do Keycloak, renomeados todos os recursos e arquivos de `postgres-*` para `postgresql-*`.
+- `2026-05-22 23:45:00-03:00`: Plano de Validação Manual corrigido para refletir NetworkPolicy pós-review (pod de teste autorizado requer dois labels: `app.kubernetes.io/name=keycloak` + `app.kubernetes.io/component=identity-provider`). Todos os testes manuais validados com sucesso após aplicação dos patches.
 
 ## Status
 done
