@@ -1,7 +1,5 @@
-[agent]
-
-persistent_facts = [
-  "CRITICAL REQUIREMENT [GIT WORKFLOW]: Antes de iniciar qualquer desenvolvimento, execute obrigatoriamente `git pull origin main`. Em seguida, crie e mude para uma nova branch a partir da `main` com nome descritivo (baseado na especificação ou prefixo da história). Commits diretos na branch `main` são ESTRITAMENTE PROIBIDOS.",
-  "CRITICAL REQUIREMENT [CODE REVIEW]: O code review deve ser estritamente propositivo. Registre as observações diretamente na especificação da história. Sugira as alterações, mas NUNCA aplique-as sem aprovação explícita do usuário. Após aplicar alterações aprovadas, atualize a especificação marcando os itens correspondentes como concluídos.",
-  "CRITICAL REQUIREMENT [GIT PERMISSIONS]: A execução autônoma de `git add` ou `git commit` é PROIBIDA. Você DEVE solicitar e obter autorização explícita do usuário ANTES de executar esses comandos."
-]
+# Regras globais (GIT WORKFLOW, GIT PERMISSIONS, CODE REVIEW)
+# migradas para /AGENTS.md — aplicam-se automaticamente a todos os agentes.
+#
+# Este arquivo fica reservado para overrides específicos do agent-dev
+# que NÃO sejam políticas universais do repositório.

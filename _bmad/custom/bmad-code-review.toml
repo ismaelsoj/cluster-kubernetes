@@ -1,5 +1,5 @@
-[workflow]
-
-persistent_facts = [
-  "CRITICAL REQUIREMENT [CODE REVIEW]: O code review deve ser estritamente propositivo. Registre as observações diretamente na especificação da história. Sugira as alterações, mas NUNCA aplique-as sem aprovação explícita do usuário. Após aplicar alterações aprovadas, atualize a especificação marcando os itens correspondentes como concluídos."
-]
+# Regra global (CODE REVIEW propositivo)
+# migrada para /AGENTS.md — aplica-se automaticamente a todos os agentes.
+#
+# Este arquivo fica reservado para overrides específicos do code-review
+# que NÃO sejam políticas universais do repositório.

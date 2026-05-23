@@ -2,7 +2,8 @@
 
 persistent_facts = [
   "CRITICAL REQUIREMENT [SPECIFICATIONS]: TODO fluxo `quick-dev` DEVE gerar uma especificação no padrão BMad Method. Salve os arquivos EXCLUSIVAMENTE na estrutura de diretórios padrão do BMad, NUNCA em pastas isoladas de ferramentas/IDE.",
-  "CRITICAL REQUIREMENT [WORKFLOW APPROVAL]: A especificação DEVE ser criada na primeira iteração e EXIGE aprovação explícita do usuário. IF aprovada: inicie a implementação OU inicie nova iteração de contexto limpo. IF a iteração inicial já fornecer uma especificação BMad pronta: o desenvolvimento está automaticamente autorizado.",
-  "CRITICAL REQUIREMENT [CODE REVIEW]: O code review deve ser estritamente propositivo. Registre as observações diretamente na especificação da história. Sugira as alterações, mas NUNCA aplique-as sem aprovação explícita do usuário. Após aplicar alterações aprovadas, atualize a especificação marcando os itens correspondentes como concluídos.",
-  "CRITICAL REQUIREMENT [GIT PERMISSIONS]: A execução autônoma de `git add` ou `git commit` é PROIBIDA. Você DEVE solicitar e obter autorização explícita do usuário ANTES de executar esses comandos."
+  "CRITICAL REQUIREMENT [WORKFLOW APPROVAL]: A especificação DEVE ser criada na primeira iteração e EXIGE aprovação explícita do usuário. IF aprovada: inicie a implementação OU inicie nova iteração de contexto limpo. IF a iteração inicial já fornecer uma especificação BMad pronta: o desenvolvimento está automaticamente autorizado."
 ]
+
+# Regras globais (CODE REVIEW, GIT PERMISSIONS)
+# migradas para /AGENTS.md — aplicam-se automaticamente a todos os agentes.
