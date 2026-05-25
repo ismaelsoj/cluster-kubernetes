@@ -34,7 +34,7 @@ Origem: Party Mode review 2026-05-20 (Mary/Analista, Winston/Arquiteto, Amelia/D
 - Depende de BKL-001 (reusa `analyze_claude_code()`)
 
 ### BKL-003: Export JSON/CSV
-- **Tipo:** Feature | **Status:** Pronto para implementação
+- **Tipo:** Feature | **Status:** Pronto para desenvolvimento (Spec criada: [.tracker/specs/spec-export-json-csv.md](file:///home/ismael.sjunior/git-pessoal/cluster-kubernetes/.tracker/specs/spec-export-json-csv.md))
 - Flags `--format json` e `--format csv` para análise externa (Jupyter, Pandas, planilhas)
 - Sem impacto no core; Markdown permanece como view principal
 

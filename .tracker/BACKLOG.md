@@ -31,6 +31,7 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica ide
 ### BKL-003: Export JSON/CSV
 - **Tipo:** Feature
 - **Origem:** Party Mode (Amelia, John, Winston)
+- **Status:** Pronto para desenvolvimento (Spec criada: [.tracker/specs/spec-export-json-csv.md](file:///home/ismael.sjunior/git-pessoal/cluster-kubernetes/.tracker/specs/spec-export-json-csv.md))
 - **Descrição:** Adicionar flag `--format json` e `--format csv` para exportar os dados em formato estruturado, desbloqueando análise externa (Jupyter, Pandas, planilhas).
 - **Impacto:** Desbloqueia toda a camada de análise sem precisar mudar o core. O Markdown permanece como view principal, mas dados ficam acessíveis para uso programático.
 

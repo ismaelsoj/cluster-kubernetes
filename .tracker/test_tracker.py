@@ -409,5 +409,119 @@ class TestTokenTracking(unittest.TestCase):
         self.assertIn("dev-aabbccdd", report)
 
 
+class TestExportFormats(unittest.TestCase):
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.repo_root = self.temp_dir
+        # Criamos o subdiretório .tracker dentro do diretório temporário para simular a estrutura real
+        self.tracker_dir = os.path.join(self.temp_dir, ".tracker")
+        os.makedirs(self.tracker_dir, exist_ok=True)
+        self.events_dir = os.path.join(self.tracker_dir, "events")
+        os.makedirs(self.events_dir, exist_ok=True)
+        self.dev_id = "dev-testexport"
+        
+        # Cria alguns eventos mock de entrada
+        self.live_events = [
+            {
+                "event_type": "activity_daily",
+                "schema_version": 1,
+                "developer": self.dev_id,
+                "date": "2026-05-25",
+                "tool": "Claude Code",
+                "model": "Claude Sonnet 4.6",
+                "raw_model": "Claude Sonnet 4.6",
+                "model_confidence": "confirmado",
+                "hours": 1.25,
+                "sessions": 1,
+                "interactions": 10,
+                "input_tokens": 1500,
+                "output_tokens": 300,
+                "cache_creation_input_tokens": 100,
+                "cache_read_input_tokens": 50,
+                "legacy": False,
+                "generated_at": "2026-05-25T10:00:00-03:00"
+            },
+            {
+                "event_type": "activity_branch",
+                "schema_version": 1,
+                "developer": self.dev_id,
+                "date": "2026-05-25",
+                "branch": "feature-test",
+                "tools": ["Claude Code"],
+                "models": ["Claude Sonnet 4.6"],
+                "hours": 1.25,
+                "interactions": 10,
+                "input_tokens": 1500,
+                "output_tokens": 300,
+                "cache_creation_input_tokens": 100,
+                "cache_read_input_tokens": 50,
+                "legacy": False,
+                "generated_at": "2026-05-25T10:00:00-03:00"
+            }
+        ]
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir)
+
+    def test_export_json_format(self):
+        # Deve chamar export_json_report e criar TEMPO_DE_TRABALHO.json
+        work_tracker.export_json_report(self.events_dir, self.dev_id, self.live_events, self.repo_root)
+        
+        json_path = os.path.join(self.tracker_dir, "TEMPO_DE_TRABALHO.json")
+        self.assertTrue(os.path.exists(json_path))
+        
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        self.assertIsInstance(data, list)
+        self.assertGreater(len(data), 0)
+        
+        # Verifica se contém o evento de daily que exportamos
+        daily_ev = next((e for e in data if e.get("event_type") == "activity_daily"), None)
+        self.assertIsNotNone(daily_ev)
+        self.assertEqual(daily_ev["developer"], self.dev_id)
+        self.assertEqual(daily_ev["hours"], 1.25)
+        self.assertEqual(daily_ev["model"], "Claude Sonnet 4.6")
+
+    def test_export_csv_format(self):
+        # Deve chamar export_csv_report e criar TEMPO_DE_TRABALHO.csv
+        work_tracker.export_csv_report(self.events_dir, self.dev_id, self.live_events, self.repo_root)
+        
+        csv_path = os.path.join(self.tracker_dir, "TEMPO_DE_TRABALHO.csv")
+        self.assertTrue(os.path.exists(csv_path))
+        
+        with open(csv_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            
+        self.assertGreater(len(lines), 1)
+        headers = [c.strip() for c in lines[0].split(",")]
+        self.assertIn("developer", headers)
+        self.assertIn("event_type", headers)
+        self.assertIn("hours", headers)
+        
+        # Verifica se o número de colunas bate
+        row1 = [c.strip() for c in lines[1].split(",")]
+        self.assertEqual(len(row1), len(headers))
+
+    def test_export_formats_atomic_write(self):
+        # Testar se os arquivos de destino são atualizados de forma atômica.
+        # Nós verificamos isso garantindo que a escrita completa ocorre.
+        # Caso o processo falhe no meio, o arquivo antigo (se houver) deve permanecer intacto.
+        json_path = os.path.join(self.tracker_dir, "TEMPO_DE_TRABALHO.json")
+        
+        # Escreve um arquivo pré-existente
+        with open(json_path, "w", encoding="utf-8") as f:
+            f.write("dados antigos")
+            
+        work_tracker.export_json_report(self.events_dir, self.dev_id, self.live_events, self.repo_root)
+        
+        with open(json_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            
+        self.assertNotEqual(content, "dados antigos")
+        self.assertTrue(content.startswith("["))
+
+
 if __name__ == "__main__":
     unittest.main()

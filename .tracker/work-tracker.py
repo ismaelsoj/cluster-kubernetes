@@ -9,6 +9,7 @@ e gera tabelas agregadas detalhadas por dia de trabalho."""
 import os
 import re
 import json
+import csv
 import glob
 import hashlib
 import argparse
@@ -1033,9 +1034,129 @@ def export_markdown_report(events_dir, masked_id, live_events, repo_root):
 
     print(f"\033[92m✔ Métricas de tempo atualizadas com sucesso no arquivo: {report_path}\033[0m")
 
+def export_json_report(events_dir, masked_id, live_events, repo_root):
+    # Se for exportar, emite os eventos (preserva legacy, substitui live)
+    emit_events(events_dir, masked_id, live_events)
+
+    # Carrega TODOS os eventos de todos os desenvolvedores
+    all_compiled_events = load_all_events(events_dir)
+
+    # Salva o relatório JSON
+    report_path = os.path.join(repo_root, ".tracker", "TEMPO_DE_TRABALHO.json")
+    tmp_path = report_path + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(all_compiled_events, f, indent=2, ensure_ascii=False)
+        os.replace(tmp_path, report_path)
+        print(f"\033[92m✔ Métricas de tempo atualizadas com sucesso no arquivo: {report_path}\033[0m")
+    except Exception as e:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+        raise e
+
+def export_csv_report(events_dir, masked_id, live_events, repo_root):
+    # Se for exportar, emite os eventos (preserva legacy, substitui live)
+    emit_events(events_dir, masked_id, live_events)
+
+    # Carrega TODOS os eventos de todos os desenvolvedores
+    all_compiled_events = load_all_events(events_dir)
+
+    # Salva o relatório CSV
+    report_path = os.path.join(repo_root, ".tracker", "TEMPO_DE_TRABALHO.csv")
+    tmp_path = report_path + ".tmp"
+
+    headers = [
+        "developer", "event_type", "scope", "date", "branch", "tool", "model",
+        "hours", "sessions", "interactions", "input_tokens", "output_tokens",
+        "cache_creation_input_tokens", "cache_read_input_tokens", "generated_at"
+    ]
+
+    try:
+        with open(tmp_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f, delimiter=",", quoting=csv.QUOTE_MINIMAL)
+            writer.writerow(headers)
+
+            for ev in all_compiled_events:
+                e_type = ev.get("event_type", "")
+
+                developer = ev.get("developer", "")
+                scope = ev.get("scope", "") if e_type == "dev_summary" else ""
+
+                date = ""
+                if e_type in ("activity_daily", "activity_branch"):
+                    date = ev.get("date", "")
+
+                branch = ev.get("branch", "") if e_type == "activity_branch" else ""
+
+                tool = ""
+                if e_type == "activity_daily":
+                    tool = ev.get("tool", "")
+                elif e_type == "activity_branch":
+                    tools_list = ev.get("tools", [])
+                    tool = ", ".join(sorted(tools_list)) if isinstance(tools_list, list) else str(tools_list)
+
+                model = ""
+                if e_type == "activity_daily":
+                    model = ev.get("model", "")
+                elif e_type == "activity_branch":
+                    models_list = ev.get("models", [])
+                    model = ", ".join(sorted(models_list)) if isinstance(models_list, list) else str(models_list)
+
+                hours = ""
+                if "hours" in ev:
+                    hours = ev["hours"]
+                elif "total_hours" in ev:
+                    hours = ev["total_hours"]
+
+                sessions = ""
+                if e_type == "dev_summary":
+                    sessions = ev.get("total_sessions", "")
+                elif e_type == "activity_daily":
+                    sessions = ev.get("sessions", "")
+
+                interactions = ""
+                if e_type == "dev_summary":
+                    interactions = ev.get("total_interactions", "")
+                elif e_type in ("activity_daily", "activity_branch"):
+                    interactions = ev.get("interactions", "")
+
+                if e_type == "dev_summary":
+                    input_tokens = ev.get("total_input_tokens", "")
+                    output_tokens = ev.get("total_output_tokens", "")
+                    cache_creation_input_tokens = ev.get("total_cache_creation_input_tokens", "")
+                    cache_read_input_tokens = ev.get("total_cache_read_input_tokens", "")
+                else:
+                    input_tokens = ev.get("input_tokens", "")
+                    output_tokens = ev.get("output_tokens", "")
+                    cache_creation_input_tokens = ev.get("cache_creation_input_tokens", "")
+                    cache_read_input_tokens = ev.get("cache_read_input_tokens", "")
+
+                generated_at = ev.get("generated_at", "")
+
+                row = [
+                    developer, e_type, scope, date, branch, tool, model,
+                    hours, sessions, interactions, input_tokens, output_tokens,
+                    cache_creation_input_tokens, cache_read_input_tokens, generated_at
+                ]
+                writer.writerow(row)
+
+        os.replace(tmp_path, report_path)
+        print(f"\033[92m✔ Métricas de tempo atualizadas com sucesso no arquivo: {report_path}\033[0m")
+    except Exception as e:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+        raise e
+
 def main():
     parser = argparse.ArgumentParser(description="Calculador de tempo de trabalho de IA apartado e seguro.")
     parser.add_argument("--export", action="store_true", help="Se definido, anexa/atualiza o relatório em formato Markdown.")
+    parser.add_argument("--format", choices=["markdown", "json", "csv"], default="markdown", help="Formato de exportação do relatório (apenas com --export).")
     parser.add_argument("--gap", type=int, default=45, help="Intervalo máximo em minutos entre comandos para agrupar na mesma sessão.")
     args = parser.parse_args()
     
@@ -1068,7 +1189,12 @@ def main():
     live_events = build_live_events(daily_stats, branch_stats, masked_id)
 
     if args.export:
-        export_markdown_report(events_dir, masked_id, live_events, repo_root)
+        if args.format == "json":
+            export_json_report(events_dir, masked_id, live_events, repo_root)
+        elif args.format == "csv":
+            export_csv_report(events_dir, masked_id, live_events, repo_root)
+        else:
+            export_markdown_report(events_dir, masked_id, live_events, repo_root)
     else:
         dev_jsonl_path = os.path.join(events_dir, f"dev-{masked_id}.jsonl" if not masked_id.startswith("dev-") else f"{masked_id}.jsonl")
         show_console_report(username, hostname, masked_id, repo_root, brasilia_now_str, args.gap, dev_jsonl_path, daily_stats, live_total_hours)
