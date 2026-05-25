@@ -105,3 +105,13 @@ Registro centralizado de itens identificados em revisões/triagens que não pert
 ### Diferido para melhoria de segurança de geração de senhas (Story 3.x ou cross-story)
 
 - **[scripts/inject-secrets.sh:38, 50]** Fallback de geração de senha enfraquecido — quando openssl não está disponível, o fallback `od -vAn -N16 -tx1 /dev/urandom | ... | head -c 16` trunca bytes hex, resultando em ~64 bits de entropia vs. 128 bits do openssl. Afeta principalmente CI/CD em containers Alpine ou ambientes minimais. **Razão para defer:** AC atendido, funcionalidade OK. Melhoria de segurança, não bloqueador. Endereçar quando harmonizar geração de senhas com sistema de secrets centralizado (Story 3.4+).
+
+## Deferred from: triagem de arquitetura e backlog (2026-05-25)
+
+### Diferido para arquitetura futura do repositório (Monorepo)
+
+- **Migração do `.tracker` para estrutura de Monorepo ou Repositório Isolado:** O rastreador de tempo (`.tracker`) vive dentro do repositório de infraestrutura de Kubernetes (`cluster-kubernetes`). Essa proximidade mistura os históricos de commit e polui as estatísticas de infraestrutura com commits e dados locais de tracking de trabalho. Planejar a separação física do tracker em um repositório próprio ou a reestruturação formal do repositório para um monorepo real com barreiras rígidas de escopo e CI/CD.
+
+---
+*Edição/Implementação: Gemini 3.5 Flash via Antigravity — 2026-05-25 15:12:30-03:00*
+
