@@ -12,7 +12,7 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica ide
 ### BKL-001: Rastreamento de Tokens (Claude Code)
 - **Tipo:** Feature
 - **Origem:** Party Mode (Amelia, John, Mary, Winston)
-- **Status:** Pronto para implementação
+- **Status:** Pronto para desenvolvimento (Spec criada: [.tracker/specs/spec-rastreamento-de-tokens-claude-code.md](file:///home/ismael.sjunior/git-pessoal/cluster-kubernetes/.tracker/specs/spec-rastreamento-de-tokens-claude-code.md))
 - **Descrição:** O JSONL do Claude Code já contém o campo `usage` com dados ricos:
   - `input_tokens` — tokens de entrada
   - `output_tokens` — tokens de saída

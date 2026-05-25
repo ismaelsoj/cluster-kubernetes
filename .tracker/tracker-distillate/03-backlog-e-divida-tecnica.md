@@ -21,7 +21,7 @@ Origem: Party Mode review 2026-05-20 (Mary/Analista, Winston/Arquiteto, Amelia/D
 ## Prioridade Alta — Abertos
 
 ### BKL-001: Rastreamento de Tokens (Claude Code)
-- **Tipo:** Feature | **Status:** Pronto para implementação
+- **Tipo:** Feature | **Status:** Pronto para desenvolvimento (Spec criada)
 - Campo `usage` nos JSONL do Claude Code: `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`
 - Localização: `message.usage` em entries do tipo `assistant`
 - Impacto: estimar custo por modelo, responder "Opus vs Sonnet", métricas de investimento além de esforço
