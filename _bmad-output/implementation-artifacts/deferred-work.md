@@ -112,6 +112,12 @@ Registro centralizado de itens identificados em revisões/triagens que não pert
 
 - **Migração do `.tracker` para estrutura de Monorepo ou Repositório Isolado:** O rastreador de tempo (`.tracker`) vive dentro do repositório de infraestrutura de Kubernetes (`cluster-kubernetes`). Essa proximidade mistura os históricos de commit e polui as estatísticas de infraestrutura com commits e dados locais de tracking de trabalho. Planejar a separação física do tracker em um repositório próprio ou a reestruturação formal do repositório para um monorepo real com barreiras rígidas de escopo e CI/CD.
 
+## Deferred from: code review of spec-rastreamento-de-tokens-claude-code (2026-05-25)
+
+### Diferido para melhoria futura do .tracker/work-tracker.py
+
+- **Sobrescrita de tokens no processamento do mesmo bloco de pings:** no parser de logs do Claude Code, cada evento de ping é adicionado a uma lista `pings`. Caso ocorra mais de um item do tipo `"assistant"` na mesma linha de logs, os campos de tokens do `ping` serão sobrescritos em vez de acumulados. Se os logs do Claude Code distribuírem o consumo do mesmo ping em múltiplas interações dentro do mesmo evento, isso causará subnotificação de tokens. [.tracker/work-tracker.py:149-156] — Razão para adiar: Escopo atendido, a estrutura atual atende as sessões registradas em dados reais no TDD. Endereçar em refatoração de estabilidade de logs.
+
 ---
-*Edição/Implementação: Gemini 3.5 Flash via Antigravity — 2026-05-25 15:12:30-03:00*
+*Edição/Implementação: Gemini 3.5 Flash via Antigravity — 2026-05-25 16:08:00-03:00*
 

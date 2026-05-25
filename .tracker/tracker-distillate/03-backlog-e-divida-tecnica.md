@@ -20,17 +20,18 @@ Origem: Party Mode review 2026-05-20 (Mary/Analista, Winston/Arquiteto, Amelia/D
 
 ## Prioridade Alta — Abertos
 
-### BKL-001: Rastreamento de Tokens (Claude Code)
-- **Tipo:** Feature | **Status:** Pronto para desenvolvimento (Spec criada)
-- Campo `usage` nos JSONL do Claude Code: `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`
-- Localização: `message.usage` em entries do tipo `assistant`
-- Impacto: estimar custo por modelo, responder "Opus vs Sonnet", métricas de investimento além de esforço
-
-### BKL-002: Rastreamento de Tokens (Antigravity) — ⛔ Inviável
+### BKL-030: Rastreamento de Tokens (Antigravity) — ⛔ Inviável
 - **Tipo:** Pesquisa / Limitação Técnica | **Status:** Bloqueado
 - `transcript.jsonl` não expõe `usage` / tokens; `.pb` criptografado; sem SQLite acessível
 - Ação: monitorar atualizações do Antigravity; sugerir Feature Request para chave `"usage": {"input_tokens": X, "output_tokens": Y}`
 - Rastreamento permanece baseado apenas em tempo ativo para Antigravity
+
+### BKL-030: Backfill de Tokens em Sessões Legadas (Claude Code)
+- **Tipo:** Feature | **Status:** Pronto para desenvolvimento (Spec criada)
+- Sessões anteriores à BKL-001 foram persistidas como eventos `"legacy": true` sem campos de token
+- Flag `--backfill-tokens` (+ `BACKFILL_TOKENS=true` no Makefile) re-lê os JSONLs originais e preenche os eventos legados
+- Idempotente; ignora eventos `legacy: false`; registra aviso se JSONL foi rotacionado pelo Claude Code
+- Depende de BKL-001 (reusa `analyze_claude_code()`)
 
 ### BKL-003: Export JSON/CSV
 - **Tipo:** Feature | **Status:** Pronto para implementação
@@ -46,6 +47,7 @@ Origem: Party Mode review 2026-05-20 (Mary/Analista, Winston/Arquiteto, Amelia/D
 
 ## Prioridade Alta — Concluídos ✅
 
+- **BKL-001:** Rastreamento de Tokens (Claude Code) ✅ — coleta de usage do JSONL do Claude Code, acumulação no pipeline, persistência JSONL e tabelas no Markdown. 15 testes passando.
 - **BKL-005:** Refatorar `main()` ✅ — separado em `collect_events()`, `compute_sessions()`, `aggregate_sessions()`, `render_report()`
 - **BKL-006:** Testes unitários ✅ — `scratch/test_tracker.py` (parser `transcript.jsonl`, regex, `aggregate_sessions`, `legacy_boundary`, `emit_events`)
 - **BKL-007:** Persistência JSON canônica ✅ — atendido por arquitetura orientada a eventos (JSONL em `.tracker/events/`); `TEMPO_DE_TRABALHO.md` é renderização pura
@@ -100,3 +102,4 @@ Origem: Party Mode review 2026-05-20 (Mary/Analista, Winston/Arquiteto, Amelia/D
 
 ---
 *Autoria/Implementação: Claude Sonnet 4.6 (Thinking) via Antigravity — 2026-05-25*
+*Revisão/Edição: Gemini 3.5 Flash (High) via Antigravity — 2026-05-25*

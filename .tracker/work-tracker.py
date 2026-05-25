@@ -57,6 +57,28 @@ def format_hours(hours):
         m = 0
     return f"{h}h {m:02d}m"
 
+def format_tokens_pt(value):
+    if value is None:
+        return "0"
+    try:
+        return f"{int(value):,}".replace(",", ".")
+    except (ValueError, TypeError):
+        return "0"
+
+def format_tokens_abbreviated(value):
+    if value is None or value == 0:
+        return "0"
+    try:
+        val_int = int(value)
+        if val_int >= 1000000:
+            val_m = val_int / 1000000.0
+            return f"{val_m:.0f}M" if val_m.is_integer() else f"{val_m:.1f}M"
+        if val_int >= 1000:
+            return f"{val_int // 1000}k"
+        return str(val_int)
+    except (ValueError, TypeError):
+        return "0"
+
 def parse_hours_from_str(h_str):
     m_h = re.search(r'(\d+)\s*h', h_str)
     m_m = re.search(r'(\d+)\s*m', h_str)
@@ -275,13 +297,22 @@ def analyze_claude_code(repo_root):
                     if raw:
                         current_model = normalize_model_name(raw)
 
+                    usage = {}
+                    if data.get("type") == "assistant":
+                        raw_usage = data.get("message", {}).get("usage")
+                        usage = raw_usage if isinstance(raw_usage, dict) else {}
+
                     events.append({
                         "dt": dt,
                         "tool": "Claude Code",
                         "is_change": False,
                         "model": None,
                         "is_ping": True,
-                        "active_model": current_model
+                        "active_model": current_model,
+                        "input_tokens": int(usage.get("input_tokens", 0) or 0),
+                        "output_tokens": int(usage.get("output_tokens", 0) or 0),
+                        "cache_creation_input_tokens": int(usage.get("cache_creation_input_tokens", 0) or 0),
+                        "cache_read_input_tokens": int(usage.get("cache_read_input_tokens", 0) or 0),
                     })
                     total_events += 1
                 except Exception:
@@ -435,14 +466,18 @@ def emit_events(events_dir, masked_id, live_events):
                 except json.JSONDecodeError:
                     pass
 
-    live_hours = sum(ev["hours"] for ev in live_events if ev["event_type"] == "activity_daily")
-    live_interactions = sum(ev["interactions"] for ev in live_events if ev["event_type"] == "activity_daily")
-    live_sessions = sum(ev["sessions"] for ev in live_events if ev["event_type"] == "activity_daily")
+    live_daily = [ev for ev in live_events if ev["event_type"] == "activity_daily"]
+    live_hours = sum(ev["hours"] for ev in live_daily)
+    live_interactions = sum(ev["interactions"] for ev in live_daily)
+    live_sessions = sum(ev["sessions"] for ev in live_daily)
+    live_input_tokens = sum(ev.get("input_tokens", 0) for ev in live_daily)
+    live_output_tokens = sum(ev.get("output_tokens", 0) for ev in live_daily)
+    live_cache_creation_tokens = sum(ev.get("cache_creation_input_tokens", 0) for ev in live_daily)
+    live_cache_read_tokens = sum(ev.get("cache_read_input_tokens", 0) for ev in live_daily)
 
     tz_br = timezone(timedelta(hours=-3))
     now_br = datetime.now(tz=tz_br)
     generated_at_str = now_br.isoformat()
-    live_daily = [ev for ev in live_events if ev["event_type"] == "activity_daily"]
     if live_daily:
         max_date_iso = max(ev["date"] for ev in live_daily)
         max_dt = datetime.strptime(max_date_iso, "%Y-%m-%d")
@@ -458,6 +493,10 @@ def emit_events(events_dir, masked_id, live_events):
         "total_hours": round(live_hours, 4),
         "total_interactions": live_interactions,
         "total_sessions": live_sessions,
+        "total_input_tokens": live_input_tokens,
+        "total_output_tokens": live_output_tokens,
+        "total_cache_creation_input_tokens": live_cache_creation_tokens,
+        "total_cache_read_input_tokens": live_cache_read_tokens,
         "last_active_date": last_active_date_str,
         "legacy": False,
         "generated_at": generated_at_str
@@ -547,12 +586,19 @@ def compute_sessions(events, gap_minutes, legacy_boundary, branch_timeline):
         sessions.append(current_session)
     return sessions, ping_events
 
+def _empty_stats():
+    return {"hours": 0.0, "sessions": 0, "interactions": 0,
+            "input_tokens": 0, "output_tokens": 0,
+            "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}
+
 def aggregate_sessions(sessions):
-    daily_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0})))
-    branch_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0}))))
+    daily_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(_empty_stats)))
+    branch_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(_empty_stats))))
     total_hours = 0.0
 
     for sess in sessions:
+        if not sess:
+            continue
         date_str = sess[0]["dt_br"].strftime("%d/%m/%Y")
 
         models_in_session = set((ev["tool"], ev["active_model"]) for ev in sess)
@@ -569,6 +615,11 @@ def aggregate_sessions(sessions):
             ev_date = ev["dt_br"].strftime("%d/%m/%Y")
             daily_stats[ev_date][ev["tool"]][ev["active_model"]]["interactions"] += 1
             branch_stats[ev_date][ev["branch"]][ev["tool"]][ev["active_model"]]["interactions"] += 1
+            for tok_key in ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"):
+                val = ev.get(tok_key, 0)
+                val_int = int(val) if val is not None else 0
+                daily_stats[ev_date][ev["tool"]][ev["active_model"]][tok_key] += val_int
+                branch_stats[ev_date][ev["branch"]][ev["tool"]][ev["active_model"]][tok_key] += val_int
 
         date_tool_model_mins = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
         date_branch_tool_model_mins = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(float))))
@@ -634,6 +685,10 @@ def build_live_events(daily_stats, branch_stats, masked_id):
                     "hours": round(h, 4),
                     "sessions": s,
                     "interactions": i,
+                    "input_tokens": daily_stats[d][t][m].get("input_tokens", 0),
+                    "output_tokens": daily_stats[d][t][m].get("output_tokens", 0),
+                    "cache_creation_input_tokens": daily_stats[d][t][m].get("cache_creation_input_tokens", 0),
+                    "cache_read_input_tokens": daily_stats[d][t][m].get("cache_read_input_tokens", 0),
                     "legacy": False,
                     "generated_at": generated_at_str
                 })
@@ -654,6 +709,13 @@ def build_live_events(daily_stats, branch_stats, masked_id):
             tools_used = sorted(branch_stats[d][b].keys())
             models_used = sorted({m for t in branch_stats[d][b].values() for m in t.keys()})
 
+            def _sum_tok(key):
+                return sum(
+                    branch_stats[d][b][t][m].get(key, 0)
+                    for t in branch_stats[d][b]
+                    for m in branch_stats[d][b][t]
+                )
+
             live_events.append({
                 "event_type": "activity_branch",
                 "schema_version": SCHEMA_VERSION,
@@ -664,6 +726,10 @@ def build_live_events(daily_stats, branch_stats, masked_id):
                 "models": models_used,
                 "hours": round(branch_hours, 4),
                 "interactions": branch_interactions,
+                "input_tokens": _sum_tok("input_tokens"),
+                "output_tokens": _sum_tok("output_tokens"),
+                "cache_creation_input_tokens": _sum_tok("cache_creation_input_tokens"),
+                "cache_read_input_tokens": _sum_tok("cache_read_input_tokens"),
                 "legacy": False,
                 "generated_at": generated_at_str
             })
@@ -740,26 +806,42 @@ def render_report(all_events):
                 # Extract date portion from old format "DD/MM/YYYY HH:MM:SS"
                 last_active_date = ev["last_updated"].split()[0]
 
-        tool_totals = defaultdict(lambda: {"hours": 0.0, "interactions": 0})
+        total_input_tokens = sum(ev.get("total_input_tokens", 0) for ev in dev_summaries)
+        total_output_tokens = sum(ev.get("total_output_tokens", 0) for ev in dev_summaries)
+        total_cache_creation_tokens = sum(ev.get("total_cache_creation_input_tokens", 0) for ev in dev_summaries)
+        total_cache_read_tokens = sum(ev.get("total_cache_read_input_tokens", 0) for ev in dev_summaries)
+        total_all_tokens = total_input_tokens + total_output_tokens + total_cache_creation_tokens + total_cache_read_tokens
+        tokens_header_str = f" ({format_tokens_abbreviated(total_all_tokens)} tokens totais no Claude Code)" if total_all_tokens > 0 else ""
+
+        tool_totals = defaultdict(lambda: {"hours": 0.0, "interactions": 0, "input_tokens": 0, "output_tokens": 0})
         for ev in daily_events:
             t = ev["tool"]
             tool_totals[t]["hours"] += ev["hours"]
             tool_totals[t]["interactions"] += ev["interactions"]
+            tool_totals[t]["input_tokens"] += ev.get("input_tokens", 0)
+            tool_totals[t]["output_tokens"] += ev.get("output_tokens", 0)
 
-        daily_grouped = defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0})
+        daily_grouped = defaultdict(lambda: {"hours": 0.0, "sessions": 0, "interactions": 0,
+                                              "input_tokens": 0, "output_tokens": 0,
+                                              "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0})
         for ev in daily_events:
             date_br = iso_to_date(ev["date"])
             key = (date_br, ev["tool"], ev["model"])
             daily_grouped[key]["hours"] += ev["hours"]
             daily_grouped[key]["sessions"] += ev["sessions"]
             daily_grouped[key]["interactions"] += ev["interactions"]
+            for tok_key in ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"):
+                daily_grouped[key][tok_key] += ev.get(tok_key, 0)
 
-        branch_grouped = defaultdict(lambda: {"tools": set(), "models": set(), "hours": 0.0, "interactions": 0})
+        branch_grouped = defaultdict(lambda: {"tools": set(), "models": set(), "hours": 0.0, "interactions": 0,
+                                               "input_tokens": 0, "output_tokens": 0})
         for ev in branch_events:
             date_br = iso_to_date(ev["date"])
             key = (date_br, ev["branch"])
             branch_grouped[key]["hours"] += ev["hours"]
             branch_grouped[key]["interactions"] += ev["interactions"]
+            branch_grouped[key]["input_tokens"] += ev.get("input_tokens", 0)
+            branch_grouped[key]["output_tokens"] += ev.get("output_tokens", 0)
             for t in ev["tools"]:
                 branch_grouped[key]["tools"].add(t)
             for m in ev["models"]:
@@ -769,40 +851,52 @@ def render_report(all_events):
             f"## 👤 Desenvolvedor: `{dev_id}`\n\n"
             f"* **Última Data Ativa:** {last_active_date} (Horário de Brasília)\n"
             f"* **Tempo Ativo Combinado (IA):** **{format_hours(total_hours)}**\n"
-            f"* **Total de Interações:** **{total_interactions} comandos** em {total_sessions} sessões\n\n"
+            f"* **Total de Interações:** **{total_interactions} comandos** em {total_sessions} sessões{tokens_header_str}\n\n"
         )
 
         dev_summary_block += (
             f"### 🛠️ Totais por Ferramenta\n\n"
-            f"| Ferramenta | Tempo Ativo | Interações |\n"
-            f"| :---: | :---: | :---: |\n"
+            f"| Ferramenta | Tempo Ativo | Interações | Tokens (Entrada / Saída) |\n"
+            f"| :---: | :---: | :---: | :---: |\n"
         )
         if tool_totals:
             for t in sorted(tool_totals.keys()):
                 th = tool_totals[t]["hours"]
                 ti = tool_totals[t]["interactions"]
-                dev_summary_block += f"| **{t}** | {format_hours(th)} | {ti} |\n"
+                if t == "Claude Code":
+                    in_tok = tool_totals[t]["input_tokens"]
+                    out_tok = tool_totals[t]["output_tokens"]
+                    tok_col = f"{format_tokens_pt(in_tok)} / {format_tokens_pt(out_tok)}"
+                else:
+                    tok_col = "N/A"
+                dev_summary_block += f"| **{t}** | {format_hours(th)} | {ti} | {tok_col} |\n"
         else:
-            dev_summary_block += f"| Nenhuma | 0h 00m | 0 |\n"
+            dev_summary_block += f"| Nenhuma | 0h 00m | 0 | N/A |\n"
 
         dev_summary_block += (
             f"\n### 🗓️ Detalhamento Diário das Horas (Brasília)\n\n"
-            f"| Dia de Trabalho | Ferramenta | Modelo LLM | Tempo Ativo | Sessões Ativas | Interações |\n"
-            f"| :---: | :---: | :---: | :---: | :---: | :---: |\n"
+            f"| Dia de Trabalho | Ferramenta | Modelo LLM | Tempo Ativo | Sessões Ativas | Interações | Tokens (Entrada / Saída) |\n"
+            f"| :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n"
         )
         if daily_grouped:
             for (d, t, m) in sorted(daily_grouped.keys(), key=lambda x: datetime.strptime(x[0], "%d/%m/%Y")):
                 h = daily_grouped[(d, t, m)]["hours"]
                 s = daily_grouped[(d, t, m)]["sessions"]
                 i = daily_grouped[(d, t, m)]["interactions"]
-                dev_summary_block += f"| {d} | **{t}** | {m} | {format_hours(h)} | {s} | {i} |\n"
+                if t == "Claude Code":
+                    in_tok = daily_grouped[(d, t, m)]["input_tokens"]
+                    out_tok = daily_grouped[(d, t, m)]["output_tokens"]
+                    tok_col = f"{format_tokens_pt(in_tok)} / {format_tokens_pt(out_tok)}"
+                else:
+                    tok_col = "N/A"
+                dev_summary_block += f"| {d} | **{t}** | {m} | {format_hours(h)} | {s} | {i} | {tok_col} |\n"
         else:
-            dev_summary_block += f"| N/A | Nenhuma | Nenhum | 0h 00m | 0 | 0 |\n"
+            dev_summary_block += f"| N/A | Nenhuma | Nenhum | 0h 00m | 0 | 0 | N/A |\n"
 
         dev_summary_block += (
             f"\n### 🌿 Detalhamento Diário por Branch / História (Brasília)\n\n"
-            f"| Dia de Trabalho | Branch Ativa | Ferramentas | Modelos Utilizados | Tempo Ativo | Interações |\n"
-            f"| :---: | :---: | :---: | :---: | :---: | :---: |\n"
+            f"| Dia de Trabalho | Branch Ativa | Ferramentas | Modelos Utilizados | Tempo Ativo | Interações | Tokens (Entrada / Saída) |\n"
+            f"| :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n"
         )
         if branch_grouped:
             for (d, b) in sorted(branch_grouped.keys(), key=lambda x: datetime.strptime(x[0], "%d/%m/%Y")):
@@ -810,9 +904,50 @@ def render_report(all_events):
                 bi = branch_grouped[(d, b)]["interactions"]
                 tools_used = ", ".join(sorted(branch_grouped[(d, b)]["tools"]))
                 models_used = ", ".join(sorted(branch_grouped[(d, b)]["models"]))
-                dev_summary_block += f"| {d} | `{b}` | {tools_used} | {models_used} | {format_hours(bh)} | {bi} |\n"
+                has_claude_code = "Claude Code" in branch_grouped[(d, b)]["tools"]
+                if has_claude_code:
+                    in_tok = branch_grouped[(d, b)]["input_tokens"]
+                    out_tok = branch_grouped[(d, b)]["output_tokens"]
+                    tok_col = f"{format_tokens_pt(in_tok)} / {format_tokens_pt(out_tok)}"
+                else:
+                    tok_col = "N/A"
+                dev_summary_block += f"| {d} | `{b}` | {tools_used} | {models_used} | {format_hours(bh)} | {bi} | {tok_col} |\n"
         else:
-            dev_summary_block += f"| N/A | Nenhuma | Nenhuma | Nenhum | 0h 00m | 0 |\n"
+            dev_summary_block += f"| N/A | Nenhuma | Nenhuma | Nenhum | 0h 00m | 0 | N/A |\n"
+
+        # Tabela de tokens do Claude Code (só renderiza se houver dados)
+        claude_token_rows = [
+            (d, m,
+             daily_grouped[(d, t, m)]["input_tokens"],
+             daily_grouped[(d, t, m)]["output_tokens"],
+             daily_grouped[(d, t, m)]["cache_read_input_tokens"],
+             daily_grouped[(d, t, m)]["cache_creation_input_tokens"])
+            for (d, t, m) in sorted(daily_grouped.keys(), key=lambda x: datetime.strptime(x[0], "%d/%m/%Y"))
+            if t == "Claude Code"
+        ]
+        has_token_data = any(row[2] + row[3] + row[4] + row[5] > 0 for row in claude_token_rows)
+        if has_token_data:
+            dev_summary_block += (
+                f"\n### 🪙 Consumo de Tokens (Claude Code)\n\n"
+                f"| Dia de Trabalho | Modelo LLM | Entrada (Prompt) | Saída (Completion) | Cache Lido | Cache Criado | Total |\n"
+                f"| :---: | :--- | :---: | :---: | :---: | :---: | :---: |\n"
+            )
+            sum_in = sum_out = sum_read = sum_create = sum_total = 0
+            for (d, m, in_tok, out_tok, cache_read, cache_create) in claude_token_rows:
+                total_row = in_tok + out_tok + cache_read + cache_create
+                dev_summary_block += (
+                    f"| {d} | {m} | {format_tokens_pt(in_tok)} | {format_tokens_pt(out_tok)} | "
+                    f"{format_tokens_pt(cache_read)} | {format_tokens_pt(cache_create)} | {format_tokens_pt(total_row)} |\n"
+                )
+                sum_in += in_tok
+                sum_out += out_tok
+                sum_read += cache_read
+                sum_create += cache_create
+                sum_total += total_row
+            dev_summary_block += (
+                f"| **Total** | | **{format_tokens_pt(sum_in)}** | **{format_tokens_pt(sum_out)}** | "
+                f"**{format_tokens_pt(sum_read)}** | **{format_tokens_pt(sum_create)}** | **{format_tokens_pt(sum_total)}** |\n"
+            )
 
         blocks.append(dev_summary_block.strip())
 
@@ -834,6 +969,7 @@ def show_console_report(username, hostname, masked_id, repo_root, brasilia_now_s
 
     legacy_hours = 0.0
     tool_model_totals = defaultdict(lambda: defaultdict(float))
+    tool_model_token_totals = defaultdict(lambda: defaultdict(lambda: {"input_tokens": 0, "output_tokens": 0}))
 
     if os.path.exists(dev_jsonl_path):
         try:
@@ -848,6 +984,9 @@ def show_console_report(username, hostname, masked_id, repo_root, brasilia_now_s
                             legacy_hours = ev.get("total_hours", 0.0)
                         elif ev.get("event_type") == "activity_daily":
                             tool_model_totals[ev["tool"]][ev["model"]] += ev["hours"]
+                            if ev.get("tool") == "Claude Code":
+                                tool_model_token_totals[ev["tool"]][ev["model"]]["input_tokens"] += ev.get("input_tokens", 0)
+                                tool_model_token_totals[ev["tool"]][ev["model"]]["output_tokens"] += ev.get("output_tokens", 0)
         except Exception:
             pass
 
@@ -855,11 +994,20 @@ def show_console_report(username, hostname, masked_id, repo_root, brasilia_now_s
         for t in daily_stats[d]:
             for m in daily_stats[d][t]:
                 tool_model_totals[t][m] += daily_stats[d][t][m]["hours"]
+                if t == "Claude Code":
+                    tool_model_token_totals[t][m]["input_tokens"] += daily_stats[d][t][m].get("input_tokens", 0)
+                    tool_model_token_totals[t][m]["output_tokens"] += daily_stats[d][t][m].get("output_tokens", 0)
 
     for t in sorted(tool_model_totals.keys()):
         print(f"  [{t}]")
         for m, h in sorted(tool_model_totals[t].items()):
-            print(f"   • {m}: \033[92m{format_hours(h)}\033[0m")
+            if t == "Claude Code":
+                in_tok = tool_model_token_totals[t][m]["input_tokens"]
+                out_tok = tool_model_token_totals[t][m]["output_tokens"]
+                tok_str = f" (Tokens: {format_tokens_abbreviated(in_tok)} In / {format_tokens_abbreviated(out_tok)} Out)"
+            else:
+                tok_str = ""
+            print(f"   • {m}: \033[92m{format_hours(h)}\033[0m{tok_str}")
 
     total_combined_hours = legacy_hours + live_total_hours
     print("-"*60)

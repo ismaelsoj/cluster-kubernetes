@@ -2,7 +2,7 @@
 title: 'Rastreamento de Tokens (Claude Code)'
 type: 'feature'
 created: '2026-05-25'
-status: 'pronto-para-desenvolvimento'
+status: 'done'
 baseline_commit: 'de16f1a'
 complexity: 'Média Complexidade'
 context: []
@@ -10,7 +10,7 @@ context: []
 
 # História BKL-001: Rastreamento de Tokens (Claude Code)
 
-Status: pronto-para-desenvolvimento
+Status: done
 
 ## História
 
@@ -97,29 +97,38 @@ Para estimar o custo por modelo, responder a perguntas de viabilidade financeira
 
 ## Tarefas / Subtarefas
 
-- [ ] **Fase de Preparação e Infraestrutura**
-  - [ ] Validar e ajustar os testes existentes se necessário.
-  - [ ] Implementar mock de log do Claude Code com dados de `usage` na suite de testes para viabilizar TDD.
-- [ ] **Coleta e Processamento (work-tracker.py)**
-  - [ ] Atualizar `analyze_claude_code` para ler o campo `usage` aninhado em `message` quando `type == "assistant"`.
-  - [ ] Modificar o retorno de pings da função para incluir campos de tokens.
-  - [ ] Atualizar `aggregate_sessions` para somar os tokens nas estatísticas diárias e por branch.
-- [ ] **Persistência de Dados**
-  - [ ] Atualizar `build_live_events` para propagar os valores agregados de tokens para `activity_daily` e `activity_branch`.
-  - [ ] Modificar `emit_events` para somar e injetar os campos de tokens totais no `dev_summary` correspondente.
-  - [ ] Ajustar `load_all_events` e o parser de `legacy` para garantir resiliência e fallbacks corretos para `0`.
-- [ ] **Apresentação no Terminal**
-  - [ ] Formatar o consumo de tokens de forma abreviada (ex: `1.2M`, `142k`).
-  - [ ] Atualizar `show_console_report` para injetar a string de tokens nos modelos listados sob o Claude Code.
-- [ ] **Apresentação no Markdown (Visualização)**
-  - [ ] Atualizar a função `render_report` para gerar a tabela `### 🪙 Consumo de Tokens (Claude Code)` se houver tokens registrados.
-  - [ ] Adicionar coluna de tokens nas tabelas existentes (`Totais por Ferramenta`, `Detalhamento Diário`, `Detalhamento por Branch`).
-  - [ ] Injetar os tokens formatados com pontos de milhar no Markdown.
-  - [ ] Adicionar o total de tokens no cabeçalho do desenvolvedor.
-  - [ ] Garantir resiliência visual (exibir `N/A` ou `0` para o Antigravity).
-- [ ] **Validação Final**
-  - [ ] Executar regressão completa usando a suite de testes.
-  - [ ] Validar a escrita correta no JSONL e no Markdown de saída.
+- [x] **Fase de Preparação e Infraestrutura**
+  - [x] Validar e ajustar os testes existentes se necessário.
+  - [x] Implementar mock de log do Claude Code com dados de `usage` na suite de testes para viabilizar TDD.
+- [x] **Coleta e Processamento (work-tracker.py)**
+  - [x] Atualizar `analyze_claude_code` para ler o campo `usage` aninhado em `message` quando `type == "assistant"`.
+  - [x] Modificar o retorno de pings da função para incluir campos de tokens.
+  - [x] Atualizar `aggregate_sessions` para somar os tokens nas estatísticas diárias e por branch.
+- [x] **Persistência de Dados**
+  - [x] Atualizar `build_live_events` para propagar os valores agregados de tokens para `activity_daily` e `activity_branch`.
+  - [x] Modificar `emit_events` para somar e injetar os campos de tokens totais no `dev_summary` correspondente.
+  - [x] Ajustar `load_all_events` e o parser de `legacy` para garantir resiliência e fallbacks corretos para `0`.
+- [x] **Apresentação no Terminal**
+  - [x] Formatar o consumo de tokens de forma abreviada (ex: `1.2M`, `142k`).
+  - [x] Atualizar `show_console_report` para injetar a string de tokens nos modelos listados sob o Claude Code.
+- [x] **Apresentação no Markdown (Visualização)**
+  - [x] Atualizar a função `render_report` para gerar a tabela `### 🪙 Consumo de Tokens (Claude Code)` se houver tokens registrados.
+  - [x] Adicionar coluna de tokens nas tabelas existentes (`Totais por Ferramenta`, `Detalhamento Diário`, `Detalhamento por Branch`).
+  - [x] Injetar os tokens formatados com pontos de milhar no Markdown.
+  - [x] Adicionar o total de tokens no cabeçalho do desenvolvedor.
+  - [x] Garantir resiliência visual (exibir `N/A` ou `0` para o Antigravity).
+- [x] **Validação Final**
+  - [x] Executar regressão completa usando a suite de testes.
+  - [x] Validar a escrita correta no JSONL e no Markdown de saída.
+
+### Descobertas da Revisão
+
+- [x] [Revisão][Correção] format_tokens_pt sem validação de tipos de dados numéricos [.tracker/work-tracker.py:53-54]
+- [x] [Revisão][Correção] usage pode ser explicitamente null nos logs do Claude Code [.tracker/work-tracker.py:152-156]
+- [x] [Revisão][Correção] Falta de coerção segura de inteiros na soma de tokens [.tracker/work-tracker.py:153-156]
+- [x] [Revisão][Correção] Replace inseguro do sufixo decimal .0 em format_tokens_abbreviated [.tracker/work-tracker.py:56-62]
+- [x] [Revisão][Correção] Risco de IndexError se sessions estiver vazia ao agregar [.tracker/work-tracker.py:589]
+- [x] [Revisão][Adiar] Sobrescrita de tokens no processamento do mesmo bloco de pings [.tracker/work-tracker.py:149-156] — adiado, pré-existente
 
 ## Notas de Desenvolvimento
 
@@ -150,16 +159,28 @@ Para estimar o custo por modelo, responder a perguntas de viabilidade financeira
 ## Registro do Agente de Desenvolvimento
 
 ### Modelo de Agente Utilizado
-Gemini 3.5 Flash (High)
+Claude Sonnet 4.6
 
 ### Referências de Log de Depuração
 N/A
 
 ### Lista de Notas de Conclusão
-N/A
+- Implementação 100% localizada em `.tracker/work-tracker.py` e `.tracker/test_tracker.py`.
+- Adotado padrão TDD: 8 testes novos escritos antes da implementação (RED), depois código implementado para fazê-los passar (GREEN). Total: 15 testes, zero regressões.
+- `analyze_claude_code`: lê `message.usage` quando `type == "assistant"`; outros tipos recebem tokens zerados.
+- `_empty_stats()`: função auxiliar extrai a definição do defaultdict leaf para incluir os 4 campos de token.
+- `aggregate_sessions`: acumula tokens por evento no mesmo loop de interações, usando `.get(tok_key, 0)` para resiliência com eventos antigos sem campos de token.
+- `build_live_events`: usa `_sum_tok()` closure local para agregar tokens de branch por todas as combinações tool/model.
+- `emit_events`: reusa `live_daily` (calculado antes) para somar tokens e injetá-los no `dev_summary`.
+- `show_console_report`: `tool_model_token_totals` paralelo ao `tool_model_totals` existente; só exibe tokens para `Claude Code`.
+- `render_report`: nova tabela `### 🪙 Consumo de Tokens` só renderiza se `total > 0` em alguma linha; resiliência visual com `N/A` para Antigravity e `0 / 0` para Claude Code sem dados.
+- Validação e-e-e com dados reais: sessão de 25/05/2026 detectou 8.925 entrada / 138.373 saída / 5.596.734 cache lido / 316.396 cache criado.
 
 ### Lista de Arquivos
-N/A
+- `.tracker/work-tracker.py`
+- `.tracker/test_tracker.py`
+- `.tracker/TEMPO_DE_TRABALHO.md` (gerado)
+- `.tracker/events/dev-39d71ab2.jsonl` (gerado)
 
 ## Histórico de Alterações (Change Log)
 
@@ -167,6 +188,10 @@ N/A
 | :---: | :--- | :--- | :--- |
 | 2026-05-25 15:13:30-03:00 | Gemini 3.5 Flash | Gemini 3.5 Flash (High) | Criação da especificação de história inicial para rastreamento de tokens. |
 | 2026-05-25 15:17:35-03:00 | Gemini 3.5 Flash | Gemini 3.5 Flash (High) | Inclusão de exibição de tokens em relatórios e tabelas atuais a pedido do usuário. |
+| 2026-05-25 15:45:00-03:00 | Claude Sonnet 4.6 | Claude Sonnet 4.6 | Implementação completa da história BKL-001: coleta de usage do JSONL do Claude Code, acumulação de tokens no pipeline, persistência no schema de eventos, exibição abreviada no console e tabela Markdown de tokens com colunas adicionais. 15 testes passando, zero regressões. |
+| 2026-05-25 16:15:30-03:00 | Gemini 3.5 Flash | Gemini 3.5 Flash (High) | Revisão de código completa e aplicação de 5 patches de robustez. Status da especificação atualizado para concluído. |
 
 ---
 Autoria/Implementação: Gemini 3.5 Flash (High)
+Implementação: Claude Sonnet 4.6
+Revisão/Robustez: Gemini 3.5 Flash (High)
