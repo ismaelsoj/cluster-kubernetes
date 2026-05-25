@@ -1049,13 +1049,13 @@ def export_json_report(events_dir, masked_id, live_events, repo_root):
             json.dump(all_compiled_events, f, indent=2, ensure_ascii=False)
         os.replace(tmp_path, report_path)
         print(f"\033[92m✔ Métricas de tempo atualizadas com sucesso no arquivo: {report_path}\033[0m")
-    except Exception as e:
+    except Exception:
         if os.path.exists(tmp_path):
             try:
                 os.remove(tmp_path)
             except Exception:
                 pass
-        raise e
+        raise
 
 def export_csv_report(events_dir, masked_id, live_events, repo_root):
     # Se for exportar, emite os eventos (preserva legacy, substitui live)
@@ -1145,13 +1145,13 @@ def export_csv_report(events_dir, masked_id, live_events, repo_root):
 
         os.replace(tmp_path, report_path)
         print(f"\033[92m✔ Métricas de tempo atualizadas com sucesso no arquivo: {report_path}\033[0m")
-    except Exception as e:
+    except Exception:
         if os.path.exists(tmp_path):
             try:
                 os.remove(tmp_path)
             except Exception:
                 pass
-        raise e
+        raise
 
 def main():
     parser = argparse.ArgumentParser(description="Calculador de tempo de trabalho de IA apartado e seguro.")

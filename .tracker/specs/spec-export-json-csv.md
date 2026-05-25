@@ -11,7 +11,7 @@ context:
 
 # História BKL-003: Exportação JSON/CSV
 
-Status: revisao
+Status: done
 
 ## Contexto
 
@@ -117,6 +117,21 @@ ls -la .tracker/TEMPO_DE_TRABALHO.md
 - [x] **Validação e Finalização**
   - [x] Executar todos os testes unitários (`python3 .tracker/test_tracker.py`) e garantir que estão verdes (GREEN).
   - [x] Executar manualmente comandos de exportação para JSON e CSV, verificando se os arquivos `.tracker/TEMPO_DE_TRABALHO.json` e `.tracker/TEMPO_DE_TRABALHO.csv` são criados com os dados corretos.
+
+### Review Findings
+
+- [x] [Review][Patch] `test_export_csv_format` usa `str.split(",")` naive — deve usar `csv.reader` [`.tracker/test_tracker.py:498-505`]
+- [x] [Review][Patch] `test_export_csv_format` não verifica valores das colunas (hours, developer, tool, branch) [`.tracker/test_tracker.py:487-505`]
+- [x] [Review][Patch] `test_export_formats_atomic_write` cobre apenas JSON — escrita atômica do CSV não testada [`.tracker/test_tracker.py:507-523`]
+- [x] [Review][Patch] `test_export_json_format` não valida tipos dos campos (`hours` float, `sessions` int, `interactions` int) [`.tracker/test_tracker.py:467-485`]
+- [x] [Review][Patch] Nenhum teste valida que `argparse` rejeita `--format` inválido (AC 1) [`.tracker/test_tracker.py`]
+- [x] [Review][Patch] `raise e` em vez de bare `raise` nas funções de exportação — reseta o traceback [`.tracker/work-tracker.py:~1049,~1085`]
+- [x] [Review][Defer] `export_markdown_report` não usa escrita atômica (`.tmp`+`os.replace`) — pré-existente [`.tracker/work-tracker.py:~1020-1033`] — deferred, pre-existing
+- [x] [Review][Defer] Race condition em chamadas concorrentes a `emit_events` (mesmo `masked_id`) — pré-existente [`.tracker/work-tracker.py:~1037,~1060`] — deferred, pre-existing
+- [x] [Review][Defer] Ordenação não-determinística dos eventos na exportação JSON (`glob` filesystem order) — pré-existente [`.tracker/work-tracker.py:~1037-1045`] — deferred, pre-existing
+- [x] [Review][Defer] Campo `total_sessions` vs `sessions` no schema `dev_summary` — inconsistência de nomenclatura pré-existente [`.tracker/work-tracker.py:~1116`] — deferred, pre-existing
+- [x] [Review][Defer] Permissões de arquivo não preservadas na substituição atômica (`os.replace`) — comportamento padrão do OS — deferred, pre-existing
+- [x] [Review][Defer] Tokens de eventos legados: ambiguidade string vazia vs zero — pré-existente [`.tracker/work-tracker.py:~1132`] — deferred, pre-existing
 
 ## Notas de Desenvolvimento
 

@@ -119,5 +119,17 @@ Registro centralizado de itens identificados em revisões/triagens que não pert
 - **Sobrescrita de tokens no processamento do mesmo bloco de pings:** no parser de logs do Claude Code, cada evento de ping é adicionado a uma lista `pings`. Caso ocorra mais de um item do tipo `"assistant"` na mesma linha de logs, os campos de tokens do `ping` serão sobrescritos em vez de acumulados. Se os logs do Claude Code distribuírem o consumo do mesmo ping em múltiplas interações dentro do mesmo evento, isso causará subnotificação de tokens. [.tracker/work-tracker.py:149-156] — Razão para adiar: Escopo atendido, a estrutura atual atende as sessões registradas em dados reais no TDD. Endereçar em refatoração de estabilidade de logs.
 
 ---
-*Edição/Implementação: Gemini 3.5 Flash via Antigravity — 2026-05-25 16:08:00-03:00*
+
+## Deferred from: code review of spec-export-json-csv (2026-05-25)
+
+### Diferido para melhoria futura do .tracker/work-tracker.py e test_tracker.py
+
+- **`export_markdown_report` não usa escrita atômica (`.tmp`+`os.replace`):** A função abre `report_path` diretamente para escrita. Se o processo for interrompido, o arquivo `.md` fica truncado. Os novos exportadores JSON/CSV implementam atomicidade corretamente; inconsistência a corrigir em refatoração futura do .tracker. [`.tracker/work-tracker.py:~1020-1033`]
+- **Race condition em chamadas concorrentes a `emit_events`:** Se dois processos exportam formatos diferentes em paralelo com o mesmo `masked_id`, ambos escrevem `dev-<id>.jsonl.tmp` simultaneamente. Improvável em uso normal de um dev local; endereçar se o tracker for usado em contextos de CI paralelo. [`.tracker/work-tracker.py:~1037,~1060`]
+- **Ordenação não-determinística dos eventos na exportação JSON:** `load_all_events` usa `glob.glob` que retorna arquivos em ordem de inode (não garantida). O JSON exportado pode ter ordem diferente entre execuções, dificultando diffs. Pré-existente em `load_all_events`. [`.tracker/work-tracker.py:~1037-1045`]
+- **Campo `total_sessions` vs `sessions` no schema `dev_summary`:** O evento `dev_summary` persiste `total_sessions` no JSONL, mas a spec nota "campo `sessions` para `dev_summary`". A lógica CSV compensa lendo `total_sessions`. Inconsistência de nomenclatura pré-existente no schema de eventos. [`.tracker/work-tracker.py:~1116`]
+- **Permissões de arquivo não preservadas na substituição atômica:** `os.replace(tmp, dest)` não herda permissões do arquivo existente; o `.tmp` é criado com `umask` padrão. Sem impacto em uso local, mas relevante em repos compartilhados com permissões especiais.
+- **Tokens de eventos legados: ambiguidade string vazia vs zero:** Eventos `activity_daily/branch` gerados antes de BKL-001 não possuem campos de token, resultando em células vazias no CSV. Eventos pós-BKL-001 terão `0` mesmo sem atividade. A distinção "sem dados" vs "zero" não está documentada no schema. [`.tracker/work-tracker.py:~1132`]
+
+*Revisão/Code Review: Claude Sonnet 4.6 (claude-sonnet-4-6) via Claude Code — 2026-05-25*
 

@@ -465,62 +465,152 @@ class TestExportFormats(unittest.TestCase):
         shutil.rmtree(self.temp_dir)
 
     def test_export_json_format(self):
-        # Deve chamar export_json_report e criar TEMPO_DE_TRABALHO.json
         work_tracker.export_json_report(self.events_dir, self.dev_id, self.live_events, self.repo_root)
-        
+
         json_path = os.path.join(self.tracker_dir, "TEMPO_DE_TRABALHO.json")
         self.assertTrue(os.path.exists(json_path))
-        
+
         with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-            
+
         self.assertIsInstance(data, list)
         self.assertGreater(len(data), 0)
-        
-        # Verifica se contém o evento de daily que exportamos
+
         daily_ev = next((e for e in data if e.get("event_type") == "activity_daily"), None)
-        self.assertIsNotNone(daily_ev)
+        self.assertIsNotNone(daily_ev, "Evento activity_daily não encontrado no JSON")
         self.assertEqual(daily_ev["developer"], self.dev_id)
         self.assertEqual(daily_ev["hours"], 1.25)
         self.assertEqual(daily_ev["model"], "Claude Sonnet 4.6")
 
+        # Verifica tipos dos campos numéricos
+        self.assertIsInstance(daily_ev["hours"], float)
+        self.assertIsInstance(daily_ev["sessions"], int)
+        self.assertIsInstance(daily_ev["interactions"], int)
+        self.assertIsInstance(daily_ev["input_tokens"], int)
+        self.assertIsInstance(daily_ev["output_tokens"], int)
+        self.assertIsInstance(daily_ev["event_type"], str)
+
     def test_export_csv_format(self):
-        # Deve chamar export_csv_report e criar TEMPO_DE_TRABALHO.csv
         work_tracker.export_csv_report(self.events_dir, self.dev_id, self.live_events, self.repo_root)
-        
+
         csv_path = os.path.join(self.tracker_dir, "TEMPO_DE_TRABALHO.csv")
         self.assertTrue(os.path.exists(csv_path))
-        
-        with open(csv_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            
-        self.assertGreater(len(lines), 1)
-        headers = [c.strip() for c in lines[0].split(",")]
+
+        import csv as csv_module
+        with open(csv_path, "r", encoding="utf-8", newline="") as f:
+            reader = csv_module.reader(f)
+            headers = next(reader)
+            rows = list(reader)
+
         self.assertIn("developer", headers)
         self.assertIn("event_type", headers)
         self.assertIn("hours", headers)
-        
-        # Verifica se o número de colunas bate
-        row1 = [c.strip() for c in lines[1].split(",")]
-        self.assertEqual(len(row1), len(headers))
+        self.assertGreater(len(rows), 0)
+
+        for row in rows:
+            self.assertEqual(len(row), len(headers))
+
+        # Verifica valores da linha activity_daily
+        def col(row, name):
+            return row[headers.index(name)]
+
+        daily_row = next((r for r in rows if col(r, "event_type") == "activity_daily"), None)
+        self.assertIsNotNone(daily_row, "Linha activity_daily não encontrada no CSV")
+        self.assertEqual(col(daily_row, "developer"), self.dev_id)
+        self.assertEqual(col(daily_row, "hours"), "1.25")
+        self.assertEqual(col(daily_row, "tool"), "Claude Code")
+        self.assertEqual(col(daily_row, "model"), "Claude Sonnet 4.6")
+        self.assertEqual(col(daily_row, "date"), "2026-05-25")
+        self.assertEqual(col(daily_row, "branch"), "")
+        self.assertEqual(col(daily_row, "scope"), "")
+
+        # Verifica valores da linha activity_branch
+        branch_row = next((r for r in rows if col(r, "event_type") == "activity_branch"), None)
+        self.assertIsNotNone(branch_row, "Linha activity_branch não encontrada no CSV")
+        self.assertEqual(col(branch_row, "developer"), self.dev_id)
+        self.assertEqual(col(branch_row, "branch"), "feature-test")
+        self.assertEqual(col(branch_row, "sessions"), "")
+        self.assertEqual(col(branch_row, "date"), "2026-05-25")
+
+    def test_export_csv_format_comma_in_field(self):
+        # Garante que campos com vírgula (multi-tool/model) são escapados corretamente (RFC 4180)
+        # e que o csv.reader ainda lê a linha com o número correto de colunas.
+        multi_tool_events = [
+            {
+                "event_type": "activity_branch",
+                "schema_version": 1,
+                "developer": self.dev_id,
+                "date": "2026-05-25",
+                "branch": "feature-multi",
+                "tools": ["Antigravity", "Claude Code"],
+                "models": ["Claude Haiku 4.5", "Claude Sonnet 4.6"],
+                "hours": 2.0,
+                "interactions": 5,
+                "input_tokens": 800,
+                "output_tokens": 200,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "legacy": False,
+                "generated_at": "2026-05-25T12:00:00-03:00",
+            }
+        ]
+        work_tracker.export_csv_report(self.events_dir, self.dev_id, multi_tool_events, self.repo_root)
+
+        csv_path = os.path.join(self.tracker_dir, "TEMPO_DE_TRABALHO.csv")
+        import csv as csv_module
+        with open(csv_path, "r", encoding="utf-8", newline="") as f:
+            reader = csv_module.reader(f)
+            headers = next(reader)
+            rows = list(reader)
+
+        self.assertGreater(len(rows), 0)
+        for row in rows:
+            self.assertEqual(len(row), len(headers), f"Linha com número errado de colunas: {row}")
+
+        # Verifica que o campo tool contém os dois tools separados por vírgula
+        tool_idx = headers.index("tool")
+        branch_row = next((r for r in rows if r[headers.index("event_type")] == "activity_branch"), None)
+        self.assertIsNotNone(branch_row)
+        self.assertIn(",", branch_row[tool_idx])
 
     def test_export_formats_atomic_write(self):
-        # Testar se os arquivos de destino são atualizados de forma atômica.
-        # Nós verificamos isso garantindo que a escrita completa ocorre.
-        # Caso o processo falhe no meio, o arquivo antigo (se houver) deve permanecer intacto.
         json_path = os.path.join(self.tracker_dir, "TEMPO_DE_TRABALHO.json")
-        
-        # Escreve um arquivo pré-existente
+
         with open(json_path, "w", encoding="utf-8") as f:
             f.write("dados antigos")
-            
+
         work_tracker.export_json_report(self.events_dir, self.dev_id, self.live_events, self.repo_root)
-        
+
         with open(json_path, "r", encoding="utf-8") as f:
             content = f.read()
-            
+
         self.assertNotEqual(content, "dados antigos")
         self.assertTrue(content.startswith("["))
+
+    def test_export_csv_atomic_write(self):
+        csv_path = os.path.join(self.tracker_dir, "TEMPO_DE_TRABALHO.csv")
+
+        with open(csv_path, "w", encoding="utf-8") as f:
+            f.write("dados antigos")
+
+        work_tracker.export_csv_report(self.events_dir, self.dev_id, self.live_events, self.repo_root)
+
+        with open(csv_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertNotEqual(content, "dados antigos")
+        self.assertTrue(content.startswith("developer,"))
+
+    def test_argparse_rejects_invalid_format(self):
+        import subprocess
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "work-tracker.py")
+        result = subprocess.run(
+            [sys.executable, script, "--export", "--format", "invalido"],
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(result.returncode, 0, "argparse deveria rejeitar --format inválido com exit code != 0")
+        self.assertIn("invalido", result.stderr)
 
 
 if __name__ == "__main__":
