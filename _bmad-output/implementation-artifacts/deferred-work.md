@@ -105,3 +105,9 @@ Registro centralizado de itens identificados em revisões/triagens que não pert
 ### Diferido para melhoria de segurança de geração de senhas (Story 3.x ou cross-story)
 
 - **[scripts/inject-secrets.sh:38, 50]** Fallback de geração de senha enfraquecido — quando openssl não está disponível, o fallback `od -vAn -N16 -tx1 /dev/urandom | ... | head -c 16` trunca bytes hex, resultando em ~64 bits de entropia vs. 128 bits do openssl. Afeta principalmente CI/CD em containers Alpine ou ambientes minimais. **Razão para defer:** AC atendido, funcionalidade OK. Melhoria de segurança, não bloqueador. Endereçar quando harmonizar geração de senhas com sistema de secrets centralizado (Story 3.4+).
+
+## Deferred from: code review of 2-2-manifestos-kustomize-keycloak (2026-05-27)
+
+- **[cluster/infrastructure/keycloak-auth/base/keycloak-priorityclass.yaml:13]** PriorityClass não garante a "imunidade a eviction" declarada no AC; `PreemptLowerPriority` ajuda scheduling/preemption, mas o pod ainda usa QoS Burstable porque `requests` são menores que `limits`. **Razão para defer:** Não tenho condições técnicas de tomar essa decisão agora.
+
+Revisão: GPT-5.5

@@ -58,6 +58,22 @@ kubectl get pods -l app.kubernetes.io/name=keycloak -n keycloak-auth
 kubectl logs -f -l app.kubernetes.io/name=keycloak -n keycloak-auth
 ```
 
+### Obter credenciais administrativas
+
+> As credenciais vêm do Secret `keycloak-admin-secret`. Trate a senha como dado sensível:
+> não cole em issues, logs ou commits.
+
+```bash
+ADMIN_USERNAME="$(kubectl get secret keycloak-admin-secret -n keycloak-auth \
+  -o jsonpath='{.data.admin-username}' | base64 -d)"
+
+ADMIN_PASSWORD="$(kubectl get secret keycloak-admin-secret -n keycloak-auth \
+  -o jsonpath='{.data.admin-password}' | base64 -d)"
+
+printf 'Usuário admin: %s\n' "${ADMIN_USERNAME}"
+printf 'Senha admin: %s\n' "${ADMIN_PASSWORD}"
+```
+
 ### Reiniciar o deployment (aplicar nova imagem ou configmap)
 
 ```bash
@@ -77,6 +93,7 @@ kubectl exec -n keycloak-auth deploy/keycloak-deployment -- \
 
 > **Contexto:** Traefik está desabilitado no k3d (Kong DB-less assume o roteamento na Wave 3).
 > Enquanto o Kong não for implantado, use port-forward para acessar o Keycloak diretamente.
+> O healthcheck permanece interno na porta management `9000`.
 
 ```bash
 # Port-forward: expõe o serviço na porta 8090 local (evita conflito com o 8080 do k3d)
@@ -84,7 +101,7 @@ kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80
 
 # Em outro terminal, acesse via navegador ou curl:
 open http://localhost:8090          # painel web do Keycloak
-curl http://localhost:8090/health/ready   # retorna {"status":"UP",...}
+open http://localhost:8090/admin    # console administrativo
 ```
 
 > Após implantar o Kong (Wave 3), o acesso externo passará pela porta 8080 do host

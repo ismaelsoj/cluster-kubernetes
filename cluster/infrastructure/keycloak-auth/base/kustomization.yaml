@@ -15,7 +15,7 @@ resources:
   - keycloak-priorityclass.yaml
   - keycloak-deployment.yaml
   - keycloak-service.yaml
-  - keycloak-ingress.yaml
 
 # Autoria/Implementação: Gemini 3.5 Flash
 # Revisão: claude-sonnet-4-6
+# Revisão: GPT-5.5
