@@ -2,7 +2,7 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Você DEVE definir explicitamente o nível de
 
 # Story 2.2: manifestos-kustomize-keycloak
 
-**Status:** review
+**Status:** done
 **Complexidade:** Média Complexidade
 
 ## Story Foundation
@@ -163,6 +163,7 @@ Implementação: claude-sonnet-4-6
 Revisão: GPT-5.5
 
 ## Change Log
+- `2026-05-27 14:54:49-03:00`: Story testada e concluída pelo usuário; status atualizado para `done` e sprint status sincronizado.
 - `2026-05-27 14:41:47-03:00`: Ajuste pós-validação — variáveis administrativas depreciadas do Keycloak substituídas por `KC_BOOTSTRAP_ADMIN_USERNAME`/`KC_BOOTSTRAP_ADMIN_PASSWORD`; Plano de Validação Manual recebeu passo para obter credenciais do Secret e validar login no console.
 - `2026-05-27 14:10:44-03:00`: Patches do code review aplicados — Ingress da Wave 2 removido, health interno em `9000` documentado, `startupProbe` adicionado, autoria LLM registrada em artefatos novos e Change Log reordenado.
 - `2026-05-27 14:03:07-03:00`: Decisões do code review registradas — Ingress removido/deferido até Kong; health mantido interno na management port 9000; hardening de eviction/PriorityClass diferido por insuficiência técnica para decisão agora.
