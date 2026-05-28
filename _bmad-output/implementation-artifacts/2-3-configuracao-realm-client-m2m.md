@@ -216,7 +216,9 @@ Body: grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-l
 Retorna JWT. O campo `expires_in` deve ser próximo de 31536000 (1 ano).
 
 **Event Listeners — jboss-logging:**
-O listener `jboss-logging` em Keycloak 26 com `KC_LOG_CONSOLE_OUTPUT=json` produz eventos de login em JSON no stdout. Esses eventos incluem o campo `type: CLIENT_LOGIN` para emissões via `client_credentials`. Não requer configuração adicional além de `eventsEnabled: true` e `eventsListeners: ["jboss-logging"]` no realm-config.json.
+O listener `jboss-logging` em Keycloak 26 com `KC_LOG_CONSOLE_OUTPUT=json` produz eventos de login em JSON no stdout. Esses eventos incluem o campo `type: CLIENT_LOGIN` para emissões via `client_credentials`.
+
+**ATENÇÃO:** eventos de sucesso do listener `jboss-logging` usam nível `DEBUG` por padrão. Para que `CLIENT_LOGIN` apareça no stdout com a configuração padrão de logs do servidor, o Deployment também deve definir `KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__SUCCESS_LEVEL=info`.
 
 **Kustomize configMapGenerator com hash:**
 Ao usar `configMapGenerator`, o Kustomize adiciona um sufixo de hash ao nome do ConfigMap (ex: `keycloak-realm-config-2f9abc01`). O Kustomize automaticamente atualiza todas as referências ao ConfigMap no mesmo `kustomization.yaml`. O `keycloak-deployment.yaml` deve usar o nome base `keycloak-realm-config` — o Kustomize resolve. Para verificar o nome gerado: `kubectl kustomize cluster/infrastructure/keycloak-auth/base/ | grep "name: keycloak-realm-config"`.
@@ -296,6 +298,9 @@ Resultado esperado: entrada de log JSON contendo `"type":"CLIENT_LOGIN"` e `"cli
 - [ ] Executar validação manual completa (itens 3–7 do Plano de Validação)
 - [x] Registrar `# Autoria/Implementação: <modelo>` no rodapé do `realm-config.json` (em comentário JSON não é possível — incluir no Change Log da story)
 
+### Review Findings
+- [x] [Review][Patch] Configurar `jboss-logging` para emitir eventos de sucesso em `INFO` [cluster/infrastructure/keycloak-auth/base/keycloak-deployment.yaml:77]
+
 ## Dev Agent Record
 
 ### Plano de Implementação
@@ -314,6 +319,7 @@ Arquivos criados/modificados:
 1. **`realm-config.json` (novo):** Realm `cluster-local` com Client `m2m-client` configurado com `serviceAccountsEnabled: true`, apenas `client_credentials` habilitado, `access.token.lifespan: "31536000"` (1 ano), `eventsEnabled: true` com listener `jboss-logging`.
 2. **`kustomization.yaml` (atualizado):** `configMapGenerator` adicionado gerando ConfigMap `keycloak-realm-config` com labels obrigatórios (`app.kubernetes.io/name: keycloak`, `app.kubernetes.io/component: identity-provider`, `app.kubernetes.io/part-of: cluster-kubernetes`) e annotation `argocd.argoproj.io/sync-wave: "2"`. ConfigMap **não** adicionado em `resources:` — gerado exclusivamente via `configMapGenerator`.
 3. **`keycloak-deployment.yaml` (atualizado):** Arg `--import-realm` adicionado após `start`; volumeMount `/opt/keycloak/data/import` com `readOnly: true`; volume `realm-config-volume` referenciando `keycloak-realm-config` (Kustomize resolve o nome com hash automaticamente).
+4. **Correção pós-review:** adicionada env `KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__SUCCESS_LEVEL=info` para que eventos `CLIENT_LOGIN` do listener `jboss-logging` sejam emitidos no stdout durante a validação manual.
 
 **Validações estáticas executadas:**
 - `kubectl kustomize base/` → ConfigMap gerado (`keycloak-realm-config-tf96t99db2`), Deployment com `--import-realm` e volume corretamente resolvido com hash. ✅
@@ -335,3 +341,4 @@ Implementação: claude-sonnet-4-6
 ## Change Log
 - `2026-05-28 17:00:00-03:00`: Story criada pelo workflow bmad-create-story; status: ready-for-dev. Autoria: claude-sonnet-4-6.
 - `2026-05-28 18:00:00-03:00`: Implementação concluída — criado `realm-config.json`, atualizado `kustomization.yaml` (configMapGenerator) e `keycloak-deployment.yaml` (--import-realm + volume). make lint: 92 testes, 0 falhas. kubectl kustomize: ConfigMap + Deployment corretos. Status: review. Autoria/Implementação: claude-sonnet-4-6.
+- `2026-05-28 10:28:23-03:00`: Correção pós-code-review aplicada após validação manual identificar ausência de `CLIENT_LOGIN` no stdout. Adicionada env `KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__SUCCESS_LEVEL=info` no Deployment e ajustada a documentação da story para refletir o comportamento real do listener `jboss-logging`. Autoria/Implementação: GPT-5 Codex.
