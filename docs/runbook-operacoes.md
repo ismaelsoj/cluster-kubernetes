@@ -141,6 +141,54 @@ kubectl exec -n keycloak-auth deploy/postgresql-deployment -- \
 kubectl logs -f -l app.kubernetes.io/name=postgresql -n keycloak-auth
 ```
 
+### Backup completo do banco
+
+```bash
+./scripts/pg-backup.sh
+# Saída em: ./backups/keycloak-db-backup-YYYYMMDD-HHMMSS.dump
+```
+
+### Restore a partir de backup
+
+```bash
+./scripts/pg-restore.sh ./backups/keycloak-db-backup-<timestamp>.dump
+# Keycloak fica indisponível durante o restore (~1-2 min)
+```
+
+### Listar conteúdo de um backup sem restaurar
+
+```bash
+kubectl exec -n keycloak-auth deploy/postgresql-deployment -- \
+  pg_restore --list /tmp/keycloak-restore.dump 2>/dev/null | head -20
+# Alternativa local (requer pg_restore instalado no host):
+pg_restore --list ./backups/keycloak-db-backup-<timestamp>.dump | head -20
+```
+
+### Estado esperado após restore bem-sucedido (Story 2.3)
+
+| Objeto | Valor |
+|--------|-------|
+| Realm | `cluster-local` |
+| Client | `m2m-client` |
+| Client Secret | `dev-m2m-local-secret` |
+| Grant | `client_credentials` apenas |
+| TTL do client | `access.token.lifespan = 31536000` (1 ano) |
+
+Validação pós-restore:
+
+```bash
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=keycloak \
+  -n keycloak-auth --timeout=180s
+kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80 &
+curl -s -X POST http://localhost:8090/realms/cluster-local/protocol/openid-connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('OK - expires_in:', d.get('expires_in'))"
+# Esperado: OK - expires_in: 31536000
+```
+
+<!-- Autoria/Implementação: claude-sonnet-4-6 -->
+
 ---
 
 ## Cluster k3d

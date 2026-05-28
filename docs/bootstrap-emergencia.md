@@ -146,3 +146,43 @@ sed "s|targetRevision: main|targetRevision: <BRANCH_DESEJADA>|" cluster/bootstra
 ```
 
 Uma vez aplicado o `root-app.yaml`, o ArgoCD iniciará a sincronização em cascata de todos os recursos do repositório respeitando rigorosamente as ordens das **Sync Waves** declaradas.
+
+---
+
+## 6. Recuperação via Backup PostgreSQL (FR23)
+
+Use esta seção quando o banco de dados do Keycloak estiver corrompido ou perdido e houver backup disponível. Execute **após** a Etapa 5 (ArgoCD e infraestrutura em execução).
+
+### 6.1. Gerar backup (operação de rotina)
+
+```bash
+./scripts/pg-backup.sh
+# Gera: ./backups/keycloak-db-backup-YYYYMMDD-HHMMSS.dump
+```
+
+Armazene o arquivo de dump em local externo ao cluster (ex: S3, NFS, disco externo).
+
+### 6.2. Restaurar banco a partir de backup
+
+```bash
+./scripts/pg-restore.sh ./backups/keycloak-db-backup-<timestamp>.dump
+```
+
+O script:
+1. Escala Keycloak para 0 réplicas (interrupção controlada)
+2. Copia dump para o pod PostgreSQL
+3. Executa `pg_restore --clean --if-exists`
+4. Escala Keycloak de volta para 1 réplica
+
+### 6.3. Validar restore
+
+```bash
+kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80 &
+curl -s -X POST http://localhost:8090/realms/cluster-local/protocol/openid-connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('Token OK:', 'access_token' in d)"
+# Esperado: Token OK: True
+```
+
+<!-- Autoria/Implementação: claude-sonnet-4-6 -->
