@@ -150,7 +150,14 @@ kubectl logs -f -l app.kubernetes.io/name=postgresql -n keycloak-auth
 
 ### Restore a partir de backup
 
+Pré-condições:
+- PostgreSQL `Ready`
+- Janela de manutenção com auto-heal temporariamente desativado em `root-app` e `infra-app`
+
 ```bash
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql \
+  -n keycloak-auth --timeout=180s
+
 ./scripts/pg-restore.sh ./backups/keycloak-db-backup-<timestamp>.dump
 # Keycloak fica indisponível durante o restore (~1-2 min)
 ```
@@ -158,9 +165,6 @@ kubectl logs -f -l app.kubernetes.io/name=postgresql -n keycloak-auth
 ### Listar conteúdo de um backup sem restaurar
 
 ```bash
-kubectl exec -n keycloak-auth deploy/postgresql-deployment -- \
-  pg_restore --list /tmp/keycloak-restore.dump 2>/dev/null | head -20
-# Alternativa local (requer pg_restore instalado no host):
 pg_restore --list ./backups/keycloak-db-backup-<timestamp>.dump | head -20
 ```
 
@@ -179,15 +183,21 @@ Validação pós-restore:
 ```bash
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=keycloak \
   -n keycloak-auth --timeout=180s
-kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80 &
-curl -s -X POST http://localhost:8090/realms/cluster-local/protocol/openid-connect/token \
+kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80 >/tmp/keycloak-port-forward.log 2>&1 &
+PF_PID=$!
+sleep 3
+curl -sf -X POST http://localhost:8090/realms/cluster-local/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret" \
-  | python3 -c "import sys,json; d=json.load(sys.stdin); print('OK - expires_in:', d.get('expires_in'))"
-# Esperado: OK - expires_in: 31536000
+  | python3 -c "import sys,json; d=json.load(sys.stdin); token=d.get('access_token'); \
+if not token: raise SystemExit('ERRO: access_token ausente'); print('Token OK:', len(token) > 0)"
+kill "$PF_PID"
+wait "$PF_PID" 2>/dev/null || true
+# Esperado: Token OK: True
 ```
 
 <!-- Autoria/Implementação: claude-sonnet-4-6 -->
+<!-- Revisão: GPT-5 Codex -->
 
 ---
 

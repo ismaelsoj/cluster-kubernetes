@@ -151,7 +151,7 @@ Uma vez aplicado o `root-app.yaml`, o ArgoCD iniciará a sincronização em casc
 
 ## 6. Recuperação via Backup PostgreSQL (FR23)
 
-Use esta seção quando o banco de dados do Keycloak estiver corrompido ou perdido e houver backup disponível. Execute **após** a Etapa 5 (ArgoCD e infraestrutura em execução).
+Use esta seção quando o banco de dados do Keycloak estiver corrompido ou perdido e houver backup disponível. Execute **após** a Etapa 5, com a infraestrutura pronta e em uma janela de manutenção.
 
 ### 6.1. Gerar backup (operação de rotina)
 
@@ -164,25 +164,42 @@ Armazene o arquivo de dump em local externo ao cluster (ex: S3, NFS, disco exter
 
 ### 6.2. Restaurar banco a partir de backup
 
+Antes do restore:
+
+1. Aguarde o PostgreSQL ficar `Ready`
+2. Desative temporariamente o auto-heal de `root-app` e `infra-app` no ArgoCD para evitar que o GitOps religue o Keycloak no meio do procedimento
+
 ```bash
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql \
+  -n keycloak-auth --timeout=180s
+
 ./scripts/pg-restore.sh ./backups/keycloak-db-backup-<timestamp>.dump
 ```
 
 O script:
 1. Escala Keycloak para 0 réplicas (interrupção controlada)
-2. Copia dump para o pod PostgreSQL
-3. Executa `pg_restore --clean --if-exists`
-4. Escala Keycloak de volta para 1 réplica
+2. Copia o dump para o mesmo pod PostgreSQL que executará o restore
+3. Valida o dump com `pg_restore --list` antes de alterar o banco
+4. Executa `pg_restore --clean --if-exists`
+5. Escala Keycloak de volta para a contagem original de réplicas (hoje, `1`)
 
 ### 6.3. Validar restore
 
 ```bash
-kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80 &
-curl -s -X POST http://localhost:8090/realms/cluster-local/protocol/openid-connect/token \
+kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80 >/tmp/keycloak-port-forward.log 2>&1 &
+PF_PID=$!
+sleep 3
+
+curl -sf -X POST http://localhost:8090/realms/cluster-local/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret" \
-  | python3 -c "import sys,json; d=json.load(sys.stdin); print('Token OK:', 'access_token' in d)"
+  | python3 -c "import sys,json; d=json.load(sys.stdin); token=d.get('access_token'); \
+if not token: raise SystemExit('ERRO: access_token ausente'); print('Token OK:', len(token) > 0)"
+
+kill "$PF_PID"
+wait "$PF_PID" 2>/dev/null || true
 # Esperado: Token OK: True
 ```
 
 <!-- Autoria/Implementação: claude-sonnet-4-6 -->
+<!-- Revisão: GPT-5 Codex -->

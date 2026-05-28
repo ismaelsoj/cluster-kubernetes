@@ -41,6 +41,8 @@ backups/
 *.pem
 *.crt
 
+# Autoria/Implementação: GPT-5 Codex
+
 # Cache Python
 __pycache__/
 *.pyc
