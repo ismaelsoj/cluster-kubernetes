@@ -1,0 +1,105 @@
+# Deployment do Kong DB-Less - data plane GitOps da borda da plataforma
+# Usa configuração declarativa via ConfigMap e probes na Status API.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong-deployment
+  namespace: kong-gateway
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kong
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kong
+        app.kubernetes.io/component: gateway
+        app.kubernetes.io/part-of: cluster-kubernetes
+    spec:
+      priorityClassName: kong-critical
+      securityContext:
+        fsGroup: 1337
+      containers:
+        - name: kong
+          image: kong:3.14.0.3
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1337
+            runAsGroup: 1337
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          envFrom:
+            - configMapRef:
+                name: kong-configmap
+          ports:
+            - name: proxy-http
+              containerPort: 8000
+              protocol: TCP
+            - name: proxy-https
+              containerPort: 8443
+              protocol: TCP
+            - name: status
+              containerPort: 8100
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /status/ready
+              port: status
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: status
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /status/ready
+              port: status
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - name: kong-declarative-config
+              mountPath: /kong/declarative/kong.yml
+              subPath: kong.yml
+              readOnly: true
+            - name: kong-prefix
+              mountPath: /var/run/kong
+            - name: kong-tmp
+              mountPath: /tmp
+      volumes:
+        - name: kong-declarative-config
+          configMap:
+            name: kong-configmap
+        - name: kong-prefix
+          emptyDir: {}
+        - name: kong-tmp
+          emptyDir: {}
+
+# Autoria/Implementação: GPT-5 Codex

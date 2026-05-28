@@ -1,0 +1,30 @@
+# Serviço de borda do Kong - expõe HTTP/HTTPS internos para o balanceador do cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-service
+  namespace: kong-gateway
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: proxy-http
+      port: 80
+      targetPort: proxy-http
+      protocol: TCP
+      appProtocol: http
+    - name: proxy-https
+      port: 443
+      targetPort: proxy-https
+      protocol: TCP
+      appProtocol: https
+
+# Autoria/Implementação: GPT-5 Codex

@@ -1,0 +1,18 @@
+# PriorityClass do Kong - prioridade máxima para o gateway de borda da plataforma
+# Recurso cluster-scoped aplicado na Wave 3 junto ao data plane DB-Less.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: kong-critical
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+value: 1000000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Prioridade máxima para o Kong DB-Less que recebe o tráfego de borda"
+
+# Autoria/Implementação: GPT-5 Codex

@@ -6,7 +6,7 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Voce DEVE definir explicitamente o nivel de c
 
 # Story 3.1: Manifestos Kustomize do Kong DB-Less (Wave 3)
 
-**Status:** ready-for-dev
+**Status:** review
 **Complexidade:** Média Complexidade
 
 ## Story Foundation
@@ -31,30 +31,30 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Voce DEVE definir explicitamente o nivel de c
 
 ## Tasks / Subtasks
 
-- [ ] Preencher a base do Kong em `cluster/infrastructure/kong-gateway/base/` (AC1, AC2, AC3, AC5)
-  - [ ] Atualizar `kustomization.yaml` para declarar `namespace: kong-gateway` e listar todos os recursos da Wave 3
-  - [ ] Criar `kong-deployment.yaml`
-  - [ ] Criar `kong-service.yaml`
-  - [ ] Criar `kong-configmap.yaml`
-  - [ ] Criar `kong-priorityclass.yaml`
-  - [ ] Criar `kong-networkpolicy.yaml`
-- [ ] Configurar o runtime do Kong para DB-less e observabilidade basica (AC2, AC3, AC5)
-  - [ ] Fixar a imagem em `kong:3.14.0.3`, alinhada com a LTS ativa adotada pelo repositório
-  - [ ] Declarar `KONG_DATABASE=off` e montar ConfigMap com a configuração necessária para boot DB-less
-  - [ ] Habilitar `status_listen` em porta dedicada para probes Kubernetes, usando `/status` e `/status/ready`
-  - [ ] Garantir logs em `stdout/stderr` com formato estruturado, sem expor o Admin API publicamente
-  - [ ] Modelar a configuração já compatível com os defaults de `3.14`, sem depender de `tls_verify=false` nem de rotas HTTP implícitas
-- [ ] Expor o tráfego de borda de forma compatível com a topologia atual do cluster (AC1, AC3)
-  - [ ] Publicar portas de proxy compatíveis com o balanceador já mapeado em `k3d.yaml`
-  - [ ] Preservar o papel do Kong como ponto único de entrada, sem mexer em `k3d.yaml` nem reativar Traefik
-  - [ ] Criar NetworkPolicy minimamente permissiva e compatível com o acesso ao JWKS do Keycloak nas stories seguintes
-- [ ] Garantir consistência GitOps/Kustomize por ambiente (AC1, AC4)
-  - [ ] Manter `overlays/local`, `overlays/homologacao` e `overlays/production` apontando para `../../base`, a menos que um patch real de ambiente seja indispensável
-  - [ ] Validar `kubectl kustomize` para cada overlay antes de encerrar a story
-- [ ] Registrar rastreabilidade e validação manual no artefato final (AC1, AC2, AC3, AC4)
-  - [ ] Atualizar a `File List` com todos os arquivos novos e alterados
-  - [ ] Preencher `Completion Notes List` com a decisão final de deployment adotada
-  - [ ] Registrar `Autoria/Implementação` em cada manifesto criado
+- [x] Preencher a base do Kong em `cluster/infrastructure/kong-gateway/base/` (AC1, AC2, AC3, AC5)
+  - [x] Atualizar `kustomization.yaml` para declarar `namespace: kong-gateway` e listar todos os recursos da Wave 3
+  - [x] Criar `kong-deployment.yaml`
+  - [x] Criar `kong-service.yaml`
+  - [x] Criar `kong-configmap.yaml`
+  - [x] Criar `kong-priorityclass.yaml`
+  - [x] Criar `kong-networkpolicy.yaml`
+- [x] Configurar o runtime do Kong para DB-less e observabilidade basica (AC2, AC3, AC5)
+  - [x] Fixar a imagem em `kong:3.14.0.3`, alinhada com a LTS ativa adotada pelo repositório
+  - [x] Declarar `KONG_DATABASE=off` e montar ConfigMap com a configuração necessária para boot DB-less
+  - [x] Habilitar `status_listen` em porta dedicada para probes Kubernetes, usando `/status` e `/status/ready`
+  - [x] Garantir logs em `stdout/stderr` com formato estruturado, sem expor o Admin API publicamente
+  - [x] Modelar a configuração já compatível com os defaults de `3.14`, sem depender de `tls_verify=false` nem de rotas HTTP implícitas
+- [x] Expor o tráfego de borda de forma compatível com a topologia atual do cluster (AC1, AC3)
+  - [x] Publicar portas de proxy compatíveis com o balanceador já mapeado em `k3d.yaml`
+  - [x] Preservar o papel do Kong como ponto único de entrada, sem mexer em `k3d.yaml` nem reativar Traefik
+  - [x] Criar NetworkPolicy minimamente permissiva e compatível com o acesso ao JWKS do Keycloak nas stories seguintes
+- [x] Garantir consistência GitOps/Kustomize por ambiente (AC1, AC4)
+  - [x] Manter `overlays/local`, `overlays/homologacao` e `overlays/production` apontando para `../../base`, a menos que um patch real de ambiente seja indispensável
+  - [x] Validar `kubectl kustomize` para cada overlay antes de encerrar a story
+- [x] Registrar rastreabilidade e validação manual no artefato final (AC1, AC2, AC3, AC4)
+  - [x] Atualizar a `File List` com todos os arquivos novos e alterados
+  - [x] Preencher `Completion Notes List` com a decisão final de deployment adotada
+  - [x] Registrar `Autoria/Implementação` em cada manifesto criado
 
 ## Dev Notes
 
@@ -257,22 +257,39 @@ GPT-5 Codex
 
 ### Debug Log References
 
-Criacao de contexto baseada em `epics.md`, `architecture.md`, `project-context.md`, manifests existentes do `keycloak-auth`, `sprint-status.yaml` e documentacao oficial atual do Kong.
+Contexto carregado a partir de `SPEC.md`, `implementation-rules.md`, `architecture-status.md`, `_bmad-output/project-context.md`, manifests existentes do `keycloak-auth`, `sprint-status.yaml` e documentacao oficial do Kong para DB-less, `status_listen`, readiness e modo read-only.
+
+### Implementation Plan
+
+- Preencher a base do `kong-gateway` com manifests Wave 3 e manter os overlays apontando para `../../base`.
+- Subir o runtime do Kong em modo DB-less com `ConfigMap` declarativo, `status_listen` dedicado e `Admin API` desabilitada.
+- Endurecer o container com root filesystem somente leitura, `KONG_PREFIX=/var/run/kong` e volumes efemeros para `prefix` e `/tmp`.
+- Validar o componente com `kubectl kustomize` nos tres overlays e com a suite completa do repositório via `make lint`.
 
 ### Completion Notes List
 
-- Story criada em estado `ready-for-dev` com tasks acionaveis, limites arquiteturais e plano de validacao manual.
-- Escopo explicitamente limitado para nao absorver requisitos da Story 3.2.
-- Guardrails adicionados para impedir regressao no bootstrap, desvio de GitOps e troca arbitraria da linha de versao do Kong.
+- Base `cluster/infrastructure/kong-gateway/base/` preenchida com `kustomization`, `ConfigMap`, `Deployment`, `Service`, `PriorityClass` e `NetworkPolicy`, todos na Wave 3 e com labels obrigatorios.
+- Runtime do Kong fixado em `kong:3.14.0.3`, com `KONG_DATABASE=off`, `KONG_DECLARATIVE_CONFIG`, `KONG_STATUS_LISTEN`, `KONG_ADMIN_LISTEN=off` e logs de acesso em JSON via `stdout`.
+- Deployment endurecido com `readOnlyRootFilesystem: true`, `KONG_PREFIX=/var/run/kong`, volumes `emptyDir` para `/var/run/kong` e `/tmp`, e probes em `/status` e `/status/ready`.
+- Configuracao declarativa inicial mantida compatível com os defaults da serie `3.14`, usando rota `keycloak.local` com `protocols: [http, https]`, sem `tls_verify=false` e sem dependencia de configuracao mutavel via Admin API.
+- `kubectl kustomize` validado com sucesso para `overlays/local`, `overlays/homologacao` e `overlays/production`, e a suite `make lint` passou integralmente (Conftest + kube-linter).
+- As validacoes de runtime em cluster permanecem descritas no `Plano de Validação Manual` e nao foram executadas neste turno.
 
 ### File List
 
-- `_bmad-output/implementation-artifacts/3-1-manifestos-kustomize-kong-db-less.md` - NEW
+- `_bmad-output/implementation-artifacts/3-1-manifestos-kustomize-kong-db-less.md` - UPDATE
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` - UPDATE
+- `cluster/infrastructure/kong-gateway/base/kustomization.yaml` - UPDATE
+- `cluster/infrastructure/kong-gateway/base/kong-configmap.yaml` - NEW
+- `cluster/infrastructure/kong-gateway/base/kong-deployment.yaml` - NEW
+- `cluster/infrastructure/kong-gateway/base/kong-networkpolicy.yaml` - NEW
+- `cluster/infrastructure/kong-gateway/base/kong-priorityclass.yaml` - NEW
+- `cluster/infrastructure/kong-gateway/base/kong-service.yaml` - NEW
 
 ## Change Log
 
 - `2026-05-28 14:49:31-03:00`: Story criada pelo workflow `bmad-create-story`, com contexto tecnico detalhado para implementacao do Kong DB-Less na Wave 3. Status definido como `ready-for-dev`. Autoria/Implementação: GPT-5 Codex.
+- `2026-05-28 15:47:58-03:00`: Implementacao concluida com manifests base do Kong DB-Less, rota declarativa inicial para `keycloak.local`, hardening do container em modo read-only e validacoes `kubectl kustomize` + `make lint`. Status atualizado para `review`. Autoria/Implementação: GPT-5 Codex.
 
 ---
 Autoria/Implementação: GPT-5 Codex

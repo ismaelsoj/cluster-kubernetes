@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-05-12"
-last_updated: "2026-05-28"  # retrospectiva épico 2 concluída
+last_updated: "2026-05-28"  # story 3.1 pronta para review
 project: cluster-kubernetes
 project_key: NOKEY
 tracking_system: file-system
@@ -61,7 +61,7 @@ development_status:
 
   # --- Épico 3: Gateway de Borda e Segurança Zero-Trust ---
   epic-3: in-progress
-  3-1-manifestos-kustomize-kong-db-less: ready-for-dev
+  3-1-manifestos-kustomize-kong-db-less: review
   3-2-tls-validacao-jwks-rate-limit-default: backlog
   3-3-script-token-feedback-terminal: backlog
   3-4-refinamento-bootstrap-emergencia: backlog
