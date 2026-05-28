@@ -49,7 +49,7 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica. Or
   - Todos os testes existentes passando após atualização de imports
   - Nenhum arquivo novo ultrapassa 250 linhas
   - `python3 -c "from tracker.cli import main"` funciona sem erros
-- **Impacto:** Pré-requisito estrutural para BKL-008, BKL-009 e BKL-019; habilita BKL-021 (type hints) módulo a módulo; teto de crescimento sai de "1 arquivo × N linhas" para "N arquivos × ~200 linhas"
+- **Impacto:** Pré-requisito estrutural para BKL-008, BKL-019 e BKL-032; habilita BKL-021 (type hints) módulo a módulo; teto de crescimento sai de "1 arquivo × N linhas" para "N arquivos × ~200 linhas"
 - **Estimativa:** 3–4h (migração) + 1h (imports nos testes)
 - **Dependência:** Nenhuma
 
@@ -70,17 +70,17 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica. Or
 - **Descrição:** `date_str = sess[0]["dt_br"].strftime(...)` atribui toda a sessão à data do primeiro evento. Sessões que cruzam 00:00 acumulam horas do dia seguinte no dia anterior.
 - **Correção proposta:** Dividir a sessão no limite da meia-noite e distribuir proporcionalmente.
 
-### BKL-009: Estimativa de Custo por Modelo
-- **Tipo:** Feature
-- **Origem:** Party Mode (Mary, John, Winston)
-- **Descrição:** Usando tokens coletados (BKL-001 ✅), estimar custo em USD por modelo com base em tabela de preços. Transforma o relatório de "métrica de esforço" em "métrica de investimento".
-- **Dependência:** BKL-001 ✅ (concluído)
-- **Nota:** Preços do Antigravity são opacos (assinatura); estimativa restrita ao Claude Code.
-
 ### BKL-008: Tendência Temporal (Week-over-Week)
 - **Tipo:** Feature
 - **Origem:** Party Mode (Mary, John)
 - **Descrição:** Sumário de tendência semanal/mensal no relatório. Responde: "Estamos acelerando ou desacelerando?" Pode ser simples: total de horas por semana com delta percentual.
+
+### BKL-032: Cursor como terceira fonte de tempo ativo
+- **Tipo:** Feature
+- **Origem:** Decisão de produto (2026-05-27)
+- **Descrição:** Coletar atividade local do Cursor como terceira fonte de tempo ativo, comparável a Claude Code e Antigravity, usando o banco SQLite local `~/.cursor/ai-tracking/ai-code-tracking.db` em modo read-only com `schema_guard`. O coletor deve agrupar atividade por `conversationId/source/model`, preservar métricas nativas do Cursor como enriquecimento opcional e não redefinir o produto como analytics de proveniência de código.
+- **Dependência:** BKL-031 (modularização)
+- **Nota:** A leitura do banco deve ser defensiva, offline, sem escrita no banco real e com degradação graciosa quando Cursor não estiver instalado ou quando o schema upstream divergir.
 
 ### BKL-010: Detached HEAD capturado como SHA de branch
 - **Tipo:** Bug (menor)
@@ -171,6 +171,17 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica. Or
 
 ---
 
+## 🚫 Removidos do Escopo
+
+### BKL-009: Estimativa de Custo por Modelo
+- **Tipo:** Feature removida
+- **Origem:** Party Mode (Mary, John, Winston); decisão de produto (2026-05-27)
+- **Decisão:** Removido definitivamente do escopo. O tracker não trabalhará com preços, custo monetário ou estimativas em USD em nenhuma ferramenta.
+- **Justificativa:** Preços variam entre plataformas, planos e contratos, gerando manutenção contínua e ambiguidade indesejada.
+- **Nota:** Tokens continuam sendo coletados quando disponíveis (FR17) para usos analíticos, mas não serão multiplicados por tabela de preços.
+
+---
+
 ## ✅ Concluídos
 
 | ID | Descrição | Tipo | Entrega |
@@ -199,4 +210,16 @@ Registro centralizado de melhorias, novas funcionalidades e dívida técnica. Or
 | Código morto | 1 |
 | **Total aberto** | **20** |
 | ✅ Concluídos | 10 |
-| **Total geral** | **30** |
+| 🚫 Removidos do escopo | 1 |
+| **Total geral** | **31** |
+
+---
+
+**Autoria/Implementação:** Party Mode review (2026-05-20) + reorganizações históricas registradas no documento
+**Revisão:** GPT-5 (Codex)
+
+## Change Log
+
+| Data/Hora (BRT) | Autor | Alteração |
+|---|---|---|
+| 2026-05-27 22:54:37-03:00 | GPT-5 (Codex) | BKL-009 movido para removidos do escopo; BKL-032 criado para Cursor como terceira fonte de tempo ativo; resumo de itens atualizado. |
