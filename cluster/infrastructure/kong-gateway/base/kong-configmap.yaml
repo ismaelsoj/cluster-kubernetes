@@ -21,6 +21,7 @@ data:
   KONG_PROXY_ACCESS_LOG: /dev/stdout kong_json
   KONG_PROXY_ERROR_LOG: /dev/stderr
   KONG_LOG_LEVEL: notice
+  KONG_NGINX_WORKER_PROCESSES: "1"
   KONG_NGINX_HTTP_LOG_FORMAT: >-
     kong_json escape=json '{"time":"$time_iso8601","request_id":"$kong_request_id","client_ip":"$remote_addr","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$bytes_sent,"request_time":$request_time,"upstream_addr":"$upstream_addr","upstream_status":"$upstream_status","upstream_response_time":"$upstream_response_time","user_agent":"$http_user_agent"}'
   kong.yml: |

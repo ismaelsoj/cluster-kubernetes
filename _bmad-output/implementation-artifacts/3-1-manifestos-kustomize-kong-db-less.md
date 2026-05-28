@@ -269,7 +269,7 @@ Contexto carregado a partir de `SPEC.md`, `implementation-rules.md`, `architectu
 ### Completion Notes List
 
 - Base `cluster/infrastructure/kong-gateway/base/` preenchida com `kustomization`, `ConfigMap`, `Deployment`, `Service`, `PriorityClass` e `NetworkPolicy`, todos na Wave 3 e com labels obrigatorios.
-- Runtime do Kong fixado em `kong/kong-gateway:3.14.0.3`, com `KONG_DATABASE=off`, `KONG_DECLARATIVE_CONFIG`, `KONG_STATUS_LISTEN`, `KONG_ADMIN_LISTEN=off` e logs de acesso em JSON via `stdout`.
+- Runtime do Kong fixado em `kong/kong-gateway:3.14.0.3`, com `KONG_DATABASE=off`, `KONG_DECLARATIVE_CONFIG`, `KONG_STATUS_LISTEN`, `KONG_ADMIN_LISTEN=off`, `KONG_NGINX_WORKER_PROCESSES=1` e logs de acesso em JSON via `stdout`.
 - Deployment endurecido com `readOnlyRootFilesystem: true`, `KONG_PREFIX=/var/run/kong`, volumes `emptyDir` para `/var/run/kong` e `/tmp`, e probes em `/status` e `/status/ready`.
 - Configuracao declarativa inicial mantida compatível com os defaults da serie `3.14`, usando rota `keycloak.local` com `protocols: [http, https]`, sem `tls_verify=false` e sem dependencia de configuracao mutavel via Admin API.
 - `kubectl kustomize` validado com sucesso para `overlays/local`, `overlays/homologacao` e `overlays/production`, e a suite `make lint` passou integralmente (Conftest + kube-linter).
@@ -291,6 +291,7 @@ Contexto carregado a partir de `SPEC.md`, `implementation-rules.md`, `architectu
 - `2026-05-28 14:49:31-03:00`: Story criada pelo workflow `bmad-create-story`, com contexto tecnico detalhado para implementacao do Kong DB-Less na Wave 3. Status definido como `ready-for-dev`. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-28 15:47:58-03:00`: Implementacao concluida com manifests base do Kong DB-Less, rota declarativa inicial para `keycloak.local`, hardening do container em modo read-only e validacoes `kubectl kustomize` + `make lint`. Status atualizado para `review`. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-28 17:27:01-03:00`: Correcao pos-validacao em cluster: imagem ajustada de `kong:3.14.0.3` para `kong/kong-gateway:3.14.0.3` apos `ImagePullBackOff` por repositório inexistente em `docker.io/library`. Autoria/Implementação: GPT-5 Codex.
+- `2026-05-28 17:37:28-03:00`: Correcao pos-validacao em cluster: configurado `KONG_NGINX_WORKER_PROCESSES=1` apos `CrashLoopBackOff` por `OOMKilled`, reduzindo o default `auto` que estava abrindo 10 workers no nó Kubernetes. Autoria/Implementação: GPT-5 Codex.
 
 ---
 Autoria/Implementação: GPT-5 Codex
