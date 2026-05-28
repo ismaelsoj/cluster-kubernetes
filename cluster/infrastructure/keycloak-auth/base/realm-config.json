@@ -1,0 +1,42 @@
+{
+  "realm": "cluster-local",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "eventsEnabled": true,
+  "eventsListeners": ["jboss-logging"],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true,
+  "clients": [
+    {
+      "clientId": "m2m-client",
+      "name": "Plataforma M2M - Client Credentials",
+      "description": "Cliente M2M local dev - client_credentials flow only",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-m2m-local-secret",
+      "publicClient": false,
+      "bearerOnly": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "attributes": {
+        "access.token.lifespan": "31536000"
+      }
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "platform-service",
+        "description": "Papel para servicos de plataforma M2M"
+      }
+    ]
+  }
+}

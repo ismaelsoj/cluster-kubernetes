@@ -16,6 +16,19 @@ resources:
   - keycloak-deployment.yaml
   - keycloak-service.yaml
 
+configMapGenerator:
+  - name: keycloak-realm-config
+    files:
+      - realm-config.json
+    options:
+      labels:
+        app.kubernetes.io/name: keycloak
+        app.kubernetes.io/component: identity-provider
+        app.kubernetes.io/part-of: cluster-kubernetes
+      annotations:
+        argocd.argoproj.io/sync-wave: "2"
+
 # Autoria/Implementação: Gemini 3.5 Flash
 # Revisão: claude-sonnet-4-6
 # Revisão: GPT-5.5
+# Revisão: claude-sonnet-4-6 (story 2.3)

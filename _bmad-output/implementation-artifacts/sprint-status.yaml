@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-05-12"
-last_updated: "2026-05-27"  # story 2.2 testada e concluída
+last_updated: "2026-05-28"  # story 2.3 review
 project: cluster-kubernetes
 project_key: NOKEY
 tracking_system: file-system
@@ -55,7 +55,7 @@ development_status:
   epic-2: in-progress
   2-1-manifestos-kustomize-postgresql: done
   2-2-manifestos-kustomize-keycloak: done
-  2-3-configuracao-realm-client-m2m: backlog
+  2-3-configuracao-realm-client-m2m: review
   2-4-procedimento-backup-restore-postgresql: backlog
   epic-2-retrospective: optional
 

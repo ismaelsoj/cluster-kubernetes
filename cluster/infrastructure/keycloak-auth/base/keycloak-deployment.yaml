@@ -38,6 +38,7 @@ spec:
           image: quay.io/keycloak/keycloak:26.6.2
           args:
             - start
+            - --import-realm
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -125,11 +126,17 @@ spec:
               name: keycloak-data
             - mountPath: /tmp
               name: keycloak-tmp
+            - mountPath: /opt/keycloak/data/import
+              name: realm-config-volume
+              readOnly: true
       volumes:
         - name: keycloak-data
           emptyDir: {}
         - name: keycloak-tmp
           emptyDir: {}
+        - name: realm-config-volume
+          configMap:
+            name: keycloak-realm-config
 
 # Autoria/Implementação: claude-sonnet-4-6
 # Revisão: GPT-5.5
