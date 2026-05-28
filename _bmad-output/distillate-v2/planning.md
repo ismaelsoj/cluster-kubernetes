@@ -5,8 +5,8 @@ Use este companion para descobrir rapidamente o que está ativo no roadmap sem a
 ## Roadmap resumido
 
 - `Épico 1` Fundação do repositório e bootstrap GitOps: concluído.
-- `Épico 2` Identidade, persistência e recuperação de desastres: backlog ativo.
-- `Épico 3` Gateway de borda e segurança Zero-Trust: backlog dependente do Épico 2.
+- `Épico 2` Identidade, persistência e recuperação de desastres: concluído.
+- `Épico 3` Gateway de borda e segurança Zero-Trust: ativo, com a Story 3.1 pronta para desenvolvimento.
 - `Épico 4` Boilerplate, habilitação dev e deep security: backlog dependente do Épico 3.
 
 ## Mapa rápido por épico
@@ -32,10 +32,10 @@ Use este companion para descobrir rapidamente o que está ativo no roadmap sem a
 
 ## Próximos itens práticos
 
-- `Story 2.1` PostgreSQL em `keycloak-auth`, Wave 1, com probes, labels, comentário pt-BR e NetworkPolicy.
-- `Story 2.2` Keycloak em Wave 2, com Secret, PriorityClass, logs JSON e healthcheck público.
-- `Story 2.3` Realm e client M2M com segregação criptográfica dev/prod.
-- `Story 2.4` Backup e restore de PostgreSQL testados.
+- `Story 3.1` Kong DB-Less em `kong-gateway`, Wave 3, com ConfigMap declarativo, PriorityClass máxima, NetworkPolicy explícita e renders Kustomize válidos nos três overlays.
+- `Story 3.2` TLS, validação JWKS e rate limit default sobre a fundação do gateway entregue na 3.1.
+- `Story 3.3` Script de token e feedback terminal para apoiar a validação da Jornada 1.
+- `Story 3.4` Refinamento do bootstrap de emergência após estabilização do gateway.
 
 ## Cobertura e ordem
 

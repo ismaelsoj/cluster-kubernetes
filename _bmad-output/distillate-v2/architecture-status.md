@@ -6,8 +6,8 @@ Use este companion para decisões arquiteturais, segurança, topologia e leitura
 
 - Projeto: plataforma GitOps on-premise para cluster Kubernetes local com k3d, ArgoCD, Kong DB-Less, Keycloak e PostgreSQL.
 - Stack base: k3d v5.8.3, ArgoCD v3.4.2, Kong DB-Less v3.14.0.3 (3.14 LTS), Keycloak 26.6.2, Kustomize v5.x, kube-linter, Conftest e GitHub Actions.
-- Status: Épico 1 concluído; épicos 2 a 4 permanecem em backlog.
-- Próximo marco funcional: Story 2.1, PostgreSQL em Wave 1 dentro de `keycloak-auth`.
+- Status: Épicos 1 e 2 concluídos; Épico 3 em andamento com a Story 3.1 pronta para desenvolvimento; Épico 4 permanece em backlog.
+- Próximo marco funcional: Story 3.1, Kong DB-Less em Wave 3 dentro de `kong-gateway`.
 
 ## ADRs e limites load-bearing
 
