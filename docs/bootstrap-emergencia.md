@@ -173,6 +173,14 @@ Antes do restore:
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql \
   -n keycloak-auth --timeout=180s
 
+kubectl patch application root-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":false}}}}'
+
+kubectl patch application infra-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":false,"selfHeal":false}}}}'
+
 ./scripts/pg-restore.sh ./backups/keycloak-db-backup-<timestamp>.dump
 ```
 
@@ -185,20 +193,38 @@ O script:
 
 ### 6.3. Validar restore
 
+O `client_secret` abaixo (`dev-m2m-local-secret`) é um fixture de **desenvolvimento local** criado na Story 2.3 para validar o realm `cluster-local`. Não reutilize esse valor como padrão para outros ambientes.
+
 ```bash
 kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80 >/tmp/keycloak-port-forward.log 2>&1 &
 PF_PID=$!
 sleep 3
 
+if ! kill -0 "$PF_PID" 2>/dev/null; then
+  cat /tmp/keycloak-port-forward.log
+  exit 1
+fi
+
 curl -sf -X POST http://localhost:8090/realms/cluster-local/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret" \
-  | python3 -c "import sys,json; d=json.load(sys.stdin); token=d.get('access_token'); \
-if not token: raise SystemExit('ERRO: access_token ausente'); print('Token OK:', len(token) > 0)"
+  | python3 -c "import sys,json; d=json.load(sys.stdin); token=d.get('access_token'); assert token, 'ERRO: access_token ausente'; print('Token OK:', len(token) > 0)"
 
-kill "$PF_PID"
+kill "$PF_PID" 2>/dev/null || true
 wait "$PF_PID" 2>/dev/null || true
 # Esperado: Token OK: True
+```
+
+Após a validação, reative o auto-heal:
+
+```bash
+kubectl patch application root-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
+
+kubectl patch application infra-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":false,"selfHeal":true}}}}'
 ```
 
 <!-- Autoria/Implementação: claude-sonnet-4-6 -->

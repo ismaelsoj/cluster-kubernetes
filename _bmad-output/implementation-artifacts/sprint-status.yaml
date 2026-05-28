@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-05-12"
-last_updated: "2026-05-28"  # story 2.4 review
+last_updated: "2026-05-28"  # story 2.4 done
 project: cluster-kubernetes
 project_key: NOKEY
 tracking_system: file-system
@@ -56,7 +56,7 @@ development_status:
   2-1-manifestos-kustomize-postgresql: done
   2-2-manifestos-kustomize-keycloak: done
   2-3-configuracao-realm-client-m2m: done
-  2-4-procedimento-backup-restore-postgresql: review
+  2-4-procedimento-backup-restore-postgresql: done
   epic-2-retrospective: optional
 
   # --- Épico 3: Gateway de Borda e Segurança Zero-Trust ---

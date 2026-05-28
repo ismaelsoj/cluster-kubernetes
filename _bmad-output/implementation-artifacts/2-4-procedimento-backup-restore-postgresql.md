@@ -6,7 +6,7 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Você DEVE definir explicitamente o nível de
 
 # Story 2.4: Procedimento de Backup/Restore do PostgreSQL
 
-**Status:** review
+**Status:** done
 **Complexidade:** Baixa Complexidade
 
 ## Story Foundation
@@ -36,8 +36,8 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Você DEVE definir explicitamente o nível de
   - [x] Escalar Keycloak de volta para 1 réplica e aguardar rollout
 - [x] Atualizar `docs/bootstrap-emergencia.md`: adicionar seção "Recuperação via Backup PostgreSQL" com referência aos scripts e passos de validação (AC3)
 - [x] Atualizar `docs/runbook-operacoes.md`: adicionar seção PostgreSQL Backup/Restore com fixture do estado esperado e comandos de validação (AC4)
-- [ ] Executar validação completa em cluster vivo: backup → simular perda de dados → restore → validar token (AC1, AC2)
-  - Nota: scripts foram endurecidos após code review (`trap` de recuperação, validação prévia do dump, uso consistente do mesmo pod e fallback com `PGPASSWORD`), mas o teste em cluster vivo continua pendente e deve ser executado pelo SRE seguindo o Plano de Validação Manual da story.
+- [x] Executar validação completa em cluster vivo: backup → simular perda de dados → restore → validar token (AC1, AC2)
+  - Validado manualmente em `2026-05-28`: baseline de token OK, backup gerado, corrupção controlada aplicada, restore executado com sucesso e emissão de token confirmada ao final.
 
 ### Review Findings
 
@@ -49,8 +49,14 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Você DEVE definir explicitamente o nível de
 - [x] [Review][Patch] Implementar fallback com `PGPASSWORD` a partir do Secret [scripts/pg-backup.sh:17]
 - [x] [Review][Patch] Ajustar a rastreabilidade da validação em cluster vivo na story [/_bmad-output/implementation-artifacts/2-4-procedimento-backup-restore-postgresql.md:39]
 - [x] [Review][Patch] Registrar autoria do modelo nos demais artefatos alterados [/.gitignore:32]
-- [x] [Review][Patch] Evitar que o auto-heal do ArgoCD reverta o scale-down durante o restore [cluster/bootstrap/infra-app.yaml:25]
-- [x] [Review][Patch] Validar integridade do dump antes do restore destrutivo [scripts/pg-backup.sh:22]
+- [x] [Review][Patch] Documentar explicitamente a janela com auto-heal desativado e sua reativação [docs/bootstrap-emergencia.md:167]
+- [x] [Review][Patch] Validar integridade do dump antes do restore destrutivo [scripts/pg-restore.sh:103]
+
+### Review Summary
+
+- Scripts de backup e restore endurecidos contra falhas operacionais comuns: arquivo parcial, restore destrutivo com dump inválido, divergência entre pod-alvo e recuperação do Keycloak após erro.
+- Documentação reorganizada para um fluxo linear de validação manual, incluindo geração do backup, corrupção controlada, restore, validação de token e reativação do `selfHeal`.
+- Validação manual em cluster vivo concluída com sucesso pelo usuário, fechando AC1 e AC2 com evidência operacional.
 
 ## Dev Notes
 
@@ -323,51 +329,139 @@ ls -la scripts/pg-backup.sh scripts/pg-restore.sh
 # Esperado: -rwxr-xr-x para ambos
 ```
 
-**2. Executar backup com cluster vivo (após Story 2.3 concluída):**
+**2. Preparar variáveis para o teste manual:**
 ```bash
-./scripts/pg-backup.sh
-# Esperado: [OK] Backup concluído: ./backups/keycloak-db-backup-<ts>.dump (~alguns KB)
-ls -lh backups/
+POSTGRES_USER="$(kubectl get secret keycloak-db-secret -n keycloak-auth \
+  -o jsonpath='{.data.database-user}' | base64 -d)"
+
+POSTGRES_POD="$(kubectl get pod -n keycloak-auth \
+  -l app.kubernetes.io/name=postgresql,app.kubernetes.io/component=database \
+  -o jsonpath='{.items[0].metadata.name}')"
+
+echo "POSTGRES_USER=${POSTGRES_USER}"
+echo "POSTGRES_POD=${POSTGRES_POD}"
 ```
 
-**3. Verificar conteúdo do backup:**
-```bash
-pg_restore --list ./backups/keycloak-db-backup-<ts>.dump | grep -i "keycloak\|realm\|client"
-# Esperado: tabelas do Keycloak (REALM, CLIENT, etc.)
-```
-
-**4. Simular perda de dados e executar restore:**
-```bash
-# Simular corrupção: deletar o realm via console admin ou via psql
-kubectl exec -n keycloak-auth deploy/postgresql-deployment -- \
-  psql -U $POSTGRES_USER -d keycloak -c "DELETE FROM realm WHERE id='cluster-local';"
-
-# Pré-condições do restore
-# Desative temporariamente o auto-heal de root-app e infra-app no ArgoCD
-kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql \
-  -n keycloak-auth --timeout=180s
-
-# Executar restore
-./scripts/pg-restore.sh ./backups/keycloak-db-backup-<ts>.dump
-```
-
-**5. Validar que Keycloak emite token após restore (AC2):**
+**3. Confirmar o estado saudável antes do backup:**
 ```bash
 kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80 >/tmp/keycloak-port-forward.log 2>&1 &
 PF_PID=$!
 sleep 3
+
+if ! kill -0 "$PF_PID" 2>/dev/null; then
+  cat /tmp/keycloak-port-forward.log
+  exit 1
+fi
+
 curl -sf -X POST \
   http://localhost:8090/realms/cluster-local/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret" \
-  | python3 -c "import sys,json; d=json.load(sys.stdin); token=d.get('access_token'); \
-if not token: raise SystemExit('ERRO: access_token ausente'); print('Token OK:', len(token) > 0)"
-kill "$PF_PID"
+  | python3 -c "import sys,json; d=json.load(sys.stdin); token=d.get('access_token'); assert token, 'ERRO: baseline sem access_token'; print('Baseline OK:', len(token) > 0)"
+
+kill "$PF_PID" 2>/dev/null || true
 wait "$PF_PID" 2>/dev/null || true
+```
+
+**4. Gerar o backup e guardar o caminho do arquivo produzido:**
+```bash
+./scripts/pg-backup.sh
+
+BACKUP_FILE="$(ls -1t ./backups/keycloak-db-backup-*.dump | head -n1)"
+echo "BACKUP_FILE=${BACKUP_FILE}"
+ls -lh "${BACKUP_FILE}"
+```
+
+**5. Verificar conteúdo do backup sem depender de `pg_restore` local:**
+```bash
+kubectl cp "${BACKUP_FILE}" \
+  "keycloak-auth/${POSTGRES_POD}:/tmp/inspect.dump"
+
+kubectl exec -n keycloak-auth "pod/${POSTGRES_POD}" -- \
+  pg_restore --list /tmp/inspect.dump | grep -i "keycloak\|realm\|client"
+
+kubectl exec -n keycloak-auth "pod/${POSTGRES_POD}" -- rm -f /tmp/inspect.dump
+# Esperado: tabelas do Keycloak (REALM, CLIENT, etc.)
+```
+
+**6. Forçar a necessidade de restore com corrupção controlada do banco:**
+```bash
+kubectl exec -n keycloak-auth deploy/postgresql-deployment -- \
+  psql -U "${POSTGRES_USER}" -d keycloak -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+```
+
+**7. Confirmar que o ambiente realmente ficou inválido antes do restore:**
+```bash
+kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80 >/tmp/keycloak-port-forward.log 2>&1 &
+PF_PID=$!
+sleep 3
+
+if ! kill -0 "$PF_PID" 2>/dev/null; then
+  cat /tmp/keycloak-port-forward.log
+  exit 1
+fi
+
+curl -s -o /tmp/keycloak-restore-precheck.json -w '%{http_code}\n' \
+  -X POST http://localhost:8090/realms/cluster-local/protocol/openid-connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret"
+
+cat /tmp/keycloak-restore-precheck.json
+
+kill "$PF_PID" 2>/dev/null || true
+wait "$PF_PID" 2>/dev/null || true
+# Esperado: falha HTTP (ex: 4xx/5xx) ou ausência do access_token
+```
+
+**8. Executar o restore usando o backup salvo no passo 4:**
+```bash
+
+# Pré-condições do restore
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql \
+  -n keycloak-auth --timeout=180s
+
+kubectl patch application root-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":false}}}}'
+
+kubectl patch application infra-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":false,"selfHeal":false}}}}'
+
+# Executar restore
+./scripts/pg-restore.sh "${BACKUP_FILE}"
+```
+
+**9. Validar que Keycloak volta a emitir token após restore (AC2):**
+```bash
+kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80 >/tmp/keycloak-port-forward.log 2>&1 &
+PF_PID=$!
+sleep 3
+
+if ! kill -0 "$PF_PID" 2>/dev/null; then
+  cat /tmp/keycloak-port-forward.log
+  exit 1
+fi
+
+curl -sf -X POST \
+  http://localhost:8090/realms/cluster-local/protocol/openid-connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); token=d.get('access_token'); assert token, 'ERRO: access_token ausente'; print('Token OK:', len(token) > 0)"
+kill "$PF_PID" 2>/dev/null || true
+wait "$PF_PID" 2>/dev/null || true
+
+kubectl patch application root-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
+
+kubectl patch application infra-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":false,"selfHeal":true}}}}'
 # Esperado: Token OK: True
 ```
 
-**6. Verificar `.gitignore`:**
+**10. Verificar `.gitignore`:**
 ```bash
 grep -q "backups/" .gitignore && echo "OK" || echo "ADICIONAR backups/ ao .gitignore"
 ```
@@ -401,8 +495,9 @@ Implementação inicial sem bloqueios. No code review, os scripts foram endureci
 
 - AC1: `scripts/pg-backup.sh` criado com `set -euo pipefail`, extração de `POSTGRES_USER` via `kubectl get secret`, `pg_dump --format=custom` via `kubectl exec` redirecionado para host, `mkdir -p` automático do diretório de saída, exibição de tamanho com `du -h`.
 - AC2: `scripts/pg-restore.sh` criado com validação de arquivo, scale-down do Keycloak para 0 réplicas, `kubectl cp` para `/tmp/` (único destino gravável no container com `readOnlyRootFilesystem: true`), `pg_restore --clean --if-exists`, remoção do arquivo temporário, scale-up e aguardo de rollout.
-- AC3: `docs/bootstrap-emergencia.md` atualizado com seção 6 "Recuperação via Backup PostgreSQL (FR23)" contendo subseções de geração, restore e validação de token.
-- AC4: `docs/runbook-operacoes.md` atualizado com seção PostgreSQL Backup/Restore: scripts de backup/restore/listagem e tabela de fixture do estado esperado com comandos de validação completos.
+- AC3: `docs/bootstrap-emergencia.md` atualizado com seção 6 "Recuperação via Backup PostgreSQL (FR23)" contendo subseções de geração, restore, comandos explícitos para desativar/reativar `selfHeal` e validação de token.
+- AC4: `docs/runbook-operacoes.md` atualizado com seção PostgreSQL Backup/Restore, incluindo um roteiro linear do ciclo backup -> corrupção controlada -> restore -> validação.
+- Validação manual concluída pelo usuário em cluster vivo: ciclo completo de backup/restore executado com sucesso e token `client_credentials` restabelecido após o restore.
 - `.gitignore` atualizado: adicionados `*.dump` e `backups/` para evitar commit acidental de arquivos sensíveis.
 - Code review aplicado por `GPT-5 Codex`: backup agora grava em arquivo temporário antes do rename final; restore valida o dump antes do `pg_restore --clean`, usa o mesmo pod para cópia/execução/limpeza, restaura a réplica original do Keycloak mesmo em erro e exige janela com `selfHeal` desativado no ArgoCD.
 - Nenhum manifesto Kubernetes criado ou modificado (conforme restrição da story).
@@ -422,3 +517,8 @@ Implementação inicial sem bloqueios. No code review, os scripts foram endureci
 - `2026-05-28 20:00:00-03:00`: Story criada pelo workflow bmad-create-story; status: ready-for-dev. Autoria: claude-sonnet-4-6.
 - `2026-05-28 11:30:00-03:00`: Implementação completa da story: scripts pg-backup.sh e pg-restore.sh criados, docs atualizados, .gitignore atualizado. Status: review. Autoria/Implementação: claude-sonnet-4-6.
 - `2026-05-28 13:32:36-03:00`: Code review aplicado: restore endurecido com cleanup garantido, validação prévia do dump, checagem de auto-heal do ArgoCD, uso consistente do mesmo pod e ajustes de documentação/rastreabilidade. Validação em cluster vivo permanece pendente. Revisão: GPT-5 Codex.
+- `2026-05-28 13:49:07-03:00`: Documentação refinada para operação assistida: comandos explícitos de desligar/reativar `selfHeal`, inspeção de dump sem dependência de `pg_restore` local e alinhamento da rastreabilidade da story com o diff atual. Revisão/Implementação: GPT-5 Codex.
+- `2026-05-28 13:53:59-03:00`: Plano de validação manual reordenado para fluxo linear, com captura explícita do arquivo de backup, corrupção controlada do banco e uso do mesmo dump no restore. Revisão/Implementação: GPT-5 Codex.
+- `2026-05-28 13:53:59-03:00`: Snippets de validação endurecidos para falhar com mensagem útil quando o `port-forward` cai antes do `curl`, além de corrigir o `python3 -c` inválido das checagens de token. Revisão/Implementação: GPT-5 Codex.
+- `2026-05-28 14:12:22-03:00`: Validação manual em cluster vivo confirmada pelo usuário: baseline saudável, backup gerado, corrupção controlada do banco, restore aplicado e emissão de token verificada com sucesso. Registro atualizado por GPT-5 Codex.
+- `2026-05-28 14:14:00-03:00`: Story concluída após review aplicado, documentação refinada e validação manual end-to-end confirmada. Status atualizado para `done`. Revisão/Implementação: GPT-5 Codex.
