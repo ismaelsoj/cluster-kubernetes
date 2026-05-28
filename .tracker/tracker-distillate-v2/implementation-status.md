@@ -10,6 +10,7 @@ Use este companion para tarefas de implementacao, bugfix, code review e validaca
 - Implementacao principal: `.tracker/work-tracker.py`
 - Bootstrap legado: `.tracker/bootstrap_events.py`
 - Testes: `.tracker/test_tracker.py`
+- Make targets principais: `track-time`, `track-time EXPORT=true` e `bootstrap`
 
 ## Invariantes tecnicos
 
@@ -18,12 +19,15 @@ Use este companion para tarefas de implementacao, bugfix, code review e validaca
 - Escritas em JSONL devem ser atomicas com `.tmp` seguido de `os.replace()`.
 - Nunca reler `TEMPO_DE_TRABALHO.md` como fonte de dados live.
 - Nunca usar `overview.txt` do Antigravity ao vivo; a fonte valida e `transcript.jsonl`.
+- O schema live gira em torno de `activity_daily`, `activity_branch` e `dev_summary`.
+- Identidade continua mascarada como `dev-[hash8]` derivado de `usuario@hostname`.
 
 ## Features ativas e status real
 
 - `BKL-001` rastreamento de tokens do Claude Code: concluido.
 - `BKL-003` exportacao JSON/CSV: concluido no corpo da historia, apesar de frontmatter ainda divergente.
 - `BKL-030` backfill de tokens legados do Claude Code: pronto para desenvolvimento.
+- JSONL orientado a eventos e migracao para `transcript.jsonl`: concluidos.
 
 ## Riscos e inconsistencias conhecidas
 
@@ -31,6 +35,7 @@ Use este companion para tarefas de implementacao, bugfix, code review e validaca
 - `BKL-003` tem status divergente entre frontmatter e corpo da spec.
 - A secao de pesquisa antiga ainda diz que `BKL-001` estava pendente.
 - O backlog antigo reutiliza o identificador `BKL-030` para dois itens distintos.
+- Ainda existem bugs abertos importantes em meia-noite, gap entre ferramentas, regex de modelo e `last_updated`.
 
 ## Quando abrir mais contexto
 

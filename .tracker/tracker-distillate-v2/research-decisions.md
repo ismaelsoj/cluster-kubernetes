@@ -7,6 +7,7 @@ Use este companion apenas quando a tarefa depender de limites tecnicos de coleta
 - Tokens do Antigravity continuam inviaveis hoje porque `transcript.jsonl` nao expoe `usage` e os `.pb` nao sao uma fonte local utilizavel.
 - A fonte correta do Antigravity para atividade live e `~/.gemini/antigravity-ide/brain/*/.system_generated/logs/transcript.jsonl`.
 - `overview.txt` e legado truncado e nao deve voltar ao fluxo live.
+- Claude Code continua sendo a unica fonte atual com `usage` local confiavel para tokens.
 
 ## Decisoes abertas mas roteadas
 

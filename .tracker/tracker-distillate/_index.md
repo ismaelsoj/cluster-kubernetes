@@ -24,6 +24,9 @@ compression_ratio: "4.2:1"
 parts: 4
 ---
 
+> LEGADO: este distillate foi supersedido por `.tracker/tracker-distillate-v2/SPEC.md` em 2026-05-27.
+> Use esta arvore apenas para referencia historica e auditoria. Em caso de conflito, `tracker-distillate-v2/` prevalece.
+
 ## Orientação
 
 - Distillate do subprojeto `.tracker/` — Rastreador de Tempo de Desenvolvimento com IA (Antigravity + Claude Code).

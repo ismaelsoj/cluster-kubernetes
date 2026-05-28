@@ -31,6 +31,42 @@ Use este companion para priorizacao, refinamento e leitura rapida do roadmap sem
 - `Epic 6` Parking lot upstream
   - foco: registrar e monitorar limitacoes bloqueadas por fornecedor, sem empurrar implementacao falsa
 
+## Mapa rapido por epic
+
+- `Epic 1`
+  - fixtures ground-truth
+  - meia-noite
+  - gaps entre ferramentas
+  - timezone-aware
+  - detached HEAD
+  - fallback de branch
+  - multiplos `USER_SETTINGS_CHANGE`
+
+- `Epic 2`
+  - modularizacao em pacote `tracker/`
+  - versionamento de formato
+  - renderers separados
+  - logging e type hints
+  - lookup table de modelos
+
+- `Epic 3`
+  - dataset de referencia
+  - tendencia semanal
+  - renderizacao Markdown, JSON e CSV
+
+- `Epic 4`
+  - datasets de anomalia
+  - sessoes curtas
+  - inconsistencias de modelos e sessoes
+  - turnos por sessao
+  - padroes de conversa
+
+- `Epic 5`
+  - Cursor como terceira fonte
+
+- `Epic 6`
+  - limitacoes upstream documentadas
+
 ## Itens abertos de maior impacto imediato
 
 - `BKL-030` backfill de tokens legados do Claude Code
@@ -39,6 +75,8 @@ Use este companion para priorizacao, refinamento e leitura rapida do roadmap sem
 - `BKL-012` gap entre ferramentas descartado
 - `BKL-028` leitura de JSONL sem tratamento por linha
 - `BKL-029` `last_updated` semanticamente incorreto
+- `BKL-010` detached HEAD como SHA
+- `BKL-016` conversao errada de datetimes timezone-aware
 
 ## Regra de ouro para contexto barato
 
