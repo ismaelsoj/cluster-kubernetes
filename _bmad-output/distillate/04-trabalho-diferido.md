@@ -3,6 +3,7 @@
 ## Diferido para Story 2.x+ (Infra/Security)
 
 - [inject-secrets.sh:38,50] Fallback de geração de senha com ~64 bits entropia vs 128 bits do openssl; afeta containers Alpine/minimais; harmonizar quando sistema de secrets centralizado (Story 3.4+)
+- [keycloak-priorityclass.yaml:13] PriorityClass não garante "imunidade a eviction"; avaliar em hardening futuro se a story deve exigir apenas prioridade alta ou também QoS Guaranteed/PDB/recursos (`requests == limits`)
 
 ## Diferido para Cross-Story/Repo
 
@@ -28,3 +29,5 @@
 - ~~Mensagem de erro genérica com diretórios de scan ausentes~~ → implementado com validação explícita de existência
 - ~~Instalar conftest nativamente no GitHub Actions~~ → implementado a pedido do dev
 - ~~kebab-case.rego colon-check excessivamente amplo~~ → descartado (política real usa lista estrita)
+
+Revisão: GPT-5.5

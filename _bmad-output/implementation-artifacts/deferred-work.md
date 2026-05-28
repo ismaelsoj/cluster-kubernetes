@@ -133,3 +133,8 @@ Registro centralizado de itens identificados em revisões/triagens que não pert
 
 *Revisão/Code Review: Claude Sonnet 4.6 (claude-sonnet-4-6) via Claude Code — 2026-05-25*
 
+## Deferred from: code review of 2-2-manifestos-kustomize-keycloak (2026-05-27)
+
+- **[cluster/infrastructure/keycloak-auth/base/keycloak-priorityclass.yaml:13]** PriorityClass não garante a "imunidade a eviction" declarada no AC; `PreemptLowerPriority` ajuda scheduling/preemption, mas o pod ainda usa QoS Burstable porque `requests` são menores que `limits`. **Razão para defer:** Não tenho condições técnicas de tomar essa decisão agora.
+
+Revisão: GPT-5.5

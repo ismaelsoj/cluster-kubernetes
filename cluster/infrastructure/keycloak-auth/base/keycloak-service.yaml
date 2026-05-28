@@ -1,0 +1,23 @@
+# Serviço interno do Keycloak - expõe a porta HTTP para acesso no namespace e pelo Ingress
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-service
+  namespace: keycloak-auth
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: identity-provider
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  selector:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: identity-provider
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+
+# Autoria/Implementação: claude-sonnet-4-6

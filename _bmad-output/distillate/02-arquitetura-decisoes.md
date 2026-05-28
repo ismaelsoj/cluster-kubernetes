@@ -6,7 +6,7 @@
 - Kubernetes via k3d: runtime de orquestração
 - ArgoCD v3.4.2: operador GitOps pull-based; padrão App-of-Apps
 - Kong DB-Less v3.4.x LTS: API Gateway stateless via Kong Ingress Controller (KIC)
-- Keycloak 26.2.1: Identity Provider OIDC
+- Keycloak 26.6.2: Identity Provider OIDC
 - PostgreSQL (versão a fixar no overlay): banco exclusivo do Keycloak
 - Kustomize v5.x (nativo kubectl): motor de templates
 - kube-linter + Conftest (OPA): validação automática
