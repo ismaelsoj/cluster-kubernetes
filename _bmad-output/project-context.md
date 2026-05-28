@@ -19,7 +19,7 @@ _Este arquivo contém regras críticas e padrões que agentes de IA devem seguir
 - **k3d** v5.8.3 — provisiona o cluster Kubernetes local via Docker
 - **Kubernetes** (via k3d) — runtime de orquestração de contêineres
 - **ArgoCD** v3.4.2 — operador GitOps (pull-based), padrão App-of-Apps
-- **Kong DB-Less** v3.4.x LTS — API Gateway stateless, instalado via Kong Ingress Controller (KIC)
+- **Kong DB-Less** v3.14.0.3 (3.14 LTS) — API Gateway stateless, instalado via Kong Ingress Controller (KIC)
 - **Keycloak** 26.2.1 — Identity Provider OIDC
 - **PostgreSQL** (versão a fixar no overlay) — banco de estado exclusivo do Keycloak
 - **Kustomize** v5.x (nativo no `kubectl`) — motor de templates YAML
@@ -92,6 +92,7 @@ _Este arquivo contém regras críticas e padrões que agentes de IA devem seguir
 - **Secrets nunca no Git:** credenciais (senhas, chaves) são injetadas manualmente no bootstrap do cluster. Nenhum Secret deve aparecer em nenhum manifesto versionado.
 - **Segregação de ambientes obrigatória:** o k3d local DEVE operar com Realms e chaves de assinatura Keycloak matematicamente distintas da produção. Tokens gerados em dev são rejeitados em prod.
 - **Tráfego externo:** entra exclusivamente pelo Kong (namespace `kong-gateway`). O Kong termina TLS e valida JWKS localmente antes de repassar ao Pod.
+- **Defaults da série Kong 3.14:** `tls_certificate_verify` vem habilitado por padrão e rotas novas passam a privilegiar `https`; manifestos e configuração declarativa do gateway não devem depender de `tls_verify=false` nem assumir `http` como default implícito.
 - **Validação JWKS descentralizada:** Kong valida tokens via cache local de chaves públicas (não por introspecção ativa no Keycloak). Cache TTL = 60 minutos.
 - **Keycloak é o único emissor de tokens.** Nenhum outro componente emite ou assina JWTs.
 - **PostgreSQL do Keycloak** é acessível somente dentro do namespace `keycloak-auth` (isolado por NetworkPolicy).

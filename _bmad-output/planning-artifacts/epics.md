@@ -324,9 +324,10 @@ Para que exista ponto único de controle com prioridade máxima.
 
 **Dado** Keycloak operacional (Épico 2)
 **Quando** ArgoCD sincronizar `cluster/infrastructure/kong-gateway/`
-**Então** Kong provisionado com `sync-wave: "3"`, modo DB-Less via ConfigMap, tag imutável (ex: `kong:3.4.2`)
+**Então** Kong provisionado com `sync-wave: "3"`, modo DB-Less via ConfigMap, tag imutável `kong:3.14.0.3`
 **E** PriorityClass máxima (NFR-R01), NetworkPolicy, healthcheck público (FR24), logs JSON
 **E** labels obrigatórios, overlays para 3 ambientes
+**E** configuração compatível com os defaults da série 3.14, incluindo `tls_certificate_verify` ativo e ausência de dependência em rotas HTTP implícitas
 
 ### Story 3.2: TLS, Validação JWKS e Rate Limit Default
 

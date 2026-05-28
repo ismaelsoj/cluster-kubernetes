@@ -5,7 +5,7 @@ Use este companion para decisões arquiteturais, segurança, topologia e leitura
 ## Estado atual resumido
 
 - Projeto: plataforma GitOps on-premise para cluster Kubernetes local com k3d, ArgoCD, Kong DB-Less, Keycloak e PostgreSQL.
-- Stack base: k3d v5.8.3, ArgoCD v3.4.2, Kong DB-Less v3.4.x LTS, Keycloak 26.6.2, Kustomize v5.x, kube-linter, Conftest e GitHub Actions.
+- Stack base: k3d v5.8.3, ArgoCD v3.4.2, Kong DB-Less v3.14.0.3 (3.14 LTS), Keycloak 26.6.2, Kustomize v5.x, kube-linter, Conftest e GitHub Actions.
 - Status: Épico 1 concluído; épicos 2 a 4 permanecem em backlog.
 - Próximo marco funcional: Story 2.1, PostgreSQL em Wave 1 dentro de `keycloak-auth`.
 
@@ -13,6 +13,7 @@ Use este companion para decisões arquiteturais, segurança, topologia e leitura
 
 - Kong é DB-Less e stateless para aderência total ao GitOps.
 - Validação de JWT/JWKS acontece localmente no gateway, com cache para resiliência e baixa latência.
+- Adoção da série 3.14 exige atenção aos defaults novos de segurança, especialmente `tls_certificate_verify=on` e rotas HTTPS por padrão.
 - Keycloak é o único emissor de tokens.
 - ArgoCD lê apenas do Git; alterações manuais no cluster são proibidas, exceto bootstrap de secrets.
 - Desenvolvedores de apps trabalham apenas em `/cluster/apps/<api>/` sobre boilerplates.

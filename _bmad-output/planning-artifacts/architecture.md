@@ -137,7 +137,7 @@ Validação contínua através de scripts acoplados ao `Makefile` que gerarão u
 
 **Decisões Importantes (Moldam a Arquitetura):**
 - **Motor de Templates (Boilerplates):** *Kustomize* (v5.x nativo do kubectl).
-- **Mecanismo de Interceptação Zero-Trust:** Kong operando em modo DB-Less (v3.4.x LTS via Kong Ingress Controller).
+- **Mecanismo de Interceptação Zero-Trust:** Kong operando em modo DB-Less (`3.14.0.3`, linha `3.14 LTS`) via Kong Ingress Controller.
 - **Fonte de Identidade OIDC:** Keycloak hospedado com estado isolado no PostgreSQL.
 
 **Decisões Adiadas (Post-MVP / Backlog Futuro):**
@@ -153,6 +153,7 @@ Validação contínua através de scripts acoplados ao `Makefile` que gerarão u
 
 - **Padrão M2M OIDC:** Fluxo estrito via *Client Credentials* de longo tempo de vida (TTL) para a Fase 1.
 - **Validação JWKS Descentralizada:** Para manter a latência de rede sub-20ms e preencher a resiliência de queda temporal (sobrevivência de 60m), toda tokenização M2M passará por verificação local criptográfica de cache JWKS no Gateway Kong.
+- **Defaults endurecidos do Kong 3.14:** A linha `3.14` habilita `tls_certificate_verify` por padrão e passa a privilegiar rotas HTTPS por default. Os manifestos e configurações declarativas do gateway devem refletir isso explicitamente para evitar boot inválido ou comportamento implícito divergente.
 
 ### Padrões de API e Comunicação
 
@@ -470,7 +471,7 @@ Criar namespaces → Injetar Secrets → Instalar ArgoCD → Aplicar root-app.ya
 ### Validação de Coerência
 
 **Compatibilidade de Decisões:**
-Todas as decisões tecnológicas funcionam em conjunto sem conflitos. Kong DB-Less (v3.4.x LTS) recebe configurações declarativas via Kustomize, alinhado ao ArgoCD. O Keycloak emite tokens validados localmente pelo Kong via JWKS. O k3d (v5.8.3) suporta o arquivo `k3d.yaml` declarativo. Nenhuma incompatibilidade detectada.
+Todas as decisões tecnológicas funcionam em conjunto sem conflitos. Kong DB-Less (`3.14.0.3`, linha `3.14 LTS`) recebe configurações declarativas via Kustomize, alinhado ao ArgoCD. O Keycloak emite tokens validados localmente pelo Kong via JWKS. O k3d (v5.8.3) suporta o arquivo `k3d.yaml` declarativo. Nenhuma incompatibilidade detectada, desde que a configuração do gateway respeite os defaults mais rígidos introduzidos em `3.14`.
 
 **Consistência de Padrões:**
 Os padrões de nomenclatura (`kebab-case`), labels (`app.kubernetes.io/*` com vocabulário controlado), estrutura (`base/overlays` com 3 ambientes) e processo (Sync Waves com annotations explícitas) são aplicados uniformemente. A distinção de escopo (plataforma vs. negócio) está explícita na seção de Enforcement.
