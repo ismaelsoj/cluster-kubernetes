@@ -6,7 +6,7 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Você DEVE definir explicitamente o nível de
 
 # Story 2.3: configuracao-realm-client-m2m
 
-**Status:** review
+**Status:** done
 **Complexidade:** Baixa Complexidade
 
 ## Story Foundation
@@ -295,7 +295,7 @@ Resultado esperado: entrada de log JSON contendo `"type":"CLIENT_LOGIN"` e `"cli
   - [x] Adicionar `volume` referenciando `keycloak-realm-config` (ConfigMap)
 - [x] Executar `make lint` e confirmar 0 violações
 - [x] Executar `kubectl kustomize cluster/infrastructure/keycloak-auth/base/` e confirmar ConfigMap e Deployment corretos
-- [ ] Executar validação manual completa (itens 3–7 do Plano de Validação)
+- [x] Executar validação manual completa (itens 3–7 do Plano de Validação)
 - [x] Registrar `# Autoria/Implementação: <modelo>` no rodapé do `realm-config.json` (em comentário JSON não é possível — incluir no Change Log da story)
 
 ### Review Findings
@@ -325,8 +325,8 @@ Arquivos criados/modificados:
 - `kubectl kustomize base/` → ConfigMap gerado (`keycloak-realm-config-tf96t99db2`), Deployment com `--import-realm` e volume corretamente resolvido com hash. ✅
 - `make lint` → 92 testes conftest OPA + kube-linter: **0 falhas, 0 warnings**. ✅
 
-**Pendente — validação manual em cluster vivo (itens 3–7 do Plano de Validação):**
-- Deploy via `make up`, verificação de logs de import, obtenção de token via `curl`, verificação de evento `CLIENT_LOGIN` e teste de revogação. Requer cluster k3d em execução.
+**Validação manual concluída em cluster vivo:**
+- `make up` executado com sincronização do Deployment corrigido. Realm importado, token emitido com sucesso, evento `CLIENT_LOGIN` confirmado no stdout após aplicar `KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__SUCCESS_LEVEL=info`, e revogação manual validada ao excluir/desabilitar o client.
 
 ### Lista de Arquivos
 - `cluster/infrastructure/keycloak-auth/base/realm-config.json` (novo)
@@ -342,3 +342,4 @@ Implementação: claude-sonnet-4-6
 - `2026-05-28 17:00:00-03:00`: Story criada pelo workflow bmad-create-story; status: ready-for-dev. Autoria: claude-sonnet-4-6.
 - `2026-05-28 18:00:00-03:00`: Implementação concluída — criado `realm-config.json`, atualizado `kustomization.yaml` (configMapGenerator) e `keycloak-deployment.yaml` (--import-realm + volume). make lint: 92 testes, 0 falhas. kubectl kustomize: ConfigMap + Deployment corretos. Status: review. Autoria/Implementação: claude-sonnet-4-6.
 - `2026-05-28 10:28:23-03:00`: Correção pós-code-review aplicada após validação manual identificar ausência de `CLIENT_LOGIN` no stdout. Adicionada env `KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__SUCCESS_LEVEL=info` no Deployment e ajustada a documentação da story para refletir o comportamento real do listener `jboss-logging`. Autoria/Implementação: GPT-5 Codex.
+- `2026-05-28 11:05:14-03:00`: Validação manual concluída em cluster vivo após sincronização do Deployment corrigido. Import do realm, emissão de token, observação do evento `CLIENT_LOGIN` e revogação manual confirmados. Status: done. Autoria/Implementação: GPT-5 Codex.
