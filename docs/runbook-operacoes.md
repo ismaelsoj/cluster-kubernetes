@@ -350,6 +350,14 @@ kubectl patch application infra-app -n argocd \
 
 ./scripts/pg-restore.sh ./backups/keycloak-db-backup-<timestamp>.dump
 # Keycloak fica indisponível durante o restore (~1-2 min)
+
+kubectl patch application root-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
+
+kubectl patch application infra-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":false,"selfHeal":true}}}}'
 ```
 
 ### Teste manual completo do ciclo backup -> falha -> restore
@@ -515,3 +523,4 @@ kubectl logs <nome-do-pod> -n keycloak-auth --previous
 
 ---
 Autoria/Implementacao: GPT-5 Codex
+Revisao: claude-sonnet-4-6

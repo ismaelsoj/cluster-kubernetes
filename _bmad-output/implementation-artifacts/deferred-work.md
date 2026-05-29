@@ -168,3 +168,12 @@ Revisão: claude-opus-4-7
 - **[scripts/token-helpers.sh:122]** `TOKEN_RESPONSE_JSON` env var expõe access_token completo no ambiente do subprocess Python — visível em `/proc/<pid>/environ` e alguns outputs de `ps auxe`. Aceitável para cluster local dev. Alternativa seria passar o JSON via stdin para o Python heredoc em vez de env var.
 
 Revisão: claude-sonnet-4-6
+
+## Deferred from: code review of story-3-4-refinamento-bootstrap-emergencia (2026-05-29)
+
+- **[docs/bootstrap-emergencia.md:secao 6.3]** Token extraction via `awk -F= '/^TOKEN=/{print $2}'` truncaria token se contivesse `=` (ex: base64 com padding). JWTs usam base64url sem padding, portanto irrelevante aqui, mas o padrão é frágil para usos genéricos. Considerar `awk -F= '/^TOKEN=/{sub(/^TOKEN=/,""); print}' ` ou `cut -d= -f2-` em contexts futuros.
+- **[scripts/pg-restore.sh]** `pg_restore --clean --if-exists` sem `--dbname` explícito — depende de `PGDATABASE` do ambiente; um `--dbname` hardcoded como fallback reduz risco em restore de emergência.
+- **[docs/bootstrap-emergencia.md:secao 4.1]** `argocd app sync` pressupõe CLI pre-autenticada (`argocd login`). Em bootstrap do zero após disaster recovery, contexto CLI pode estar ausente. Considerar adicionar pré-condição de autenticação CLI (`argocd login --core` ou via port-forward) em story futura de hardening do runbook.
+- **[docs/bootstrap-emergencia.md:secao 3.2]** Procedimento manual de branch override (Passo 4) não verifica se branch local existe no remote antes do `sed | kubectl apply`. O script `cluster-up.sh` faz esse check; o doc menciona o fallback mas o comando manual não tem a guarda. Adicionar nota de pré-condição em revisão futura.
+
+Revisão: claude-sonnet-4-6

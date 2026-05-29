@@ -6,7 +6,7 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Voce DEVE definir explicitamente o nivel de c
 
 # Story 3.4: Refinamento do Bootstrap de Emergencia
 
-**Status:** review
+**Status:** done
 **Complexidade:** Baixa Complexidade
 
 ## Story Foundation
@@ -57,6 +57,23 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Voce DEVE definir explicitamente o nivel de c
   - [x] Revisar `docs/runbook-operacoes.md` apenas se necessario para evitar contradicao com o bootstrap de emergencia.
   - [x] Registrar no artefato da historia quais arquivos foram comparados e quais divergencias foram resolvidas.
   - [x] Executar a validacao manual documentada e registrar evidencias concretas no `Dev Agent Record`.
+
+### Review Findings
+
+- [x] [Review][Decision] Secao 5.4: manter check interno direto ao Keycloak (porta 80 via `keycloak-service`) como validacao especifica do restore; secao 6.2 continua como validacao final da plataforma com `make token` — nota explicativa adicionada na 5.4 [docs/bootstrap-emergencia.md:secao 5.4]
+
+- [x] [Review][Patch] Padronizar `localhost` em todos os pontos — todos os enderecos internos agora usam `localhost` (incluindo secao 2 e secao 6.1) [docs/bootstrap-emergencia.md]
+- [x] [Review][Patch] `runbook-operacoes.md` caminho simples de restore sem reativacao do auto-heal — reativacao de `root-app` e `infra-app` adicionada apos `pg-restore.sh` [docs/runbook-operacoes.md]
+- [x] [Review][Patch] Atribuicao `GPT-5 Codex` — `Revisao: claude-sonnet-4-6` adicionado como rodape nos dois documentos [docs/bootstrap-emergencia.md, docs/runbook-operacoes.md]
+- [x] [Review][Patch] Secao 6.4 sem safety guard — aviso `[!WARNING]` adicionado com instrucao de recuperacao manual do Keycloak [docs/bootstrap-emergencia.md:secao 6.4]
+- [x] [Review][Patch] Narrativa de Sync Waves ausente — descricao das waves adicionada no Passo 5 (Wave 1=PostgreSQL, Wave 2=Keycloak, Wave 3=Kong/OAuth2-Proxy) [docs/bootstrap-emergencia.md]
+- [x] [Review][Patch] Tabela de inventario sem Services — `postgresql-service`, `keycloak-service`, `kong-service`, `oauth2-proxy-service` adicionados [docs/bootstrap-emergencia.md:secao 2]
+- [x] [Review][Patch] Secao 4.1 sync duplo redundante — primeiro `argocd app sync infra-app --force` removido, mantido apenas `argocd app sync root-app infra-app apps-app --force` [docs/bootstrap-emergencia.md:secao 4.1]
+
+- [x] [Review][Defer] Token extraction via `awk -F=` poderia truncar se token contivesse `=` — irrelevante para JWTs (base64url sem padding), valido como principio geral [docs/bootstrap-emergencia.md:secao 6.3] — deferred, pre-existing
+- [x] [Review][Defer] `pg_restore --clean --if-exists` sem `--dbname` explicito no script — comportamento do script, nao do documento [scripts/pg-restore.sh] — deferred, pre-existing
+- [x] [Review][Defer] `argocd app sync` pressupoe contexto CLI pre-autenticado — cenario real em bootstrap do zero; cobre gap operacional fora do escopo desta story [docs/bootstrap-emergencia.md:secao 4.1] — deferred, pre-existing
+- [x] [Review][Defer] Procedimento manual de branch override (passo 4) nao tem verificacao de remote-existence — doc ja menciona fallback para `main`; complexidade do script fora do escopo [docs/bootstrap-emergencia.md:secao 3.2] — deferred, pre-existing
 
 ## Dev Notes
 

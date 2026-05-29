@@ -40,12 +40,16 @@ Confirme estes nomes antes de operar:
 | Deployment | `keycloak-deployment` |
 | Deployment | `kong-deployment` |
 | Deployment | `oauth2-proxy-deployment` |
+| Service | `postgresql-service` |
+| Service | `keycloak-service` |
+| Service | `kong-service` |
+| Service | `oauth2-proxy-service` |
 
 Healthchecks reais do ambiente:
 
-- Keycloak: `http://127.0.0.1:19000/health/live` e `http://127.0.0.1:19000/health/ready` via `kubectl port-forward`
-- Kong: `http://127.0.0.1:18100/status` e `http://127.0.0.1:18100/status/ready` via `kubectl port-forward`
-- OAuth2-Proxy: `http://127.0.0.1:14180/ping` e `http://127.0.0.1:14180/ready` via `kubectl port-forward`
+- Keycloak: `http://localhost:19000/health/live` e `http://localhost:19000/health/ready` via `kubectl port-forward`
+- Kong: `http://localhost:18100/status` e `http://localhost:18100/status/ready` via `kubectl port-forward`
+- OAuth2-Proxy: `http://localhost:14180/ping` e `http://localhost:14180/ready` via `kubectl port-forward`
 - Borda externa: `https://localhost`
 
 ## 3. Reconstrucao total do zero
@@ -132,6 +136,14 @@ export ARGO_TARGET_BRANCH="main"
 
 #### Passo 5. Confirmar readiness da plataforma
 
+O ArgoCD reconcilia os componentes em Sync Waves, na ordem estrita definida nos manifests:
+
+- **Wave 1** — PostgreSQL: banco de estado do Keycloak sobe primeiro.
+- **Wave 2** — Keycloak: inicia somente apos o PostgreSQL estar `Ready`.
+- **Wave 3** — Kong e OAuth2-Proxy: sobem apos o Keycloak expor o endpoint JWKS.
+
+Nao tente forcar a ordem manualmente. O ArgoCD garante a sequencia; aguarde cada wave convergir antes de diagnosticar falha.
+
 ```bash
 kubectl rollout status deployment/keycloak-deployment -n keycloak-auth --timeout=300s
 kubectl rollout status deployment/kong-deployment -n kong-gateway --timeout=300s
@@ -152,7 +164,6 @@ Esperado:
 Use reconciliação simples quando manifests, `ConfigMaps` ou `Deployments` sairam de sincronia, mas o estado persistente continua confiavel:
 
 ```bash
-argocd app sync infra-app --force
 argocd app sync root-app infra-app apps-app --force
 ```
 
@@ -252,6 +263,8 @@ O script atual executa este fluxo:
 
 ### 5.4 Validar o estado restaurado
 
+Este check acessa o Keycloak diretamente via `kubectl port-forward`, sem passar pelo Kong. O objetivo e confirmar que o banco foi restaurado e o realm responde antes de reativar o auto-heal. A validacao completa da plataforma pela borda externa fica na secao 6.
+
 `dev-m2m-local-secret` e fixture de desenvolvimento local. Ele e aceitavel apenas para o ambiente local desta plataforma e nao deve ser promovido como padrao para outros ambientes.
 
 ```bash
@@ -300,21 +313,21 @@ kubectl patch application infra-app -n argocd \
 kubectl port-forward -n keycloak-auth deploy/keycloak-deployment 19000:9000 >/tmp/pf-keycloak.log 2>&1 &
 PF_KEYCLOAK=$!
 sleep 3
-curl -sf http://127.0.0.1:19000/health/ready
+curl -sf http://localhost:19000/health/ready
 kill "${PF_KEYCLOAK}" 2>/dev/null || true
 wait "${PF_KEYCLOAK}" 2>/dev/null || true
 
 kubectl port-forward -n kong-gateway deploy/kong-deployment 18100:8100 >/tmp/pf-kong.log 2>&1 &
 PF_KONG=$!
 sleep 3
-curl -sf http://127.0.0.1:18100/status/ready
+curl -sf http://localhost:18100/status/ready
 kill "${PF_KONG}" 2>/dev/null || true
 wait "${PF_KONG}" 2>/dev/null || true
 
 kubectl port-forward -n kong-gateway deploy/oauth2-proxy-deployment 14180:4180 >/tmp/pf-oauth2-proxy.log 2>&1 &
 PF_OAUTH2_PROXY=$!
 sleep 3
-curl -sf http://127.0.0.1:14180/ready
+curl -sf http://localhost:14180/ready
 kill "${PF_OAUTH2_PROXY}" 2>/dev/null || true
 wait "${PF_OAUTH2_PROXY}" 2>/dev/null || true
 ```
@@ -357,6 +370,10 @@ Esperado:
 
 Use este teste apenas quando precisar provar que a validacao de Bearer token continua funcionando temporariamente sem o Keycloak disponivel.
 
+> [!WARNING]
+> Este teste escala o Keycloak para 0 replicas. Se qualquer etapa falhar apos o scale-down, restaure manualmente com:
+> `kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=1`
+
 ```bash
 TOKEN="$(bash scripts/generate-token.sh | awk -F= '/^TOKEN=/{print $2; exit}')"
 
@@ -387,3 +404,4 @@ Esperado:
 
 ---
 Autoria/Implementacao: GPT-5 Codex
+Revisao: claude-sonnet-4-6
