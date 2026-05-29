@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # scripts/cluster-up.sh - Provisiona o cluster k3d conforme k3d.yaml
 # Executa pre-flight checks, cria o cluster e verifica acessibilidade via kubectl
+# Autoria/Implementacao: GPT-5 Codex
 
 set -euo pipefail
 
@@ -13,6 +14,7 @@ ARGOCD_VERSION="${ARGOCD_VERSION:-v3.4.2}"
 ARGOCD_NAMESPACE="argocd"
 ARGOCD_MANIFEST_URL="https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
 ARGOCD_WAIT_TIMEOUT="${ARGOCD_WAIT_TIMEOUT:-180s}"
+PLATFORM_WAIT_TIMEOUT="${PLATFORM_WAIT_TIMEOUT:-300s}"
 BOOTSTRAP_DIR="${REPO_ROOT}/cluster/bootstrap"
 # Ordem importa: root-app primeiro (estabelece governança); infra-app e apps-app
 # são tecnicamente gerenciados pelo root-app, mas aplicamos diretamente para que
@@ -22,6 +24,27 @@ BOOTSTRAP_APPS=(root-app infra-app apps-app)
 # Branch que o ArgoCD vai monitorar — usa a branch local detectada por padrão.
 # Em CI/produção, sobrescrever com ARGO_TARGET_BRANCH=main.
 ARGO_TARGET_BRANCH="${ARGO_TARGET_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
+
+resolve_argocd_target_branch() {
+  local requested_branch="$1"
+
+  if [ -z "${requested_branch}" ] || [ "${requested_branch}" = "HEAD" ]; then
+    echo "AVISO: branch Git local nao detectada com clareza. Usando 'main' no ArgoCD."
+    ARGO_TARGET_BRANCH="main"
+    return 0
+  fi
+
+  if git ls-remote --exit-code --heads origin "${requested_branch}" >/dev/null 2>&1; then
+    ARGO_TARGET_BRANCH="${requested_branch}"
+    return 0
+  fi
+
+  echo "AVISO: branch '${requested_branch}' nao existe no remoto 'origin'."
+  echo "       O ArgoCD vai monitorar 'main' para evitar bootstrap preso em ComparisonError."
+  ARGO_TARGET_BRANCH="main"
+}
+
+resolve_argocd_target_branch "${ARGO_TARGET_BRANCH}"
 
 # ─── Pre-flight: binários obrigatórios ──────────────────────────────────────
 for bin in docker kubectl k3d; do
@@ -50,18 +73,6 @@ if [ "$DOCKER_CPUS" -lt 4 ] || [ "$DOCKER_MEM_GB" -lt 6 ]; then
   echo "AVISO: Docker com ${DOCKER_CPUS} CPUs e ${DOCKER_MEM_GB}GB RAM."
   echo "       Recomendado: ≥4 CPUs e ≥6GB RAM (Docker Desktop → Settings → Resources)."
 fi
-
-# ─── Pre-flight: conflito de portas ──────────────────────────────────────────
-# Verifica se as portas que o k3d precisa expor (HTTP/HTTPS) já estão em uso.
-# Usa ss (Linux) como método primário e /dev/tcp (bash built-in, macOS) como fallback.
-for port in 80 443; do
-  if ss -tlnp 2>/dev/null | grep -q ":${port} " || \
-     (echo >/dev/tcp/localhost/$port) 2>/dev/null; then
-    echo "ERRO: Porta ${port} já está em uso no host."
-    echo "      Libere a porta antes de provisionar o cluster."
-    exit 1
-  fi
-done
 
 # ─── Funções de bootstrap GitOps (Story 1.3) ─────────────────────────────────
 # Instala o ArgoCD de forma idempotente: cria namespace se necessário, aplica
@@ -113,6 +124,35 @@ apply_bootstrap_apps() {
   echo "==> [Bootstrap] App-of-Apps aplicado. ArgoCD iniciará a sincronização recursiva."
 }
 
+wait_for_deployment_available() {
+  local namespace="$1"
+  local deployment_name="$2"
+  local timeout="$3"
+  local deadline
+
+  deadline=$(( $(date +%s) + ${timeout%s} ))
+
+  echo "==> [Bootstrap] Aguardando deployment '${deployment_name}' no namespace '${namespace}'..."
+  while ! kubectl get deployment "${deployment_name}" -n "${namespace}" >/dev/null 2>&1; do
+    if [ "$(date +%s)" -ge "${deadline}" ]; then
+      echo "ERRO: deployment '${deployment_name}' nao foi criado no namespace '${namespace}' dentro de ${timeout}."
+      return 1
+    fi
+    sleep 5
+  done
+
+  kubectl rollout status "deployment/${deployment_name}" -n "${namespace}" --timeout="${timeout}"
+}
+
+wait_for_platform_readiness() {
+  echo ""
+  echo "==> [Bootstrap] Aguardando componentes centrais da Jornada 1..."
+  wait_for_deployment_available keycloak-auth keycloak-deployment "${PLATFORM_WAIT_TIMEOUT}"
+  wait_for_deployment_available kong-gateway kong-deployment "${PLATFORM_WAIT_TIMEOUT}"
+  wait_for_deployment_available kong-gateway oauth2-proxy-deployment "${PLATFORM_WAIT_TIMEOUT}"
+  echo "==> [Bootstrap] Keycloak, Kong e OAuth2-Proxy prontos para validacao operacional."
+}
+
 # ─── Idempotência: cluster já existe ─────────────────────────────────────────
 # Verifica se o cluster já existe usando k3d cluster get (match exato por nome).
 # Se existe e está saudável, garante que o ArgoCD e o root-app também estão
@@ -125,8 +165,12 @@ if k3d cluster get "${CLUSTER_NAME}" &>/dev/null; then
     bash "${REPO_ROOT}/scripts/inject-secrets.sh"
     install_argocd
     apply_bootstrap_apps
+    wait_for_platform_readiness
     echo ""
     echo "Bootstrap reconciliado. Branch monitorada pelo ArgoCD: '${ARGO_TARGET_BRANCH}'."
+    echo "Proximos passos operacionais:"
+    echo "  1. Execute 'make status' para ver cluster, URLs e o resumo do token M2M."
+    echo "  2. Execute 'make token' para imprimir um token copiavel no terminal."
     exit 0
   else
     echo "ERRO: Cluster existe mas kubectl não consegue conectar."
@@ -134,6 +178,18 @@ if k3d cluster get "${CLUSTER_NAME}" &>/dev/null; then
     exit 1
   fi
 fi
+
+# ─── Pre-flight: conflito de portas ──────────────────────────────────────────
+# Verifica se as portas que o k3d precisa expor (HTTP/HTTPS) já estão em uso.
+# Usa ss (Linux) como método primário e /dev/tcp (bash built-in, macOS) como fallback.
+for port in 80 443; do
+  if ss -tlnp 2>/dev/null | grep -q ":${port} " || \
+     (echo >/dev/tcp/localhost/$port) 2>/dev/null; then
+    echo "ERRO: Porta ${port} já está em uso no host."
+    echo "      Libere a porta antes de provisionar o cluster."
+    exit 1
+  fi
+done
 
 # ─── Trap para cleanup em falha ou interrupção ───────────────────────────────
 _cleanup() {
@@ -171,8 +227,11 @@ kubectl get nodes
 bash "${REPO_ROOT}/scripts/inject-secrets.sh"
 install_argocd
 apply_bootstrap_apps
+wait_for_platform_readiness
 
 echo ""
 echo "Bootstrap GitOps concluído."
 echo "Branch monitorada pelo ArgoCD: '${ARGO_TARGET_BRANCH}'."
-echo "Execute 'make status' para ver URLs e token M2M (disponível após Story 3.3)."
+echo "Proximos passos operacionais:"
+echo "  1. Execute 'make status' para ver cluster, URLs e o resumo do token M2M."
+echo "  2. Execute 'make token' para imprimir um token copiavel no terminal."

@@ -126,6 +126,19 @@ kubectl get pod -l app.kubernetes.io/name=keycloak -n keycloak-auth \
 
 ## Gateway Kong, TLS e Validação JWT
 
+### Caminho feliz da Jornada 1
+
+Depois de `make up`, use esta sequencia como fluxo principal:
+
+```bash
+make status
+make token
+```
+
+Esperado:
+- `make status` mostra nos, componentes principais, URLs locais e um resumo do token M2M.
+- `make token` imprime um `TOKEN=...` copiavel, sem persistir o valor em arquivo versionado.
+
 ### Validar que HTTP inseguro não chega ao upstream
 
 ```bash
@@ -144,6 +157,14 @@ curl -k -i \
 Esperado: `200` via Kong HTTPS. O issuer esperado é `https://localhost/realms/cluster-local`.
 
 ### Obter token M2M local
+
+O caminho recomendado agora e:
+
+```bash
+make token
+```
+
+Se precisar depurar o fluxo manualmente, o comando equivalente continua sendo:
 
 O `client_secret` abaixo (`dev-m2m-local-secret`) é fixture de desenvolvimento local criado para o realm `cluster-local`. Não reutilize esse valor em outros ambientes.
 
@@ -202,6 +223,24 @@ wait "$PF_PID" 2>/dev/null || true
 Esperado: `/ping` e `/ready` retornam sucesso HTTP.
 
 ### Validar rota protegida com e sem token
+
+Se quiser o caminho mais curto para reproduzir o teste frio:
+
+```bash
+make status
+TOKEN="$(
+  bash scripts/generate-token.sh | awk -F= '/^TOKEN=/{print $2; exit}'
+)"
+
+curl -k -i \
+  https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo
+
+curl -k -i \
+  https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+Esperado: sem token retorna `401` ou `403`; com token valido retorna `200`.
 
 A rota protegida de prova usa o prefixo `/protected` no Kong. O Kong remove esse prefixo antes de encaminhar ao OAuth2-Proxy, e o OAuth2-Proxy valida o Bearer JWT via JWKS interno do Keycloak.
 Para tokens M2M de service account, o OAuth2-Proxy usa `preferred_username` como identidade da sessão, porque esses tokens não representam um usuário humano com email verificado.
@@ -289,10 +328,6 @@ Pré-condições:
 ```bash
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql \
   -n keycloak-auth --timeout=180s
-
-kubectl patch application root-app -n argocd \
-  --type merge \
-  -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":false}}}}'
 
 kubectl patch application infra-app -n argocd \
   --type merge \
@@ -462,3 +497,6 @@ kubectl logs <nome-do-pod> -n keycloak-auth
 # Logs da execução anterior (antes do crash)
 kubectl logs <nome-do-pod> -n keycloak-auth --previous
 ```
+
+---
+Autoria/Implementacao: GPT-5 Codex
