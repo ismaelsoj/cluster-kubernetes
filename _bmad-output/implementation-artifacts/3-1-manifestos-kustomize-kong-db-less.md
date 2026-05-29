@@ -6,7 +6,7 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Voce DEVE definir explicitamente o nivel de c
 
 # Story 3.1: Manifestos Kustomize do Kong DB-Less (Wave 3)
 
-**Status:** review
+**Status:** done
 **Complexidade:** Média Complexidade
 
 ## Story Foundation
@@ -303,6 +303,7 @@ Contexto carregado a partir de `SPEC.md`, `implementation-rules.md`, `architectu
 - `2026-05-28 17:27:01-03:00`: Correcao pos-validacao em cluster: imagem ajustada de `kong:3.14.0.3` para `kong/kong-gateway:3.14.0.3` apos `ImagePullBackOff` por repositório inexistente em `docker.io/library`. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-28 17:37:28-03:00`: Correcao pos-validacao em cluster: configurado `KONG_NGINX_WORKER_PROCESSES=1` apos `CrashLoopBackOff` por `OOMKilled`, reduzindo o default `auto` que estava abrindo 10 workers no nó Kubernetes. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-28 23:36:45-03:00`: Code review pós-implementação (6 findings). Aplicados: (F3) split do ConfigMap misto em `kong-configmap.yaml` (env vars) e `kong-declarative-config.yaml` (config DB-less montado via volumeMount); (F5) PriorityClass `kong-critical` elevado de 1000000 para 1100000, acima do `keycloak-critical`; (F6) `KONG_NGINX_WORKER_PROCESSES` movido para `auto` na base e override `"1"` adicionado no overlay local via patch Kustomize, corrigindo shipping do workaround de OOMKill para produção. Não aplicados: (F2) porta 8080 na NetworkPolicy egress confirmada correta via análise de ordem iptables (DNAT em nat/OUTPUT antes de filter/OUTPUT); (F4) rota Keycloak aceitando HTTP mantida até Story 3.2. Adicionado: componente `cluster/infrastructure/metallb/` com MetalLB v0.16.0 via remote reference Kustomize no overlay local, resolvendo Service LoadBalancer em `<pending>` no k3d (Finding 1); IPAddressPool `172.18.0.200-172.18.0.250` na subnet Docker do k3d. Autoria/Implementação: claude-sonnet-4-6. Revisão: claude-sonnet-4-6.
+- `2026-05-29 00:12:22-03:00`: Correção de lint pós-code-review: (1) `policy/kebab-case.rego` atualizado para isentar `CustomResourceDefinition` do check de nome (formato `<plural>.<group>` é mandatório pela spec k8s) e adicionar exceções RBAC do MetalLB (`metallb-system:controller`, `metallb-system:speaker`); (2) `cluster/infrastructure/metallb/base/kustomization.yaml` atualizado com patches `ignore-check.kube-linter.io/*` nos recursos vendor `metallb-webhook-service`, `controller` e `speaker`, suprimindo violações legítimas de design upstream (hostNetwork, NET_RAW, probes, labels, run-as-non-root). Regras de lint detalhadas documentadas em `_bmad-output/distillate-v2/implementation-rules.md` e `AGENTS.md`. `make lint` passou 316/316 conftest + 0 kube-linter. Validação manual em cluster concluída com sucesso: todos os ACs confirmados (Pod 1/1 Running, EXTERNAL-IP 172.18.0.200, KONG_DATABASE=off, 1 worker, `declarative config loaded`, `/status/ready → {"message":"ready"}`). Status atualizado para `done`. Autoria/Implementação: claude-sonnet-4-6.
 
 ---
 Autoria/Implementação: GPT-5 Codex
