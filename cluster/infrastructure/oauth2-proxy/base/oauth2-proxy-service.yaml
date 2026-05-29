@@ -1,0 +1,25 @@
+# Service interno do OAuth2-Proxy - destino das rotas protegidas do Kong
+apiVersion: v1
+kind: Service
+metadata:
+  name: oauth2-proxy-service
+  namespace: kong-gateway
+  labels:
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: 4180
+      targetPort: http
+      protocol: TCP
+      appProtocol: http
+
+# Autoria/Implementação: GPT-5 Codex

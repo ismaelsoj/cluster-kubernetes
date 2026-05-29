@@ -1,0 +1,8 @@
+# Overlay de production do OAuth2-Proxy - herda configuração base até parametrização futura
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# Autoria/Implementação: GPT-5 Codex

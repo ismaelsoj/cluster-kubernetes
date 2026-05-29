@@ -104,12 +104,14 @@ open http://localhost:8090          # painel web do Keycloak
 open http://localhost:8090/admin    # console administrativo
 ```
 
-> Após implantar o Kong (Wave 3), o acesso externo passará pela porta 8080 do host
-> (mapeada no k3d para a porta 80 do loadbalancer). Nesse caso, adicione ao `/etc/hosts`:
+> Após implantar o Kong (Wave 3), o acesso externo passa por HTTPS na porta
+> `8443` do host (mapeada no k3d para a porta `443` do loadbalancer). Nesse caso,
+> adicione ao `/etc/hosts`:
 > ```
 > 127.0.0.1 keycloak.local
 > ```
-> E acesse `http://keycloak.local:8080`.
+> E acesse `https://keycloak.local:8443`. Em ambiente local, o certificado é
+> self-signed e pode exigir aceite no navegador ou `curl -k` em validações manuais.
 
 ### Checar PriorityClass do pod
 
@@ -117,6 +119,90 @@ open http://localhost:8090/admin    # console administrativo
 kubectl get pod -l app.kubernetes.io/name=keycloak -n keycloak-auth \
   -o jsonpath='{.items[0].spec.priorityClassName}'
 ```
+
+---
+
+## Gateway Kong, TLS e Validação JWT
+
+### Validar que HTTP inseguro não chega ao upstream
+
+```bash
+curl -i -H 'Host: keycloak.local' http://localhost:8080/
+```
+
+Esperado: resposta não-2xx explícita do Kong, atualmente `426 Upgrade Required`, sem renderizar conteúdo normal do Keycloak por HTTP.
+
+### Validar discovery OIDC por HTTPS
+
+```bash
+curl -k -i \
+  https://keycloak.local:8443/realms/cluster-local/.well-known/openid-configuration
+```
+
+Esperado: `200` via Kong HTTPS. O issuer esperado é `https://keycloak.local:8443/realms/cluster-local`.
+
+### Obter token M2M local
+
+O `client_secret` abaixo (`dev-m2m-local-secret`) é fixture de desenvolvimento local criado para o realm `cluster-local`. Não reutilize esse valor em outros ambientes.
+
+```bash
+TOKEN="$(
+  curl -ksf -X POST \
+    https://keycloak.local:8443/realms/cluster-local/protocol/openid-connect/token \
+    -H 'Content-Type: application/x-www-form-urlencoded' \
+    -d 'grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret' \
+    | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])'
+)"
+
+python3 -c 'import base64,json,sys; p=sys.argv[1].split(".")[1] + "=="; print(json.loads(base64.urlsafe_b64decode(p))["iss"])' "${TOKEN}"
+```
+
+Esperado: token gerado e `iss` igual a `https://keycloak.local:8443/realms/cluster-local`.
+
+### Validar rota protegida com e sem token
+
+A rota protegida de prova usa o prefixo `/protected` no Kong. O Kong remove esse prefixo antes de encaminhar ao OAuth2-Proxy, e o OAuth2-Proxy valida o Bearer JWT via JWKS interno do Keycloak.
+
+```bash
+curl -k -i \
+  https://keycloak.local:8443/protected/realms/cluster-local/protocol/openid-connect/userinfo
+
+curl -k -i \
+  https://keycloak.local:8443/protected/realms/cluster-local/protocol/openid-connect/userinfo \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+Esperado: sem token retorna `401/403` antes do upstream; com token válido a requisição passa pela validação do OAuth2-Proxy e mantém o header `Authorization: Bearer`.
+
+### Validar rate limit default
+
+```bash
+for i in $(seq 1 105); do
+  curl -ks -o /tmp/kong-rate-limit-body.txt -w "%{http_code}\n" \
+    https://keycloak.local:8443/protected/realms/cluster-local/protocol/openid-connect/userinfo \
+    -H "Authorization: Bearer ${TOKEN}"
+done | tail -10
+```
+
+Esperado: após aproximadamente 100 requisições dentro de 1 minuto, alguma resposta retorna `429 Too Many Requests`. O plugin usa `policy: local`, adequado ao MVP local com 1 réplica; em múltiplos pods, os contadores não são globais e Redis deve ser avaliado em story futura.
+
+### Validar sobrevivência temporária do cache JWKS
+
+O OAuth2-Proxy usa `oidc-jwks-url` interno e o verificador remoto de chaves do provider OIDC. Esse verificador é mantido em memória e reutiliza chaves já conhecidas enquanto o `kid` do token continuar disponível no cache.
+
+```bash
+kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=0
+sleep 10
+
+curl -k -i \
+  https://keycloak.local:8443/protected/realms/cluster-local/protocol/openid-connect/userinfo \
+  -H "Authorization: Bearer ${TOKEN}"
+
+kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=1
+kubectl rollout status deployment/keycloak-deployment -n keycloak-auth
+```
+
+Esperado: token previamente validável continua aceito enquanto a chave JWKS necessária estiver em cache; ao final, o Keycloak volta a `Ready`.
 
 ---
 
@@ -228,7 +314,7 @@ kubectl exec -n keycloak-auth "pod/${POSTGRES_POD}" -- rm -f /tmp/inspect.dump
 | Client | `m2m-client` |
 | Client Secret | `dev-m2m-local-secret` |
 | Grant | `client_credentials` apenas |
-| TTL do client | `access.token.lifespan = 31536000` (1 ano) |
+| TTL do client | `access.token.lifespan = 3600` (1 hora) |
 
 Validação pós-restore:
 
@@ -268,6 +354,7 @@ kubectl patch application infra-app -n argocd \
 ```
 
 <!-- Autoria/Implementação: claude-sonnet-4-6 -->
+<!-- Autoria/Implementação: GPT-5 Codex -->
 <!-- Revisão: GPT-5 Codex -->
 
 ---

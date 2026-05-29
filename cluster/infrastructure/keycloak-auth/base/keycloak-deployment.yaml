@@ -79,6 +79,10 @@ spec:
             # Rede e proxy (TLS encerrado no edge pelo Kong na Wave 3)
             - name: KC_HTTP_ENABLED
               value: "true"
+            - name: KC_HOSTNAME
+              value: https://keycloak.local:8443
+            - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+              value: "true"
             - name: KC_HOSTNAME_STRICT
               value: "false"
             - name: KC_PROXY_HEADERS
@@ -141,4 +145,5 @@ spec:
             name: keycloak-realm-config
 
 # Autoria/Implementação: claude-sonnet-4-6
+# Autoria/Implementação: GPT-5 Codex
 # Revisão: GPT-5.5

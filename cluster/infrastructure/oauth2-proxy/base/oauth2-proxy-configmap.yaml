@@ -1,0 +1,44 @@
+# ConfigMap do OAuth2-Proxy - valida Bearer JWT via Keycloak OIDC/JWKS sem segredos
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oauth2-proxy-configmap
+  namespace: kong-gateway
+  labels:
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+data:
+  OAUTH2_PROXY_PROVIDER: keycloak-oidc
+  OAUTH2_PROXY_CLIENT_ID: m2m-client
+  OAUTH2_PROXY_OIDC_ISSUER_URL: https://keycloak.local:8443/realms/cluster-local
+  OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
+  OAUTH2_PROXY_OIDC_JWKS_URL: http://keycloak-service.keycloak-auth.svc.cluster.local/realms/cluster-local/protocol/openid-connect/certs
+  OAUTH2_PROXY_LOGIN_URL: https://keycloak.local:8443/realms/cluster-local/protocol/openid-connect/auth
+  OAUTH2_PROXY_REDEEM_URL: http://keycloak-service.keycloak-auth.svc.cluster.local/realms/cluster-local/protocol/openid-connect/token
+  OAUTH2_PROXY_VALIDATE_URL: http://keycloak-service.keycloak-auth.svc.cluster.local/realms/cluster-local/protocol/openid-connect/userinfo
+  OAUTH2_PROXY_REDIRECT_URL: https://keycloak.local:8443/oauth2/callback
+  OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+  OAUTH2_PROXY_SCOPE: openid
+  OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+  OAUTH2_PROXY_UPSTREAMS: http://keycloak-service.keycloak-auth.svc.cluster.local/
+  OAUTH2_PROXY_SKIP_JWT_BEARER_TOKENS: "true"
+  OAUTH2_PROXY_OIDC_EXTRA_AUDIENCES: m2m-client
+  OAUTH2_PROXY_API_ROUTES: ^/.*
+  OAUTH2_PROXY_BEARER_TOKEN_LOGIN_FALLBACK: "false"
+  OAUTH2_PROXY_FORCE_JSON_ERRORS: "true"
+  OAUTH2_PROXY_COOKIE_SECURE: "true"
+  OAUTH2_PROXY_COOKIE_SAMESITE: lax
+  OAUTH2_PROXY_SKIP_AUTH_STRIP_HEADERS: "false"
+  OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "false"
+  OAUTH2_PROXY_SET_AUTHORIZATION_HEADER: "false"
+  OAUTH2_PROXY_PASS_ACCESS_TOKEN: "false"
+  OAUTH2_PROXY_PASS_HOST_HEADER: "false"
+  OAUTH2_PROXY_REVERSE_PROXY: "true"
+  OAUTH2_PROXY_TRUSTED_PROXY_IPS: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+  OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+  OAUTH2_PROXY_SILENCE_PING_LOGGING: "true"
+
+# Autoria/Implementação: GPT-5 Codex

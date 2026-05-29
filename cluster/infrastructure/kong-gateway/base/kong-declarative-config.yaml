@@ -1,4 +1,4 @@
-# ConfigMap da configuração declarativa do Kong DB-Less - rota inicial do Keycloak
+# ConfigMap da configuração declarativa do Kong DB-Less - borda TLS, OIDC e rate limit
 # Montado como arquivo em /kong/declarative/kong.yml via volumeMount + subPath.
 apiVersion: v1
 kind: ConfigMap
@@ -17,12 +17,12 @@ data:
     _transform: true
 
     services:
-      - name: keycloak-service
+      - name: keycloak-public-service
         host: keycloak-service.keycloak-auth.svc.cluster.local
         port: 80
         protocol: http
         routes:
-          - name: keycloak-route
+          - name: keycloak-http-block-route
             hosts:
               - keycloak.local
             paths:
@@ -31,6 +31,52 @@ data:
             strip_path: false
             protocols:
               - http
+            plugins:
+              - name: request-termination
+                config:
+                  status_code: 426
+                  message: "Use HTTPS on https://keycloak.local:8443"
+          - name: keycloak-oidc-public-route
+            hosts:
+              - keycloak.local
+            paths:
+              - /.well-known
+              - /realms/cluster-local/.well-known
+              - /realms/cluster-local/protocol/openid-connect/certs
+              - /realms/cluster-local/protocol/openid-connect/token
+              - /resources
+            preserve_host: true
+            strip_path: false
+            protocols:
               - https
+      - name: oauth2-proxy-service
+        host: oauth2-proxy-service.kong-gateway.svc.cluster.local
+        port: 4180
+        protocol: http
+        routes:
+          - name: oauth2-proxy-callback-route
+            hosts:
+              - keycloak.local
+            paths:
+              - /oauth2
+            preserve_host: true
+            strip_path: false
+            protocols:
+              - https
+          - name: keycloak-protected-route
+            hosts:
+              - keycloak.local
+            paths:
+              - /protected
+            preserve_host: true
+            strip_path: true
+            protocols:
+              - https
+            plugins:
+              - name: rate-limiting
+                config:
+                  minute: 100
+                  policy: local
 
 # Autoria/Implementação: claude-sonnet-4-6
+# Autoria/Implementação: GPT-5 Codex

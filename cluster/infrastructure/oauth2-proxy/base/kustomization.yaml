@@ -1,0 +1,14 @@
+# Kustomization base - oauth2-proxy - cluster-kubernetes
+# Wave 3 — validador OIDC/JWKS OSS integrado ao Kong DB-Less
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kong-gateway
+
+resources:
+  - oauth2-proxy-configmap.yaml
+  - oauth2-proxy-deployment.yaml
+  - oauth2-proxy-service.yaml
+  - oauth2-proxy-networkpolicy.yaml
+
+# Autoria/Implementação: GPT-5 Codex

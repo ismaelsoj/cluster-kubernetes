@@ -2,6 +2,9 @@
   "realm": "cluster-local",
   "enabled": true,
   "sslRequired": "external",
+  "attributes": {
+    "autoria-implementacao": "GPT-5 Codex"
+  },
   "registrationAllowed": false,
   "accessTokenLifespan": 3600,
   "ssoSessionIdleTimeout": 1800,
@@ -27,8 +30,23 @@
       "protocol": "openid-connect",
       "fullScopeAllowed": true,
       "attributes": {
-        "access.token.lifespan": "31536000"
-      }
+        "access.token.lifespan": "3600"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-mapper-m2m-client",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "m2m-client",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
   "roles": {

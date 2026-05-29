@@ -1,0 +1,8 @@
+# Overlay local do OAuth2-Proxy - herda configuração base para validação JWKS no k3d
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# Autoria/Implementação: GPT-5 Codex

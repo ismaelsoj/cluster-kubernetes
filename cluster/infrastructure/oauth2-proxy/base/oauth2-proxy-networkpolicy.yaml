@@ -1,12 +1,11 @@
-# NetworkPolicy do Kong - ingress aberto nas portas de borda e egress mínimo explícito
-# Permite DNS e comunicação futura com o Keycloak/JWKS sem expor o Admin API.
+# NetworkPolicy do OAuth2-Proxy - ingress interno e egress mínimo para DNS/Keycloak
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: kong-networkpolicy
+  name: oauth2-proxy-networkpolicy
   namespace: kong-gateway
   labels:
-    app.kubernetes.io/name: kong
+    app.kubernetes.io/name: oauth2-proxy
     app.kubernetes.io/component: gateway
     app.kubernetes.io/part-of: cluster-kubernetes
   annotations:
@@ -14,7 +13,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: kong
+      app.kubernetes.io/name: oauth2-proxy
       app.kubernetes.io/component: gateway
   policyTypes:
     - Ingress
@@ -22,11 +21,7 @@ spec:
   ingress:
     - ports:
         - protocol: TCP
-          port: 8000
-        - protocol: TCP
-          port: 8443
-        - protocol: TCP
-          port: 8100
+          port: 4180
   egress:
     - to:
         - namespaceSelector:
@@ -51,16 +46,5 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kong-gateway
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: oauth2-proxy
-              app.kubernetes.io/component: gateway
-      ports:
-        - protocol: TCP
-          port: 4180
 
 # Autoria/Implementação: GPT-5 Codex

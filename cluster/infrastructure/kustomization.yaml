@@ -9,4 +9,7 @@ resources:
   - namespaces/base
   - metallb/overlays/local
   - keycloak-auth/overlays/local
+  - oauth2-proxy/overlays/local
   - kong-gateway/overlays/local
+
+# Autoria/Implementação: GPT-5 Codex
