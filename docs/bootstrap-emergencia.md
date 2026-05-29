@@ -1,173 +1,225 @@
-# Guia de Bootstrap de Emergência - cluster-kubernetes
+# Guia de Bootstrap de Emergencia - cluster-kubernetes
 
-Este guia documenta o procedimento de recuperação do cluster em cenários de desastre ou reconstrução do "Dia Zero" (Bootstrap de Emergência).
+Runbook principal para reconstruir ou recuperar a fundacao GitOps local (`k3d + ArgoCD + PostgreSQL + Keycloak + Kong + OAuth2-Proxy`) sem depender de memoria tribal.
 
-> [!NOTE]
-> Este documento é o esqueleto inicial com placeholders (conforme a Story 1.5) e será refinado com comandos e testes de endpoints na Story 3.4.
-> Nenhum segredo (senha, chave privada) deve ser persistido no repositório Git.
+> [!WARNING]
+> Nenhum segredo deve ser persistido no Git. O bootstrap de `Secrets` continua manual/externo por design, com apoio opcional de `.env` local e `make secrets`.
 
-## Sequência de Recuperação
+## 1. Escopo e regra de decisao
 
-A reconstrução da plataforma a partir do zero deve seguir rigorosamente a sequência abaixo para garantir a conformidade GitOps e evitar erros de sincronização:
+Use este documento em tres cenarios:
 
-1. **Inicialização do Cluster Local (K3d)**
-2. **Criação Prévia dos Namespaces**
-3. **Injeção Manual dos Secrets**
-4. **Instalação do ArgoCD**
-5. **Aplicação do root-app.yaml (Orquestrador do GitOps)**
+| Cenario | Quando usar | Acao principal |
+| --- | --- | --- |
+| Reconstrucao total | Cluster inexistente, irrecuperavel ou fora de confianca | Recriar cluster, reinjetar `Secrets`, reinstalar ArgoCD e reaplicar App-of-Apps |
+| Recuperacao parcial | Cluster existe, mas uma parte da plataforma ficou degradada | Reconciliar via ArgoCD, reinjetar `Secrets` se necessario e validar healthchecks |
+| Restore de identidade | PostgreSQL/Keycloak perderam estado ou ficaram corrompidos | Congelar auto-heal, restaurar dump e validar emissao de token |
 
----
+Regra GitOps permanente:
 
-## 1. Inicialização do Cluster Local (K3d)
+- Mudancas manuais no cluster sao aceitaveis apenas para bootstrap de `Secrets`, instalacao inicial do ArgoCD e procedimentos de recuperacao explicitamente previstos aqui.
+- Fora disso, a plataforma deve convergir pelo ArgoCD.
 
-Para provisionar a infraestrutura de contêineres local com as configurações recomendadas e limites de recursos adequados, execute:
+## 2. Inventario canonico da plataforma
+
+Confirme estes nomes antes de operar:
+
+| Tipo | Nome |
+| --- | --- |
+| Namespace | `argocd` |
+| Namespace | `keycloak-auth` |
+| Namespace | `kong-gateway` |
+| Application ArgoCD | `root-app` |
+| Application ArgoCD | `infra-app` |
+| Application ArgoCD | `apps-app` |
+| Secret | `keycloak-db-secret` |
+| Secret | `keycloak-admin-secret` |
+| Secret | `kong-tls-secret` |
+| Secret | `oauth2-proxy-secret` |
+| Deployment | `postgresql-deployment` |
+| Deployment | `keycloak-deployment` |
+| Deployment | `kong-deployment` |
+| Deployment | `oauth2-proxy-deployment` |
+
+Healthchecks reais do ambiente:
+
+- Keycloak: `http://127.0.0.1:19000/health/live` e `http://127.0.0.1:19000/health/ready` via `kubectl port-forward`
+- Kong: `http://127.0.0.1:18100/status` e `http://127.0.0.1:18100/status/ready` via `kubectl port-forward`
+- OAuth2-Proxy: `http://127.0.0.1:14180/ping` e `http://127.0.0.1:14180/ready` via `kubectl port-forward`
+- Borda externa: `https://localhost`
+
+## 3. Reconstrucao total do zero
+
+### 3.1 Caminho feliz recomendado
+
+Quando a estacao local estiver funcional e voce quiser a recuperacao mais curta e aderente ao comportamento atual do projeto:
 
 ```bash
 make up
 ```
 
-Ou, se preferir inicializar manualmente usando a especificação `k3d.yaml` da raiz do repositório:
+O `make up` executa o fluxo real consolidado em `scripts/cluster-up.sh`:
+
+1. cria ou reconcilia o cluster k3d;
+2. garante `keycloak-auth` e `kong-gateway`;
+3. injeta `keycloak-db-secret`, `keycloak-admin-secret`, `kong-tls-secret` e `oauth2-proxy-secret`;
+4. instala ArgoCD `v3.4.2` com `kubectl apply --server-side=true --force-conflicts`;
+5. aplica `root-app`, `infra-app` e `apps-app` com override de `targetRevision`;
+6. aguarda readiness de PostgreSQL, Keycloak, Kong e OAuth2-Proxy indiretamente pela reconciliacao da plataforma.
+
+### 3.2 Procedimento manual verificado
+
+Use este caminho quando precisar executar a recuperacao passo a passo.
+
+#### Passo 1. Criar o cluster
 
 ```bash
 k3d cluster create --config k3d.yaml
+kubectl wait --for=condition=Ready nodes --all --timeout=120s
 ```
 
----
+#### Passo 2. Garantir namespaces e `Secrets`
 
-## 2. Criação Prévia dos Namespaces
-
-Antes de iniciar a reconciliação automática pelo ArgoCD, os namespaces fundamentais da infraestrutura devem ser criados previamente. Isso evita falhas de dependência na aplicação dos segredos e componentes.
-
-Crie os namespaces obrigatórios executando:
-
-```bash
-kubectl create namespace keycloak-auth
-kubectl create namespace kong-gateway
-```
-
----
-
-## 3. Injeção Manual dos Secrets
-
-Os segredos sensíveis nunca devem ser versionados ou armazenados no Git (NFR-S02 / FR22). Em cenários de emergência, o SRE deve injetar os Secrets no cluster de forma estática antes de aplicar a governança do ArgoCD.
-
-### 3.1. Secrets do Identity Provider e Banco de Dados (Namespace: `keycloak-auth`)
-
-*   **Secret de conexão com o Banco de Dados (PostgreSQL):**
-    
-    Substitua `<VALOR_USUARIO_DB>` e `<VALOR_SENHA_DB>` com suas credenciais reais:
-    
-    ```bash
-    kubectl create secret generic keycloak-db-secret \
-      --namespace=keycloak-auth \
-      --from-literal=database-user=<VALOR_USUARIO_DB> \
-      --from-literal=database-password=<VALOR_SENHA_DB>
-    ```
-    
-    **Exemplo concreto (para referência apenas — use seus próprios valores):**
-    ```bash
-    kubectl create secret generic keycloak-db-secret \
-      --namespace=keycloak-auth \
-      --from-literal=database-user=keycloak_user \
-      --from-literal=database-password=MySecurePostgresPass2026!
-    ```
-    
-    **Requisitos:**
-    - `database-user`: lowercase alphanumeric + underscore, min 3 caracteres
-    - `database-password`: mínimo 12 caracteres (recomendado 16+), sem espaços
-
-*   **Secret de administração do console Keycloak:**
-    
-    Substitua `<VALOR_ADMIN_USER>` e `<VALOR_ADMIN_PASSWORD>` com suas credenciais reais:
-    
-    ```bash
-    kubectl create secret generic keycloak-admin-secret \
-      --namespace=keycloak-auth \
-      --from-literal=admin-username=<VALOR_ADMIN_USER> \
-      --from-literal=admin-password=<VALOR_ADMIN_PASSWORD>
-    ```
-    
-    **Exemplo concreto (para referência apenas — use seus próprios valores):**
-    ```bash
-    kubectl create secret generic keycloak-admin-secret \
-      --namespace=keycloak-auth \
-      --from-literal=admin-username=admin_sre \
-      --from-literal=admin-password=MySecureAdminPass2026!
-    ```
-    
-    **Requisitos:**
-    - `admin-username`: lowercase alphanumeric + underscore, min 3 caracteres
-    - `admin-password`: mínimo 12 caracteres (recomendado 16+), sem espaços
-
-### 3.2. Script Utilitário Local (Opcional)
-
-Para acelerar o processo e evitar erros de digitação, você pode utilizar o script utilitário interativo:
+O caminho suportado e idempotente:
 
 ```bash
 make secrets
 ```
 
-Ou diretamente:
+Equivalente direto:
 
 ```bash
 ./scripts/inject-secrets.sh
 ```
 
-> [!WARNING]
-> O script lê os valores de um arquivo local `.env` (ignorado no Git) ou os solicita de forma interativa. Em ambientes não-interativos, ele gera senhas seguras automaticamente e as exibe. NUNCA envie ou comite o arquivo `.env` gerado.
+Esse script:
 
----
+- cria/aplica os namespaces `keycloak-auth` e `kong-gateway`;
+- cria/atualiza `keycloak-db-secret`, `keycloak-admin-secret`, `kong-tls-secret` e `oauth2-proxy-secret`;
+- usa `.env` local apenas como conveniencia operacional, nunca como artefato versionado.
 
-## 4. Instalação do ArgoCD
-
-Com os namespaces criados e os Secrets injetados, instale o ArgoCD de forma idempotente. A instalação utiliza a versão estável e imutável definida nas especificações (`v3.4.2` por padrão) com suporte a manifestos grandes via *Server-Side Apply*:
+#### Passo 3. Instalar o ArgoCD
 
 ```bash
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n argocd --server-side=true --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.4.2/manifests/install.yaml
+kubectl apply -n argocd --server-side=true --force-conflicts \
+  -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.4.2/manifests/install.yaml
+kubectl wait --for=condition=Available -n argocd --timeout=180s deployment/argocd-server
 ```
 
-Aguarde o ArgoCD ficar totalmente pronto:
+#### Passo 4. Aplicar o bootstrap GitOps
+
+Em desenvolvimento local, `scripts/cluster-up.sh` nao aplica so o `root-app`: ele aplica `root-app`, `infra-app` e `apps-app` com o mesmo override de branch para evitar que os filhos nascam apontando para `main` enquanto voce trabalha em outra branch.
+
+Se a sua branch local existir em `origin`, use-a como `targetRevision`. Se ela nao existir no remoto, o comportamento atual do script e fazer fallback para `main` para evitar `ComparisonError` no ArgoCD.
+
+Aplicacao manual equivalente:
 
 ```bash
-kubectl wait --for=condition=Available --namespace argocd --timeout=180s deployment/argocd-server
+export ARGO_TARGET_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
+for app in root-app infra-app apps-app; do
+  sed "s|targetRevision: main|targetRevision: ${ARGO_TARGET_BRANCH}|" \
+    "cluster/bootstrap/${app}.yaml" | kubectl apply -f -
+done
 ```
 
----
-
-## 5. Aplicação do root-app.yaml (Orquestrador do GitOps)
-
-Aplique a governança recursiva do ArgoCD (padrão App-of-Apps).
-Substitua temporariamente a branch de destino (`targetRevision`) no manifesto para coincidir com a sua branch de desenvolvimento local (o script `cluster-up.sh` faz isso de forma transparente, mas o SRE pode fazê-lo manualmente se necessário):
+Se a branch local ainda nao existir no remoto e voce quiser reproduzir fielmente o comportamento automatizado, publique a branch primeiro ou use `main` de forma explicita:
 
 ```bash
-# Substitua <BRANCH_DESEJADA> pelo branch de trabalho (ex: main ou feature/sua-feature)
-sed "s|targetRevision: main|targetRevision: <BRANCH_DESEJADA>|" cluster/bootstrap/root-app.yaml | kubectl apply -f -
+export ARGO_TARGET_BRANCH="main"
 ```
 
-Uma vez aplicado o `root-app.yaml`, o ArgoCD iniciará a sincronização em cascata de todos os recursos do repositório respeitando rigorosamente as ordens das **Sync Waves** declaradas.
+#### Passo 5. Confirmar readiness da plataforma
 
----
+```bash
+kubectl rollout status deployment/keycloak-deployment -n keycloak-auth --timeout=300s
+kubectl rollout status deployment/kong-deployment -n kong-gateway --timeout=300s
+kubectl rollout status deployment/oauth2-proxy-deployment -n kong-gateway --timeout=300s
+kubectl get applications -n argocd
+```
 
-## 6. Recuperação via Backup PostgreSQL (FR23)
+Esperado:
 
-Use esta seção quando o banco de dados do Keycloak estiver corrompido ou perdido e houver backup disponível. Execute **após** a Etapa 5, com a infraestrutura pronta e em uma janela de manutenção.
+- `root-app`, `infra-app` e `apps-app` existem no namespace `argocd`;
+- Keycloak, Kong e OAuth2-Proxy chegam a estado operacional;
+- o acesso externo passa a responder em `https://localhost`.
 
-### 6.1. Gerar backup (operação de rotina)
+## 4. Recuperacao parcial
+
+### 4.1 Quando basta reconciliar pelo ArgoCD
+
+Use reconciliação simples quando manifests, `ConfigMaps` ou `Deployments` sairam de sincronia, mas o estado persistente continua confiavel:
+
+```bash
+argocd app sync infra-app --force
+argocd app sync root-app infra-app apps-app --force
+```
+
+Sem CLI do ArgoCD:
+
+```bash
+kubectl annotate app infra-app -n argocd argocd.argoproj.io/refresh=hard --overwrite
+kubectl annotate app root-app -n argocd argocd.argoproj.io/refresh=hard --overwrite
+kubectl annotate app apps-app -n argocd argocd.argoproj.io/refresh=hard --overwrite
+```
+
+Use esse caminho para:
+
+- pods presos em configuracao antiga;
+- drift manual removivel por re-sync;
+- falhas de rollout que nao envolvem perda de `Secret` ou corrupcao de banco.
+
+### 4.2 Quando reinjetar `Secrets`
+
+Reexecute `make secrets` ou `./scripts/inject-secrets.sh` quando:
+
+- `keycloak-db-secret`, `keycloak-admin-secret`, `kong-tls-secret` ou `oauth2-proxy-secret` sumirem;
+- o cluster tiver sido recriado;
+- certificados TLS locais ou segredos gerados em `.env` precisarem ser refeitos.
+
+Nao use esse passo para mascarar erro de aplicacao ArgoCD se os `Secrets` continuam presentes e corretos.
+
+### 4.3 Quando usar restore do PostgreSQL
+
+Va para a secao 5 se houver indicio de perda de estado do Keycloak, por exemplo:
+
+- realm `cluster-local` ausente;
+- client `m2m-client` nao existe mais;
+- emissao de token falha mesmo com pods e `Secrets` corretos;
+- banco foi corrompido, truncado ou restaurado parcialmente.
+
+### 4.4 Quando destruir e recriar o cluster
+
+Prefira reconstrucao total quando:
+
+- `kubectl` nao consegue estabilizar o cluster;
+- a fundacao GitOps ficou sem confianca;
+- houve mistura de alteracoes manuais fora do procedimento previsto;
+- restaurar componente isolado geraria mais risco do que reprovisionar tudo.
+
+## 5. Restore do PostgreSQL e recuperacao do Keycloak
+
+### 5.1 Gerar backup
 
 ```bash
 ./scripts/pg-backup.sh
-# Gera: ./backups/keycloak-db-backup-YYYYMMDD-HHMMSS.dump
 ```
 
-Armazene o arquivo de dump em local externo ao cluster (ex: S3, NFS, disco externo).
+Saida esperada:
 
-### 6.2. Restaurar banco a partir de backup
+- arquivo `./backups/keycloak-db-backup-YYYYMMDD-HHMMSS.dump`;
+- dump armazenado fora do cluster para uso em desastre real.
 
-Antes do restore:
+### 5.2 Congelar auto-heal antes do restore
 
-1. Aguarde o PostgreSQL ficar `Ready`
-2. Desative temporariamente o auto-heal de `root-app` e `infra-app` no ArgoCD para evitar que o GitOps religue o Keycloak no meio do procedimento
+O comportamento atual suportado exige congelar `root-app` e `infra-app`, nao apenas um deles. Isso evita que o GitOps religue o Keycloak durante a janela de manutencao ou reverta o ajuste de um app filho enquanto o outro continua automatizado.
+
+Pre-condicoes:
+
+- `postgresql-deployment` existente e `Ready`;
+- janela de manutencao aprovada;
+- dump valido disponivel localmente.
 
 ```bash
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql \
@@ -180,42 +232,55 @@ kubectl patch application root-app -n argocd \
 kubectl patch application infra-app -n argocd \
   --type merge \
   -p '{"spec":{"syncPolicy":{"automated":{"prune":false,"selfHeal":false}}}}'
+```
 
+### 5.3 Restaurar o dump
+
+```bash
 ./scripts/pg-restore.sh ./backups/keycloak-db-backup-<timestamp>.dump
 ```
 
-O script:
-1. Escala Keycloak para 0 réplicas (interrupção controlada)
-2. Copia o dump para o mesmo pod PostgreSQL que executará o restore
-3. Valida o dump com `pg_restore --list` antes de alterar o banco
-4. Executa `pg_restore --clean --if-exists`
-5. Escala Keycloak de volta para a contagem original de réplicas (hoje, `1`)
+O script atual executa este fluxo:
 
-### 6.3. Validar restore
+1. valida que `root-app` e `infra-app` nao estao com `selfHeal=true`;
+2. copia o dump para o pod PostgreSQL;
+3. valida o arquivo com `pg_restore --list`;
+4. escala `keycloak-deployment` para `0`;
+5. executa `pg_restore --clean --if-exists`;
+6. remove o dump temporario do pod;
+7. restaura a contagem original de replicas do Keycloak.
 
-O `client_secret` abaixo (`dev-m2m-local-secret`) é um fixture de **desenvolvimento local** criado na Story 2.3 para validar o realm `cluster-local`. Não reutilize esse valor como padrão para outros ambientes.
+### 5.4 Validar o estado restaurado
+
+`dev-m2m-local-secret` e fixture de desenvolvimento local. Ele e aceitavel apenas para o ambiente local desta plataforma e nao deve ser promovido como padrao para outros ambientes.
 
 ```bash
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=keycloak \
+  -n keycloak-auth --timeout=180s
+
 kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80 >/tmp/keycloak-port-forward.log 2>&1 &
 PF_PID=$!
 sleep 3
 
-if ! kill -0 "$PF_PID" 2>/dev/null; then
-  cat /tmp/keycloak-port-forward.log
-  exit 1
-fi
-
 curl -sf -X POST http://localhost:8090/realms/cluster-local/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret" \
+  -d "grant_type=client_credentials" \
+  -d "client_id=m2m-client" \
+  -d "client_secret=dev-m2m-local-secret" \
+  --data-urlencode "scope=openid profile email" \
   | python3 -c "import sys,json; d=json.load(sys.stdin); token=d.get('access_token'); assert token, 'ERRO: access_token ausente'; print('Token OK:', len(token) > 0)"
 
 kill "$PF_PID" 2>/dev/null || true
 wait "$PF_PID" 2>/dev/null || true
-# Esperado: Token OK: True
 ```
 
-Após a validação, reative o auto-heal:
+Esperado:
+
+- o realm `cluster-local` responde;
+- o client `m2m-client` volta a emitir token;
+- a fixture local continua funcionando apenas como prova de desenvolvimento.
+
+### 5.5 Reativar auto-heal
 
 ```bash
 kubectl patch application root-app -n argocd \
@@ -227,5 +292,98 @@ kubectl patch application infra-app -n argocd \
   -p '{"spec":{"syncPolicy":{"automated":{"prune":false,"selfHeal":true}}}}'
 ```
 
-<!-- Autoria/Implementação: claude-sonnet-4-6 -->
-<!-- Revisão: GPT-5 Codex -->
+## 6. Validacoes internas e externas apos o recovery
+
+### 6.1 Saude interna do cluster
+
+```bash
+kubectl port-forward -n keycloak-auth deploy/keycloak-deployment 19000:9000 >/tmp/pf-keycloak.log 2>&1 &
+PF_KEYCLOAK=$!
+sleep 3
+curl -sf http://127.0.0.1:19000/health/ready
+kill "${PF_KEYCLOAK}" 2>/dev/null || true
+wait "${PF_KEYCLOAK}" 2>/dev/null || true
+
+kubectl port-forward -n kong-gateway deploy/kong-deployment 18100:8100 >/tmp/pf-kong.log 2>&1 &
+PF_KONG=$!
+sleep 3
+curl -sf http://127.0.0.1:18100/status/ready
+kill "${PF_KONG}" 2>/dev/null || true
+wait "${PF_KONG}" 2>/dev/null || true
+
+kubectl port-forward -n kong-gateway deploy/oauth2-proxy-deployment 14180:4180 >/tmp/pf-oauth2-proxy.log 2>&1 &
+PF_OAUTH2_PROXY=$!
+sleep 3
+curl -sf http://127.0.0.1:14180/ready
+kill "${PF_OAUTH2_PROXY}" 2>/dev/null || true
+wait "${PF_OAUTH2_PROXY}" 2>/dev/null || true
+```
+
+Esses checks validam probes internos de Kubernetes. Eles nao substituem a validacao da jornada externa pela borda.
+
+### 6.2 Saude externa da plataforma
+
+```bash
+curl -k -sf https://localhost/realms/cluster-local/.well-known/openid-configuration >/tmp/oidc.json
+make status
+make token
+```
+
+Esperado:
+
+- discovery OIDC acessivel via Kong HTTPS;
+- `make status` mostra cluster acessivel, componentes centrais e URLs corretas;
+- `make token` imprime um `TOKEN=...` copiavel com `issuer=https://localhost/realms/cluster-local`.
+
+### 6.3 Teste protegido final
+
+```bash
+TOKEN="$(bash scripts/generate-token.sh | awk -F= '/^TOKEN=/{print $2; exit}')"
+
+curl -k -i \
+  https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo
+
+curl -k -i \
+  https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+Esperado:
+
+- sem token: `401` ou `403`;
+- com token valido: resposta `200` pelo fluxo protegido.
+
+### 6.4 Teste de sobrevivencia do cache JWKS
+
+Use este teste apenas quando precisar provar que a validacao de Bearer token continua funcionando temporariamente sem o Keycloak disponivel.
+
+```bash
+TOKEN="$(bash scripts/generate-token.sh | awk -F= '/^TOKEN=/{print $2; exit}')"
+
+curl -k -i https://localhost/oauth2/auth \
+  -H "Authorization: Bearer ${TOKEN}"
+
+kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=0
+sleep 10
+
+curl -k -i https://localhost/oauth2/auth \
+  -H "Authorization: Bearer ${TOKEN}"
+
+kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=1
+kubectl rollout status deployment/keycloak-deployment -n keycloak-auth --timeout=300s
+```
+
+Esperado:
+
+- `202 Accepted` no `/oauth2/auth` enquanto a chave JWKS necessaria continua em cache;
+- esse teste prova a validacao local do token sem depender do upstream `/protected/.../userinfo`.
+
+## 7. Divergencias resolvidas por este runbook
+
+- O bootstrap manual agora documenta o comportamento real de `scripts/cluster-up.sh`: override de branch para `root-app`, `infra-app` e `apps-app`, e nao apenas para `root-app`.
+- A recuperacao parcial ficou separada da reconstrucao total, com criterio explicito para `argocd app sync`, reinjecao de `Secrets`, restore de banco e recriacao do cluster.
+- O restore do PostgreSQL passa a congelar e reativar `root-app` e `infra-app` de forma consistente com `scripts/pg-restore.sh` e com a protecao `prune` atual.
+- Os healthchecks e validacoes finais usam os endpoints reais do projeto: Keycloak `:9000/health/*`, Kong `/status` e `/status/ready`, OAuth2-Proxy `/ping` e `/ready`, e a borda externa `https://localhost`.
+
+---
+Autoria/Implementacao: GPT-5 Codex

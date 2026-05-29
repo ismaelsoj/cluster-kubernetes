@@ -2,6 +2,9 @@
 
 Referência rápida para operações do dia-a-dia no cluster local (k3d + ArgoCD).
 
+> [!NOTE]
+> Para reconstrução total do cluster ou recuperação de desastre, use `docs/bootstrap-emergencia.md` como runbook principal. Este documento fica focado em operação contínua e troubleshooting.
+
 ---
 
 ## ArgoCD
@@ -81,12 +84,20 @@ kubectl rollout restart deployment/keycloak-deployment -n keycloak-auth
 kubectl rollout status deployment/keycloak-deployment -n keycloak-auth
 ```
 
-### Verificar health manualmente de dentro do cluster
+### Verificar health manualmente do Keycloak
 
 ```bash
-# Health e métricas ficam na porta 9000 (management interface do Keycloak 26+)
-kubectl exec -n keycloak-auth deploy/keycloak-deployment -- \
-  curl -sf http://localhost:9000/health/ready
+# Health e métricas ficam na porta 9000 (management interface do Keycloak 26+).
+# A imagem atual não traz curl; por isso a validação suportada usa port-forward.
+kubectl port-forward -n keycloak-auth deploy/keycloak-deployment 19000:9000 \
+  >/tmp/keycloak-health-port-forward.log 2>&1 &
+PF_PID=$!
+sleep 3
+
+curl -sf http://127.0.0.1:19000/health/ready
+
+kill "$PF_PID" 2>/dev/null || true
+wait "$PF_PID" 2>/dev/null || true
 ```
 
 ### Acessar o Keycloak no navegador local
@@ -328,6 +339,10 @@ Pré-condições:
 ```bash
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql \
   -n keycloak-auth --timeout=180s
+
+kubectl patch application root-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":false}}}}'
 
 kubectl patch application infra-app -n argocd \
   --type merge \

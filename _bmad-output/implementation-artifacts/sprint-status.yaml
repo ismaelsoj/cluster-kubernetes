@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-05-12"
-last_updated: "2026-05-29"  # story 3.3 done (code review concluído)
+last_updated: "2026-05-29"  # story 3.4 pronta para review
 project: cluster-kubernetes
 project_key: NOKEY
 tracking_system: file-system
@@ -64,7 +64,7 @@ development_status:
   3-1-manifestos-kustomize-kong-db-less: review
   3-2-tls-validacao-jwks-rate-limit-default: done
   3-3-script-token-feedback-terminal: done
-  3-4-refinamento-bootstrap-emergencia: backlog
+  3-4-refinamento-bootstrap-emergencia: review
   epic-3-retrospective: optional
 
   # --- Épico 4: Boilerplate, Habilitação do Desenvolvedor e Deep Security ---
