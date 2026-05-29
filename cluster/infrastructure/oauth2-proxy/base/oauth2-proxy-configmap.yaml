@@ -13,13 +13,13 @@ metadata:
 data:
   OAUTH2_PROXY_PROVIDER: keycloak-oidc
   OAUTH2_PROXY_CLIENT_ID: m2m-client
-  OAUTH2_PROXY_OIDC_ISSUER_URL: https://keycloak.local:8443/realms/cluster-local
+  OAUTH2_PROXY_OIDC_ISSUER_URL: https://localhost/realms/cluster-local
   OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
   OAUTH2_PROXY_OIDC_JWKS_URL: http://keycloak-service.keycloak-auth.svc.cluster.local/realms/cluster-local/protocol/openid-connect/certs
-  OAUTH2_PROXY_LOGIN_URL: https://keycloak.local:8443/realms/cluster-local/protocol/openid-connect/auth
+  OAUTH2_PROXY_LOGIN_URL: https://localhost/realms/cluster-local/protocol/openid-connect/auth
   OAUTH2_PROXY_REDEEM_URL: http://keycloak-service.keycloak-auth.svc.cluster.local/realms/cluster-local/protocol/openid-connect/token
   OAUTH2_PROXY_VALIDATE_URL: http://keycloak-service.keycloak-auth.svc.cluster.local/realms/cluster-local/protocol/openid-connect/userinfo
-  OAUTH2_PROXY_REDIRECT_URL: https://keycloak.local:8443/oauth2/callback
+  OAUTH2_PROXY_REDIRECT_URL: https://localhost/oauth2/callback
   OAUTH2_PROXY_EMAIL_DOMAINS: "*"
   OAUTH2_PROXY_SCOPE: openid
   OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180

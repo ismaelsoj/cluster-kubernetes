@@ -22,9 +22,11 @@ options:
         nodeFilters:
           - server:*
 ports:
-  - port: 8080:80
+  - port: 80:30080
     nodeFilters:
       - loadbalancer
-  - port: 8443:443
+  - port: 443:30443
     nodeFilters:
       - loadbalancer
+
+# Autoria/Implementação: GPT-5 Codex

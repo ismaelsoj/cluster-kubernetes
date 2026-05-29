@@ -20,6 +20,11 @@ is_kong_deployment if {
     input.metadata.name == "kong-deployment"
 }
 
+is_kong_service if {
+    input.kind == "Service"
+    input.metadata.name == "kong-service"
+}
+
 is_oauth2_proxy_deployment if {
     input.kind == "Deployment"
     input.metadata.name == "oauth2-proxy-deployment"
@@ -30,8 +35,22 @@ is_oauth2_proxy_config if {
     input.metadata.name == "oauth2-proxy-configmap"
 }
 
+is_keycloak_deployment if {
+    input.kind == "Deployment"
+    input.metadata.name == "keycloak-deployment"
+}
+
 kong_yaml := input.data["kong.yml"] if {
     is_kong_declarative_config
+}
+
+keycloak_env_value(name) := value if {
+    is_keycloak_deployment
+    some container in input.spec.template.spec.containers
+    container.name == "keycloak"
+    some env in container.env
+    env.name == name
+    value := env.value
 }
 
 oauth2_proxy_container := container if {
@@ -58,6 +77,30 @@ deny contains msg if {
     msg := "Deployment do Kong deve montar o Secret TLS kong-tls-secret como volume read-only."
 }
 
+deny contains msg if {
+    is_kong_service
+    not kong_http_nodeport_fixed
+    msg := "kong-service deve fixar nodePort 30080 para o mapeamento local localhost:80."
+}
+
+deny contains msg if {
+    is_kong_service
+    not kong_https_nodeport_fixed
+    msg := "kong-service deve fixar nodePort 30443 para o mapeamento local localhost:443."
+}
+
+kong_http_nodeport_fixed if {
+    some port in input.spec.ports
+    port.name == "proxy-http"
+    port.nodePort == 30080
+}
+
+kong_https_nodeport_fixed if {
+    some port in input.spec.ports
+    port.name == "proxy-https"
+    port.nodePort == 30443
+}
+
 kong_tls_secret_mounted if {
     some volume in input.spec.template.spec.volumes
     volume.name == "kong-tls"
@@ -77,6 +120,12 @@ deny contains msg if {
     is_kong_declarative_config
     not contains(kong_yaml, "name: keycloak-http-block-route")
     msg := "Kong deve declarar rota HTTP explicita para bloquear ou redirecionar trafego inseguro."
+}
+
+deny contains msg if {
+    is_kong_declarative_config
+    not contains(kong_yaml, "- localhost")
+    msg := "Rotas do Kong devem aceitar localhost como host local principal."
 }
 
 deny contains msg if {
@@ -146,10 +195,28 @@ deny contains msg if {
 }
 
 deny contains msg if {
+    is_oauth2_proxy_config
+    input.data.OAUTH2_PROXY_OIDC_ISSUER_URL != "https://localhost/realms/cluster-local"
+    msg := "OAuth2-Proxy deve validar issuer externo https://localhost/realms/cluster-local."
+}
+
+deny contains msg if {
+    is_oauth2_proxy_config
+    input.data.OAUTH2_PROXY_REDIRECT_URL != "https://localhost/oauth2/callback"
+    msg := "OAuth2-Proxy deve usar redirect externo https://localhost/oauth2/callback."
+}
+
+deny contains msg if {
     is_oauth2_proxy_deployment
     env_blob := json.marshal(oauth2_proxy_container.env)
     not contains(env_blob, "oauth2-proxy-secret")
     msg := "Segredos do OAuth2-Proxy devem vir do Secret oauth2-proxy-secret, nao de ConfigMap."
+}
+
+deny contains msg if {
+    is_keycloak_deployment
+    keycloak_env_value("KC_HOSTNAME") != "https://localhost"
+    msg := "Keycloak deve declarar KC_HOSTNAME=https://localhost para estabilizar o issuer externo local."
 }
 
 # Autoria/Implementação: GPT-5 Codex

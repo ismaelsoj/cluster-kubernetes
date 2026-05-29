@@ -24,6 +24,7 @@ data:
         routes:
           - name: keycloak-http-block-route
             hosts:
+              - localhost
               - keycloak.local
             paths:
               - /
@@ -35,9 +36,10 @@ data:
               - name: request-termination
                 config:
                   status_code: 426
-                  message: "Use HTTPS on https://keycloak.local:8443"
+                  message: "Use HTTPS on https://localhost"
           - name: keycloak-oidc-public-route
             hosts:
+              - localhost
               - keycloak.local
             paths:
               - /.well-known
@@ -56,6 +58,7 @@ data:
         routes:
           - name: oauth2-proxy-callback-route
             hosts:
+              - localhost
               - keycloak.local
             paths:
               - /oauth2
@@ -65,6 +68,7 @@ data:
               - https
           - name: keycloak-protected-route
             hosts:
+              - localhost
               - keycloak.local
             paths:
               - /protected

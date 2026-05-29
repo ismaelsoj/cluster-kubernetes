@@ -19,11 +19,13 @@ spec:
     - name: proxy-http
       port: 80
       targetPort: proxy-http
+      nodePort: 30080
       protocol: TCP
       appProtocol: http
     - name: proxy-https
       port: 443
       targetPort: proxy-https
+      nodePort: 30443
       protocol: TCP
       appProtocol: https
 

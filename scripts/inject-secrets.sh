@@ -32,7 +32,7 @@ DB_USER="keycloak"
 ADMIN_USER="${ADMIN_USER:-admin}"
 KONG_TLS_SECRET_NAME="kong-tls-secret"
 OAUTH2_PROXY_SECRET_NAME="oauth2-proxy-secret"
-KONG_TLS_COMMON_NAME="${KONG_TLS_COMMON_NAME:-keycloak.local}"
+KONG_TLS_COMMON_NAME="${KONG_TLS_COMMON_NAME:-localhost}"
 KONG_TLS_ALT_NAMES="${KONG_TLS_ALT_NAMES:-DNS:keycloak.local,DNS:localhost,IP:127.0.0.1}"
 M2M_CLIENT_SECRET="${M2M_CLIENT_SECRET:-dev-m2m-local-secret}"
 
@@ -71,13 +71,58 @@ all_required_secrets_exist() {
   secret_exists "${NAMESPACE_KEYCLOAK}" "keycloak-db-secret" &&
     secret_exists "${NAMESPACE_KEYCLOAK}" "keycloak-admin-secret" &&
     secret_exists "${NAMESPACE_GATEWAY}" "${KONG_TLS_SECRET_NAME}" &&
-    secret_exists "${NAMESPACE_GATEWAY}" "${OAUTH2_PROXY_SECRET_NAME}"
+    secret_exists "${NAMESPACE_GATEWAY}" "${OAUTH2_PROXY_SECRET_NAME}" &&
+    oauth2_proxy_cookie_secret_valid_in_cluster
 }
 
 random_b64() {
   local bytes="$1"
   openssl rand -base64 "${bytes}" 2>/dev/null ||
     od -vAn -N"${bytes}" /dev/urandom | base64 2>/dev/null | tr -d '\n'
+}
+
+random_hex() {
+  local bytes="$1"
+  openssl rand -hex "${bytes}" 2>/dev/null ||
+    od -vAn -N"${bytes}" -tx1 /dev/urandom | tr -d ' \n'
+}
+
+oauth2_proxy_cookie_secret_is_valid() {
+  local secret="$1"
+  case "${#secret}" in
+    16|24|32) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+generate_oauth2_proxy_cookie_secret() {
+  # OAuth2-Proxy valida o tamanho literal do cookie secret para AES.
+  # Hex de 16 bytes produz 32 caracteres ASCII, aceito como segredo de 32 bytes.
+  random_hex 16
+}
+
+decode_base64() {
+  if printf 'dGVzdA==' | base64 --decode >/dev/null 2>&1; then
+    base64 --decode
+  else
+    base64 -D
+  fi
+}
+
+oauth2_proxy_cookie_secret_valid_in_cluster() {
+  local encoded_secret
+  local decoded_secret
+
+  encoded_secret="$(kubectl get secret "${OAUTH2_PROXY_SECRET_NAME}" \
+    -n "${NAMESPACE_GATEWAY}" \
+    -o jsonpath='{.data.cookie-secret}' 2>/dev/null || true)"
+
+  if [ -z "${encoded_secret}" ]; then
+    return 1
+  fi
+
+  decoded_secret="$(printf '%s' "${encoded_secret}" | decode_base64 2>/dev/null || true)"
+  oauth2_proxy_cookie_secret_is_valid "${decoded_secret}"
 }
 
 upsert_env_value() {
@@ -193,8 +238,11 @@ if [ -z "${OAUTH2_PROXY_CLIENT_SECRET:-}" ]; then
 fi
 
 if [ -z "${OAUTH2_PROXY_COOKIE_SECRET:-}" ]; then
-  OAUTH2_PROXY_COOKIE_SECRET="$(random_b64 32)"
+  OAUTH2_PROXY_COOKIE_SECRET="$(generate_oauth2_proxy_cookie_secret)"
   echo "🔑 Cookie secret do OAuth2-Proxy gerado automaticamente."
+elif ! oauth2_proxy_cookie_secret_is_valid "${OAUTH2_PROXY_COOKIE_SECRET}"; then
+  OAUTH2_PROXY_COOKIE_SECRET="$(generate_oauth2_proxy_cookie_secret)"
+  echo "🔑 Cookie secret do OAuth2-Proxy no .env tinha tamanho inválido e foi regenerado."
 fi
 
 # Bootstrap: criar namespaces antes da injeção de Secrets (idempotente via apply).

@@ -104,14 +104,16 @@ open http://localhost:8090          # painel web do Keycloak
 open http://localhost:8090/admin    # console administrativo
 ```
 
-> Após implantar o Kong (Wave 3), o acesso externo passa por HTTPS na porta
-> `8443` do host (mapeada no k3d para a porta `443` do loadbalancer). Nesse caso,
-> adicione ao `/etc/hosts`:
+> Após implantar o Kong (Wave 3), o acesso externo local passa por HTTPS na porta
+> padrão `443` do host, usando `localhost` como caminho principal. O alias
+> `keycloak.local` continua aceito pelas rotas do Kong para compatibilidade; para
+> usá-lo, adicione ao `/etc/hosts`:
 > ```
 > 127.0.0.1 keycloak.local
 > ```
-> E acesse `https://keycloak.local:8443`. Em ambiente local, o certificado é
-> self-signed e pode exigir aceite no navegador ou `curl -k` em validações manuais.
+> Acesse `https://localhost` ou, no alias, `https://keycloak.local`. Em ambiente
+> local, o certificado é self-signed e pode exigir aceite no navegador ou `curl -k`
+> em validações manuais.
 
 ### Checar PriorityClass do pod
 
@@ -127,7 +129,7 @@ kubectl get pod -l app.kubernetes.io/name=keycloak -n keycloak-auth \
 ### Validar que HTTP inseguro não chega ao upstream
 
 ```bash
-curl -i -H 'Host: keycloak.local' http://localhost:8080/
+curl -i http://localhost/
 ```
 
 Esperado: resposta não-2xx explícita do Kong, atualmente `426 Upgrade Required`, sem renderizar conteúdo normal do Keycloak por HTTP.
@@ -136,10 +138,10 @@ Esperado: resposta não-2xx explícita do Kong, atualmente `426 Upgrade Required
 
 ```bash
 curl -k -i \
-  https://keycloak.local:8443/realms/cluster-local/.well-known/openid-configuration
+  https://localhost/realms/cluster-local/.well-known/openid-configuration
 ```
 
-Esperado: `200` via Kong HTTPS. O issuer esperado é `https://keycloak.local:8443/realms/cluster-local`.
+Esperado: `200` via Kong HTTPS. O issuer esperado é `https://localhost/realms/cluster-local`.
 
 ### Obter token M2M local
 
@@ -148,7 +150,7 @@ O `client_secret` abaixo (`dev-m2m-local-secret`) é fixture de desenvolvimento 
 ```bash
 TOKEN="$(
   curl -ksf -X POST \
-    https://keycloak.local:8443/realms/cluster-local/protocol/openid-connect/token \
+    https://localhost/realms/cluster-local/protocol/openid-connect/token \
     -H 'Content-Type: application/x-www-form-urlencoded' \
     -d 'grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret' \
     | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])'
@@ -157,7 +159,38 @@ TOKEN="$(
 python3 -c 'import base64,json,sys; p=sys.argv[1].split(".")[1] + "=="; print(json.loads(base64.urlsafe_b64decode(p))["iss"])' "${TOKEN}"
 ```
 
-Esperado: token gerado e `iss` igual a `https://keycloak.local:8443/realms/cluster-local`.
+Esperado: token gerado e `iss` igual a `https://localhost/realms/cluster-local`.
+
+### Validar OAuth2-Proxy
+
+```bash
+kubectl rollout status deployment/oauth2-proxy-deployment \
+  -n kong-gateway \
+  --timeout=180s
+
+kubectl get endpoints oauth2-proxy-service -n kong-gateway
+
+kubectl logs -n kong-gateway deploy/oauth2-proxy-deployment --tail=50
+```
+
+Esperado: rollout concluído, endpoint do Service preenchido na porta `4180` e logs sem `invalid configuration` ou erro de `cookie_secret`.
+
+Para validar os endpoints de saúde diretamente:
+
+```bash
+kubectl port-forward svc/oauth2-proxy-service -n kong-gateway 4180:4180 \
+  >/tmp/oauth2-proxy-port-forward.log 2>&1 &
+PF_PID=$!
+sleep 3
+
+curl -sf http://localhost:4180/ping
+curl -sf http://localhost:4180/ready
+
+kill "$PF_PID" 2>/dev/null || true
+wait "$PF_PID" 2>/dev/null || true
+```
+
+Esperado: `/ping` e `/ready` retornam sucesso HTTP.
 
 ### Validar rota protegida com e sem token
 
@@ -165,10 +198,10 @@ A rota protegida de prova usa o prefixo `/protected` no Kong. O Kong remove esse
 
 ```bash
 curl -k -i \
-  https://keycloak.local:8443/protected/realms/cluster-local/protocol/openid-connect/userinfo
+  https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo
 
 curl -k -i \
-  https://keycloak.local:8443/protected/realms/cluster-local/protocol/openid-connect/userinfo \
+  https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo \
   -H "Authorization: Bearer ${TOKEN}"
 ```
 
@@ -179,7 +212,7 @@ Esperado: sem token retorna `401/403` antes do upstream; com token válido a req
 ```bash
 for i in $(seq 1 105); do
   curl -ks -o /tmp/kong-rate-limit-body.txt -w "%{http_code}\n" \
-    https://keycloak.local:8443/protected/realms/cluster-local/protocol/openid-connect/userinfo \
+    https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo \
     -H "Authorization: Bearer ${TOKEN}"
 done | tail -10
 ```
@@ -195,7 +228,7 @@ kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=0
 sleep 10
 
 curl -k -i \
-  https://keycloak.local:8443/protected/realms/cluster-local/protocol/openid-connect/userinfo \
+  https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo \
   -H "Authorization: Bearer ${TOKEN}"
 
 kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=1

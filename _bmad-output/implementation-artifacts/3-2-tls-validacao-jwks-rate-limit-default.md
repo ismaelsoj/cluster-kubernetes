@@ -21,7 +21,7 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Voce DEVE definir explicitamente o nivel de c
 - Keycloak 26.6.2 já existe em `keycloak-auth`, com realm `cluster-local`, client `m2m-client`, `accessTokenLifespan` de 3600s no realm e service account local configurada.
 - O PRD exige solução 100% Open-Source: `Kong DB-Less + OAuth2-Proxy`, sem licenças Enterprise. Não usar plugins Kong `openid-connect` ou `jwt-signer` como caminho feliz.
 - `scripts/inject-secrets.sh` já cria namespaces `keycloak-auth` e `kong-gateway`, mas hoje injeta apenas secrets do Keycloak/PostgreSQL. TLS do Kong precisa entrar nesse fluxo sem gravar chave privada no Git.
-- O bootstrap local expõe `8080 -> 80` e `8443 -> 443` no load balancer do k3d. A story deve usar essa topologia, não criar portas paralelas.
+- O bootstrap local expõe `80` e `443` no load balancer do k3d. Para que `localhost` chegue ao `kong-service` com ServiceLB desabilitado e MetalLB ativo, o caminho local usa NodePorts fixos `30080` e `30443` por baixo, sem criar portas paralelas para o usuário.
 
 **Acceptance Criteria:**
 
@@ -62,7 +62,7 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Voce DEVE definir explicitamente o nivel de c
   - [ ] Preservar MetalLB local e `Service` LoadBalancer com portas 80/443
   - [ ] Manter `sync-wave: "3"`, labels obrigatórios e autoria LLM em todos os artefatos editados
 - [ ] Atualizar documentação operacional mínima (AC1, AC2, AC3)
-  - [ ] Atualizar `docs/runbook-operacoes.md` para trocar o acesso pós-Kong de `http://keycloak.local:8080` para HTTPS local em `https://keycloak.local:8443`, incluindo observação sobre certificado local/self-signed quando aplicável
+  - [ ] Atualizar `docs/runbook-operacoes.md` para trocar o acesso pós-Kong para HTTPS local em `https://localhost`, incluindo observação sobre certificado local/self-signed quando aplicável
   - [ ] Documentar comandos para validar HTTP bloqueado, HTTPS funcionando, JWT válido aceito, JWT ausente/inválido bloqueado e rate limit retornando `429`
 - [ ] Executar validações automatizadas e manuais (AC1-AC6)
   - [ ] Rodar `make lint`
@@ -119,8 +119,8 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Voce DEVE definir explicitamente o nivel de c
   - **Preservar:** `set -euo pipefail`, uso de `.env`, prompts interativos seguros, `chmod 600`, idempotência via `kubectl apply`.
 
 - `docs/runbook-operacoes.md`
-  - **Estado atual:** orienta acesso pós-Kong via `http://keycloak.local:8080`.
-  - **Esta story muda:** documentar HTTPS na porta `8443`, teste de certificado local, token/JWKS/rate limit e comportamento esperado na porta 8080.
+  - **Estado anterior:** orientava acesso pós-Kong via `http://keycloak.local:8080`.
+  - **Esta story muda:** documentar HTTPS local em `https://localhost`, teste de certificado local, token/JWKS/rate limit e comportamento esperado em `http://localhost`.
   - **Preservar:** comandos existentes de Keycloak/PostgreSQL que continuam válidos para depuração interna.
 
 **Arquivos existentes para preservar, mesmo se não mudarem**
@@ -243,7 +243,7 @@ make down
 make up
 ```
 
-**Esperado:** fluxo conclui sem intervenção manual extra; `kong-tls-secret`, `keycloak-db-secret` e `keycloak-admin-secret` existem nos namespaces corretos; ArgoCD sincroniza infraestrutura.
+**Esperado:** fluxo conclui sem intervenção manual extra; `kong-tls-secret`, `oauth2-proxy-secret`, `keycloak-db-secret` e `keycloak-admin-secret` existem nos namespaces corretos; ArgoCD sincroniza infraestrutura.
 
 **3. Verificar TLS secret e montagem no Kong sem imprimir chave privada:**
 
@@ -256,27 +256,36 @@ kubectl exec -n kong-gateway deploy/kong-deployment -- test -r /etc/kong/tls/tls
 
 **Esperado:** tipo `kubernetes.io/tls`; volume TLS presente; arquivos legíveis pelo container; nenhum comando imprime `tls.key`.
 
-**4. Validar HTTP inseguro bloqueado ou redirecionado:**
+**4. Validar exposição localhost para o Kong:**
 
 ```bash
-curl -i -H 'Host: keycloak.local' http://localhost:8080/
+kubectl get svc kong-service -n kong-gateway \
+  -o jsonpath='{range .spec.ports[*]}{.name}{"="}{.nodePort}{"\n"}{end}'
+```
+
+**Esperado:** `proxy-http=30080` e `proxy-https=30443`, alinhados aos mapeamentos `80:30080` e `443:30443` do `k3d.yaml`.
+
+**5. Validar HTTP inseguro bloqueado ou redirecionado:**
+
+```bash
+curl -i http://localhost/
 ```
 
 **Esperado:** resposta não encaminha conteúdo normal do Keycloak por HTTP. Aceitável: `301/308` para HTTPS ou `426/403` explícito.
 
-**5. Validar HTTPS na borda:**
+**6. Validar HTTPS na borda:**
 
 ```bash
-curl -k -i -H 'Host: keycloak.local' https://localhost:8443/realms/cluster-local/.well-known/openid-configuration
+curl -k -i https://localhost/realms/cluster-local/.well-known/openid-configuration
 ```
 
 **Esperado:** `HTTP/2 200` ou `HTTP/1.1 200`; discovery OIDC responde via Kong HTTPS; issuer/discovery são coerentes com a configuração de validação.
 
-**6. Obter token M2M pelo caminho compatível com issuer esperado:**
+**7. Obter token M2M pelo caminho compatível com issuer esperado:**
 
 ```bash
 TOKEN="$(
-  curl -ksf -X POST https://keycloak.local:8443/realms/cluster-local/protocol/openid-connect/token \
+  curl -ksf -X POST https://localhost/realms/cluster-local/protocol/openid-connect/token \
     -H 'Content-Type: application/x-www-form-urlencoded' \
     -d 'grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret' \
     | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])'
@@ -291,36 +300,65 @@ PY
 
 **Esperado:** token gerado; `iss` impresso bate com issuer aceito pelo plugin JWKS/OIDC do Kong.
 
-**7. Validar rota protegida com e sem token:**
+**8. Validar OAuth2-Proxy antes da rota protegida:**
 
 ```bash
-curl -k -i https://keycloak.local:8443/<rota-protegida-definida-na-implementacao>
+kubectl rollout status deployment/oauth2-proxy-deployment \
+  -n kong-gateway \
+  --timeout=180s
 
-curl -k -i https://keycloak.local:8443/<rota-protegida-definida-na-implementacao> \
+kubectl get endpoints oauth2-proxy-service -n kong-gateway
+
+kubectl logs -n kong-gateway deploy/oauth2-proxy-deployment --tail=50
+```
+
+**Esperado:** rollout concluído, endpoint do Service preenchido na porta `4180` e logs sem `invalid configuration` ou erro de `cookie_secret`.
+
+```bash
+kubectl port-forward svc/oauth2-proxy-service -n kong-gateway 4180:4180 \
+  >/tmp/oauth2-proxy-port-forward.log 2>&1 &
+PF_PID=$!
+sleep 3
+
+curl -sf http://localhost:4180/ping
+curl -sf http://localhost:4180/ready
+
+kill "$PF_PID" 2>/dev/null || true
+wait "$PF_PID" 2>/dev/null || true
+```
+
+**Esperado:** `/ping` e `/ready` retornam sucesso HTTP.
+
+**9. Validar rota protegida com e sem token:**
+
+```bash
+curl -k -i https://localhost/<rota-protegida-definida-na-implementacao>
+
+curl -k -i https://localhost/<rota-protegida-definida-na-implementacao> \
   -H "Authorization: Bearer ${TOKEN}"
 ```
 
 **Esperado:** sem token retorna `401/403` do Kong antes do upstream; com token válido não é bloqueado pelo Kong e preserva `Authorization: Bearer`.
 
-**8. Validar rate limit default:**
+**10. Validar rate limit default:**
 
 ```bash
 for i in $(seq 1 105); do
   curl -ks -o /tmp/kong-rl-body.txt -w "%{http_code}\n" \
-    https://keycloak.local:8443/<rota-com-rate-limit-definida-na-implementacao> \
+    https://localhost/<rota-com-rate-limit-definida-na-implementacao> \
     -H "Authorization: Bearer ${TOKEN}"
 done | tail -10
 ```
 
 **Esperado:** após aproximadamente 100 requests na janela de 1 minuto, alguma resposta retorna `429 Too Many Requests` e headers de rate limit aparecem quando suportados pelo plugin.
 
-**9. Validar sobrevivência do cache JWKS:**
+**11. Validar sobrevivência do cache JWKS:**
 
 ```bash
 kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=0
 sleep 10
 
-curl -k -i https://keycloak.local:8443/<rota-protegida-definida-na-implementacao> \
+curl -k -i https://localhost/<rota-protegida-definida-na-implementacao> \
   -H "Authorization: Bearer ${TOKEN}"
 
 kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=1
@@ -370,7 +408,7 @@ kubectl rollout status deployment/keycloak-deployment -n keycloak-auth
 - **Realm local:** `cluster-local`
 - **Client M2M local:** `m2m-client`
 - **TTL token/JWKS alvo:** `3600s`
-- **Portas host k3d:** `8080 -> 80`, `8443 -> 443`
+- **Portas host k3d:** `80 -> 30080 -> Kong HTTP`, `443 -> 30443 -> Kong HTTPS`
 - **Regra de autoria LLM:** todo arquivo editado deve registrar `Autoria/Implementação: <modelo>`
 
 ## Questões e Riscos Salvos para o Dev Agent
@@ -395,26 +433,34 @@ Contexto carregado a partir de `SPEC.md`, companions `implementation-rules.md`, 
 - `kubectl kustomize` passou para `kong-gateway`, `oauth2-proxy` e `keycloak-auth` nos overlays `local`, `homologacao` e `production`.
 - `make down` e `make up` executaram com sucesso; bootstrap criou `kong-tls-secret` e `oauth2-proxy-secret` em `kong-gateway`.
 - Validação runtime HTTP/HTTPS/JWT/rate limit bloqueada no ArgoCD: `targetRevision: story/3-2-context` não existe no remoto, então `root-app`/`infra-app` ficaram `Unknown` com erro `unable to resolve 'story/3-2-context' to a commit SHA`.
+- Investigação runtime posterior confirmou que `localhost:8080/8443` não chegava ao Kong porque o `serverlb` do k3d encaminhava para portas de nó `80/443`, enquanto o `kong-service` estava exposto via MetalLB. Correção inicial aplicada com NodePorts fixos `30080/30443`; ajuste posterior mudou o caminho feliz para portas padrão do host `80/443`.
+- OAuth2-Proxy validado após correção do `cookie_secret`: `rollout status` concluído, endpoint `oauth2-proxy-service` preenchido na porta `4180`, logs sem erro de `cookie_secret`, `/ping` e `/ready` retornando `HTTP 200`.
+- Ajuste para portas padrão validado estaticamente: `bash -n scripts/inject-secrets.sh` passou; `kubectl kustomize` passou para `kong-gateway`, `oauth2-proxy` e `keycloak-auth` nos overlays `local`, `homologacao` e `production`; `make lint` passou com 4450/4450 checks OPA e 0 erros kube-linter.
 
 ### Completion Notes List
 
 - Implementado bootstrap idempotente de `kong-tls-secret` e `oauth2-proxy-secret` em `scripts/inject-secrets.sh`, incluindo correção de `--skip-if-exists` para considerar todos os secrets obrigatórios atuais.
 - Kong configurado com certificado TLS montado via Secret, `KONG_SSL_CERT`/`KONG_SSL_CERT_KEY`, rota HTTP explícita com `426`, rotas OIDC públicas somente HTTPS, rota protegida `/protected` via OAuth2-Proxy e plugin `rate-limiting` com `minute: 100` e `policy: local`.
 - Adicionado componente `cluster/infrastructure/oauth2-proxy/` com base e overlays `local`, `homologacao` e `production`, usando imagem oficial `quay.io/oauth2-proxy/oauth2-proxy:v7.15.2`, probes, NetworkPolicy e segredos via `oauth2-proxy-secret`.
-- Keycloak ajustado para issuer HTTPS local estável (`https://keycloak.local:8443`) e client M2M alinhado ao TTL de 3600s com audience `m2m-client`.
+- Keycloak ajustado para issuer HTTPS local estável (`https://localhost`) e client M2M alinhado ao TTL de 3600s com audience `m2m-client`.
 - Runbook atualizado com comandos de validação para HTTP bloqueado, HTTPS, token M2M, rota protegida, rate limit e cache JWKS.
-- Story permanece `in-progress` até autorização explícita para publicar a branch/commit ou outro caminho GitOps que permita o ArgoCD sincronizar os manifests para validação runtime.
+- Exposição local ajustada para os comandos de aceite em `localhost` e `localhost:443`: `k3d.yaml` encaminha host `80/443` para NodePorts fixos e `kong-service` declara `nodePort: 30080/30443`.
+- Guardrails OPA atualizados para proteger `localhost` como host local principal, issuer externo `https://localhost` no Keycloak/OAuth2-Proxy e redirect `https://localhost/oauth2/callback`.
+- Geração do `cookie_secret` do OAuth2-Proxy corrigida para produzir segredo literal de 32 bytes aceito pelo proxy; `--skip-if-exists` agora deixa de pular quando o Secret existente tem cookie inválido.
+- Story permanece `in-progress` até autorização explícita para publicar commit/push ou outro caminho GitOps que permita o ArgoCD sincronizar os manifests e validar `localhost` com a topologia nova após recriação do cluster.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/3-2-tls-validacao-jwks-rate-limit-default.md` - NEW
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` - UPDATE
+- `_bmad-output/implementation-artifacts/investigations/investigacao-kong-localhost-tls-resposta-vazia.md` - NEW
 - `cluster/infrastructure/keycloak-auth/base/keycloak-deployment.yaml` - UPDATE
 - `cluster/infrastructure/keycloak-auth/base/realm-config.json` - UPDATE
 - `cluster/infrastructure/kong-gateway/base/kong-configmap.yaml` - UPDATE
 - `cluster/infrastructure/kong-gateway/base/kong-declarative-config.yaml` - UPDATE
 - `cluster/infrastructure/kong-gateway/base/kong-deployment.yaml` - UPDATE
 - `cluster/infrastructure/kong-gateway/base/kong-networkpolicy.yaml` - UPDATE
+- `cluster/infrastructure/kong-gateway/base/kong-service.yaml` - UPDATE
 - `cluster/infrastructure/kustomization.yaml` - UPDATE
 - `cluster/infrastructure/oauth2-proxy/base/kustomization.yaml` - NEW
 - `cluster/infrastructure/oauth2-proxy/base/oauth2-proxy-configmap.yaml` - NEW
@@ -425,6 +471,7 @@ Contexto carregado a partir de `SPEC.md`, companions `implementation-rules.md`, 
 - `cluster/infrastructure/oauth2-proxy/overlays/homologacao/kustomization.yaml` - NEW
 - `cluster/infrastructure/oauth2-proxy/overlays/production/kustomization.yaml` - NEW
 - `docs/runbook-operacoes.md` - UPDATE
+- `k3d.yaml` - UPDATE
 - `policy/kong-edge-security.rego` - NEW
 - `scripts/inject-secrets.sh` - UPDATE
 
@@ -433,6 +480,8 @@ Contexto carregado a partir de `SPEC.md`, companions `implementation-rules.md`, 
 - `2026-05-29 00:17:06-03:00`: Story criada pelo workflow `bmad-create-story`, com contexto técnico detalhado para TLS de borda, validação JWKS/cache, rate limit default e bootstrap de secrets. Status definido como `ready-for-dev`. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-29 00:41:26-03:00`: Correção pós-validação de licenciamento: story alinhada ao PRD 100% Open-Source (`Kong DB-Less + OAuth2-Proxy`), removendo plugins Kong `openid-connect`/`jwt-signer` Enterprise do caminho feliz; adicionada nota de que cert-manager não é obrigatório para TLS local. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-29 01:01:44-03:00`: Implementação em andamento: TLS de borda, OAuth2-Proxy OSS, validação JWKS via `oidc-jwks-url`, rate limit default, política OPA de borda e runbook operacional adicionados. Validações estáticas passaram; validação runtime aguarda publicação da branch `story/3-2-context` para o ArgoCD sincronizar via GitOps. Autoria/Implementação: GPT-5 Codex.
+- `2026-05-29 08:23:00-03:00`: Correções pós-investigação: `localhost:8080/8443` ajustado para alcançar Kong via NodePorts fixos `30080/30443`; geração e validação do `cookie_secret` do OAuth2-Proxy corrigidas; plano manual e runbook passaram a validar explicitamente OAuth2-Proxy (`rollout`, endpoints, logs, `/ping` e `/ready`). `make lint` passou 3738/3738 OPA + 0 kube-linter; OAuth2-Proxy validado em cluster após reinjeção do Secret. Autoria/Implementação: GPT-5 Codex.
+- `2026-05-29 08:41:09-03:00`: Ajuste solicitado para usar `localhost` nas portas padrão: `k3d.yaml` mapeia `80:30080` e `443:30443`, Kong aceita `localhost` e `keycloak.local`, Keycloak/OAuth2-Proxy usam issuer externo `https://localhost`, e runbook/plano manual passaram a validar `http://localhost` e `https://localhost`. Autoria/Implementação: GPT-5 Codex.
 
 ---
 Autoria/Implementação: GPT-5 Codex
