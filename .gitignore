@@ -31,11 +31,17 @@ bin/
 
 # Dumps de banco de dados
 *.sql
+*.dump
+
+# Diretório de backups do PostgreSQL (contém dados sensíveis do Keycloak)
+backups/
 
 # Chaves locais, certificados e credenciais sensíveis
 *.key
 *.pem
 *.crt
+
+# Autoria/Implementação: GPT-5 Codex
 
 # Cache Python
 __pycache__/

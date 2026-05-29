@@ -138,6 +138,187 @@ Rodamos o distillator especificamente sobre esse subprojeto, produzindo 4 arquiv
 
 **Takeaway:** Rode o distillator quando você notar que precisa repetir o mesmo contexto de projeto em todas as sessões. Se você está explicando para o agente "lembre que nesse projeto usamos X" toda vez, é hora de distillar.
 
+### Confirmação no Changelog do BMAD
+
+Essa evolução deixou de ser apenas uma preferência nossa e passou a ficar alinhada com o próprio BMAD. No changelog oficial da **v6.8.0** do BMAD Method, o `bmad-distillator` aparece como **retired**, explicitamente **superseded by `bmad-spec`**. O mesmo changelog apresenta o `bmad-spec` como skill core para destilar qualquer intenção em um `SPEC.md` com kernel enxuto e companions nomeados.
+
+Em outras palavras: o que fizemos no projeto não foi um desvio do método, mas uma convergência com a direção oficial da ferramenta.
+
+### O Próximo Passo: Forçar `bmad-spec` Para Unificar o Contexto Ativo
+
+Com o tempo, percebemos um limite importante do uso isolado do distillator: ele comprime bem, mas não resolve sozinho o problema de **precedência de contexto**. Depois de algumas iterações, já existiam:
+
+- o distillate original do projeto principal;
+- o distillate do subprojeto `.tracker/`;
+- specs ativas novas que não existiam quando o distillate inicial foi gerado;
+- regras em `AGENTS.md` apontando para caminhos diferentes ao longo do tempo.
+
+Na prática, isso criava uma dúvida perigosa para agentes e humanos: **qual é a fonte ativa de verdade?**  
+Mesmo com distillates bons, ainda havia risco de releitura defensiva, duplicação e conflito entre resumo antigo e estado atual.
+
+### A Solução: Aplicar a Lógica do `bmad-spec`
+
+Em vez de continuar criando apenas novos resumos comprimidos, passamos a **forçar a disciplina do `bmad-spec`**:
+
+- um **kernel explícito** (`SPEC.md`) com o contrato mínimo do contexto;
+- **companions separados por intenção** (`implementation`, `architecture`, `planning`, `research`, `deferred work`);
+- uma regra de precedência clara: **v2 ativa, v1 legado**;
+- `AGENTS.md` apontando para **uma única porta de entrada oficial**;
+- árvore anterior marcada explicitamente como **LEGADO** para auditoria, não para uso operacional.
+
+Isso foi aplicado tanto no projeto principal quanto na `.tracker/`.
+
+### Os Conceitos Que Passaram a Guiar o Contexto
+
+Para que a migração não virasse apenas "mais uma pasta de resumo", passamos a usar alguns conceitos de forma deliberada.
+
+#### Kernel
+
+O **kernel** é o núcleo mínimo e obrigatório do contexto. É o arquivo que todo agente deve ler primeiro para entender:
+
+- o que é o projeto;
+- quais são as restrições que realmente mudam decisão;
+- qual é a fonte ativa de contexto;
+- como continuar a leitura sem sair vasculhando o repositório inteiro.
+
+No nosso caso, o kernel passou a ser o `SPEC.md` de cada domínio.
+
+#### Companions
+
+Os **companions** são arquivos irmãos do kernel, mas separados por intenção de uso. Eles existem para evitar inflar o `SPEC.md` com detalhes que são importantes, mas não universais.
+
+Exemplos:
+
+- `implementation-rules.md`
+- `architecture-status.md`
+- `planning.md`
+- `research-decisions.md`
+- `deferred-work.md`
+
+A regra prática foi: **o kernel orienta; os companions aprofundam**.
+
+#### Caminho Feliz de Leitura
+
+O **caminho feliz de leitura** é a menor sequência de arquivos que resolve a maioria das tarefas sem recorrer ao acervo completo do projeto.
+
+O padrão desejado passou a ser:
+
+```text
+AGENTS.md -> SPEC.md -> 1 companion
+```
+
+Se o agente precisa abrir 7 artefatos para começar uma tarefa comum, o contexto está mal desenhado.
+
+#### Legado Congelado
+
+**Legado congelado** é o material antigo que continua existindo para auditoria e rastreabilidade, mas deixa de competir como fonte ativa.
+
+Na prática, isso significa:
+
+- o conteúdo antigo não é apagado;
+- ele recebe aviso explícito de supersessão;
+- ele deixa de ser o caminho padrão de leitura;
+- em caso de conflito, a árvore nova prevalece.
+
+Isso evitou o pior cenário possível: duas "fontes oficiais" convivendo indefinidamente.
+
+#### Load-Bearing
+
+Chamamos de **load-bearing** toda informação que, se removida, mudaria uma decisão real do agente.
+
+Exemplos do projeto:
+
+- `sync-wave` obrigatório;
+- `prune: false` para infra central;
+- `.tracker/` invisível para tarefas de infra;
+- `transcript.jsonl` como fonte válida do Antigravity;
+- segregação criptográfica entre dev e produção.
+
+Se uma informação altera implementação, review, arquitetura ou validação, ela é load-bearing e precisa morar no kernel ou num companion. Se não altera decisão, é forte candidata a sair do caminho feliz.
+
+#### Design de Contexto
+
+O conceito mais importante que emergiu foi **design de contexto**.
+
+Antes, pensávamos o problema como: "tem texto demais, precisamos comprimir".  
+Depois, passamos a pensar como:
+
+- o que entra no kernel?
+- o que vai para companions?
+- o que é leitura padrão?
+- o que vira legado congelado?
+- o que é realmente load-bearing?
+
+Essa mudança de mentalidade foi decisiva. O problema deixou de ser apenas custo de tokens e passou a ser **arquitetura da informação para agentes**.
+
+### Benefício Real no Projeto
+
+O benefício não foi só "organização melhor". Ele foi mensurável no carregamento de contexto por sessão.
+
+#### Projeto principal
+
+Fluxo típico de implementação/arquitetura:
+
+- **Antes:** `AGENTS + _index + regras + arquitetura` = **1641 palavras**
+- **Depois:** `AGENTS + SPEC + implementation-rules + architecture-status` = **1197 palavras**
+- **Redução:** **27,1%**
+
+Fluxo típico de planejamento:
+
+- **Antes:** `AGENTS + _index + épicos/stories` = **1217 palavras**
+- **Depois:** `AGENTS + SPEC + planning` = **862 palavras**
+- **Redução:** **29,2%**
+
+#### Subprojeto `.tracker/`
+
+Fluxo típico de implementação:
+
+- **Antes:** `AGENTS + _index + arquitetura` = **1837 palavras**
+- **Depois:** `AGENTS + SPEC + implementation-status` = **845 palavras**
+- **Redução:** **54,0%**
+
+Fluxo típico de planejamento:
+
+- **Antes:** `AGENTS + _index + backlog` = **1769 palavras**
+- **Depois:** `AGENTS + SPEC + planning` = **945 palavras**
+- **Redução:** **46,6%**
+
+Fluxo típico de pesquisa:
+
+- **Antes:** `AGENTS + _index + pesquisa` = **1233 palavras**
+- **Depois:** `AGENTS + SPEC + research-decisions` = **684 palavras**
+- **Redução:** **44,5%**
+
+### Por Que o `bmad-spec` Funcionou Melhor
+
+O `bmad-spec` trouxe algo que o distillator sozinho não garante: **contrato operacional**.
+
+O distillator responde bem a "como comprimir?".  
+O `bmad-spec` força responder também:
+
+- o que é **kernel**;
+- o que vira **companion**;
+- o que é **caminho feliz de leitura**;
+- o que é **legado congelado**;
+- o que realmente é **load-bearing** para implementação e review.
+
+Essa diferença foi decisiva. O problema deixou de ser apenas "tokens demais" e passou a ser tratado como **design de contexto**.
+
+### A Regra que Emergimos
+
+**Distillator comprime. `bmad-spec` governa.**
+
+Em projetos pequenos, o distillator pode bastar.  
+Em projetos vivos, com múltiplas iterações, stories, revisões e subdomínios, o padrão que se mostrou mais robusto foi:
+
+1. distillar quando o contexto ficar grande;
+2. quando surgirem múltiplas versões de resumo, aplicar `bmad-spec`;
+3. promover um `SPEC.md` ativo com companions por intenção;
+4. marcar o material anterior como legado;
+5. apontar `AGENTS.md` apenas para a fonte ativa.
+
+**Takeaway:** Se você já tem um distillate, mas ainda percebe ambiguidade sobre "qual contexto carregar", não precisa de mais compressão; precisa de um **kernel governado por `bmad-spec`**.
+
 ---
 
 ## O Party Mode: Alinhamento Coletivo de Decisões
@@ -185,6 +366,7 @@ O `deferred-work.md` rastreou 23+ itens ao longo do Épico 1. Isso não é débi
 | `bmad-customize` | Quando você percebe que está dizendo ao agente a mesma coisa em sessões diferentes |
 | `AGENTS.md` | Para políticas do repositório que se aplicam a *todos* os agentes e ferramentas |
 | `bmad-distillator` | Quando o contexto do projeto ficou grande demais para carregar a cada sessão |
+| `bmad-spec` | Quando o projeto já tem resumos/distillates suficientes, mas ainda falta uma fonte ativa única, com kernel, companions e precedência clara |
 | `bmad-party-mode` | Para decisões que impactam arquitetura, produto e processo ao mesmo tempo |
 | Sprint Change Proposal | Para mudanças de escopo que afetam múltiplos artefatos — documenta a decisão e mantém os artefatos alinhados |
 | Retrospectiva (`bmad-retrospective`) | Ao final de cada épico — não como formalidade, mas para capturar o que mudou no processo |
@@ -210,3 +392,4 @@ Cada etapa dessa cadeia virou uma regra nos TOMLs. Não porque o processo seja r
 ---
 
 *Autoria: claude-sonnet-4-6 | 2026-05-25*
+*Revisão/Atualização: GPT-5 Codex | 2026-05-28 00:05:48-03:00*

@@ -2,7 +2,8 @@
 persistent_facts = [
   "CRITICAL REQUIREMENT [IMPLEMENTATION RULES]: Você DEVE avaliar o código estritamente contra as regras definidas em `_bmad-output/distillate/01-regras-implementacao.md`.",
   "CRITICAL REQUIREMENT [DEFERRED WORK]: Verifique e documente novos itens em `_bmad-output/distillate/04-trabalho-diferido.md` caso identifique problemas fora do escopo imediato da story.",
-  "CRITICAL REQUIREMENT [VALIDAÇÃO PÓS-PATCH]: Após aplicar todos os patches, HALT. Pergunte ao usuário: 'Os testes e validações do Plano de Validação Manual da story continuam passando? (sim/não)'. Aguarde resposta antes de prosseguir. Se `sim`: marque a story como `done`. Se `não`: pergunte quais testes falharam, registre no Change Log da story e defina o status como `in-progress`."
+  "CRITICAL REQUIREMENT [REGRESSÃO DE ACs]: Antes de apresentar findings, verifique: algum patch altera o comportamento de um AC aprovado? Se sim: atualize o AC na spec e informe o usuário quais ACs foram afetados.",
+  "CRITICAL REQUIREMENT [VALIDAÇÃO PÓS-PATCH]: Após aplicar todos os patches, HALT. Pergunte: 'O Plano de Validação Manual continua passando? (sim/não)'. Se sim: status → done. Se não: registre falhas no Change Log, status → in-progress."
 ]
 
 # Regra global (CODE REVIEW propositivo)

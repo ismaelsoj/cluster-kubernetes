@@ -38,6 +38,7 @@ spec:
           image: quay.io/keycloak/keycloak:26.6.2
           args:
             - start
+            - --import-realm
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -73,6 +74,8 @@ spec:
               value: "true"
             - name: KC_LOG_CONSOLE_OUTPUT
               value: json
+            - name: KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__SUCCESS_LEVEL
+              value: info
             # Rede e proxy (TLS encerrado no edge pelo Kong na Wave 3)
             - name: KC_HTTP_ENABLED
               value: "true"
@@ -125,11 +128,17 @@ spec:
               name: keycloak-data
             - mountPath: /tmp
               name: keycloak-tmp
+            - mountPath: /opt/keycloak/data/import
+              name: realm-config-volume
+              readOnly: true
       volumes:
         - name: keycloak-data
           emptyDir: {}
         - name: keycloak-tmp
           emptyDir: {}
+        - name: realm-config-volume
+          configMap:
+            name: keycloak-realm-config
 
 # Autoria/Implementação: claude-sonnet-4-6
 # Revisão: GPT-5.5

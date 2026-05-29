@@ -146,3 +146,86 @@ sed "s|targetRevision: main|targetRevision: <BRANCH_DESEJADA>|" cluster/bootstra
 ```
 
 Uma vez aplicado o `root-app.yaml`, o ArgoCD iniciará a sincronização em cascata de todos os recursos do repositório respeitando rigorosamente as ordens das **Sync Waves** declaradas.
+
+---
+
+## 6. Recuperação via Backup PostgreSQL (FR23)
+
+Use esta seção quando o banco de dados do Keycloak estiver corrompido ou perdido e houver backup disponível. Execute **após** a Etapa 5, com a infraestrutura pronta e em uma janela de manutenção.
+
+### 6.1. Gerar backup (operação de rotina)
+
+```bash
+./scripts/pg-backup.sh
+# Gera: ./backups/keycloak-db-backup-YYYYMMDD-HHMMSS.dump
+```
+
+Armazene o arquivo de dump em local externo ao cluster (ex: S3, NFS, disco externo).
+
+### 6.2. Restaurar banco a partir de backup
+
+Antes do restore:
+
+1. Aguarde o PostgreSQL ficar `Ready`
+2. Desative temporariamente o auto-heal de `root-app` e `infra-app` no ArgoCD para evitar que o GitOps religue o Keycloak no meio do procedimento
+
+```bash
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql \
+  -n keycloak-auth --timeout=180s
+
+kubectl patch application root-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":false}}}}'
+
+kubectl patch application infra-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":false,"selfHeal":false}}}}'
+
+./scripts/pg-restore.sh ./backups/keycloak-db-backup-<timestamp>.dump
+```
+
+O script:
+1. Escala Keycloak para 0 réplicas (interrupção controlada)
+2. Copia o dump para o mesmo pod PostgreSQL que executará o restore
+3. Valida o dump com `pg_restore --list` antes de alterar o banco
+4. Executa `pg_restore --clean --if-exists`
+5. Escala Keycloak de volta para a contagem original de réplicas (hoje, `1`)
+
+### 6.3. Validar restore
+
+O `client_secret` abaixo (`dev-m2m-local-secret`) é um fixture de **desenvolvimento local** criado na Story 2.3 para validar o realm `cluster-local`. Não reutilize esse valor como padrão para outros ambientes.
+
+```bash
+kubectl port-forward svc/keycloak-service -n keycloak-auth 8090:80 >/tmp/keycloak-port-forward.log 2>&1 &
+PF_PID=$!
+sleep 3
+
+if ! kill -0 "$PF_PID" 2>/dev/null; then
+  cat /tmp/keycloak-port-forward.log
+  exit 1
+fi
+
+curl -sf -X POST http://localhost:8090/realms/cluster-local/protocol/openid-connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); token=d.get('access_token'); assert token, 'ERRO: access_token ausente'; print('Token OK:', len(token) > 0)"
+
+kill "$PF_PID" 2>/dev/null || true
+wait "$PF_PID" 2>/dev/null || true
+# Esperado: Token OK: True
+```
+
+Após a validação, reative o auto-heal:
+
+```bash
+kubectl patch application root-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
+
+kubectl patch application infra-app -n argocd \
+  --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":false,"selfHeal":true}}}}'
+```
+
+<!-- Autoria/Implementação: claude-sonnet-4-6 -->
+<!-- Revisão: GPT-5 Codex -->

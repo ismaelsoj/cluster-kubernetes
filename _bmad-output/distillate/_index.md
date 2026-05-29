@@ -13,6 +13,9 @@ token_estimate: 8500
 parts: 4
 ---
 
+> LEGADO: este distillate foi supersedido por `_bmad-output/distillate-v2/SPEC.md` em 2026-05-27.
+> Use esta arvore apenas para referencia historica e auditoria. Em caso de conflito, `distillate-v2/` prevalece.
+
 ## Orientação
 
 - Destilado de 6 documentos do projeto cluster-kubernetes: PRD, Arquitetura, Épicos, Project Context, Sprint Status e Trabalho Diferido
