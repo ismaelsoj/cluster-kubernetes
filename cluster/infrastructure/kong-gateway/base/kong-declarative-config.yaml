@@ -16,6 +16,14 @@ data:
     _format_version: "3.0"
     _transform: true
 
+    # Rate limit default global (AC4): aplica-se a toda requisição sem limite próprio.
+    # Rotas podem sobrescrever com plugin rate-limiting específico (precedência por rota).
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+
     services:
       - name: keycloak-public-service
         host: keycloak-service.keycloak-auth.svc.cluster.local

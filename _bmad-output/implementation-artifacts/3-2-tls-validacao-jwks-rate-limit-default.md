@@ -70,6 +70,34 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Voce DEVE definir explicitamente o nivel de c
   - [ ] Rodar validação completa `make down && make up`
   - [ ] Validar respostas HTTP/HTTPS/JWT/rate limit em cluster local e registrar resultados no `Dev Agent Record`
 
+### Review Findings
+
+> Code review adversarial (Blind Hunter + Edge Case Hunter + Acceptance Auditor) executado em 2026-05-29 contra `main` (`d7d2d4d..fc8e440`). Revisão: claude-opus-4-7.
+
+**Decisões necessárias (resolver antes dos patches):**
+
+- [x] [Review][Patch aplicado] AC4 — Rate limit não era default global, só protegia `/protected` — **Aplicado (2026-05-29):** adicionado plugin `rate-limiting` **global** (`minute:100`, `policy:local`) no nível raiz do `kong-declarative-config.yaml` (default automático para toda requisição, fiel ao AC4); override por rota em `/protected` mantido como demonstração do padrão (precedência por rota sobrepõe o global). `make lint` 4806/4806 OPA. Decisão original era opção 2, ampliada para global a pedido do usuário (per-path continua customizável via plugin por rota).
+- [ ] [Review][Decision→Validar] AC5 — TTL do cache JWKS >= 3600s não configurado nem comprovado — `oauth2-proxy-configmap.yaml` não declara TTL/refresh de JWKS; o go-oidc renova de forma reativa (por `kid` desconhecido / `Cache-Control` do `/certs`). O passo 11 só provou ~10s, não 60 min. **Resolvido (2026-05-29, party mode): opção 2.** Rotação de chave do realm é **manual no MVP** → `kid` estável → o cache de chave pública em memória valida tokens offline por toda a vida deles (tokens vivem no máximo `accessTokenLifespan=3600s`), o que satisfaz o AC5 pelo mecanismo real (não por um TTL fixo). **AC5 segue NÃO comprovado** até o teste de queda longa (passo 11 revisado) que o Ismael rodará offline. Backlog: evoluir rotação de chave. NÃO abrir correct-course agora.
+- [x] [Review][Decision→Resolvido] AC6 — Bootstrap `make down && make up` — **Resolvido (2026-05-29): o usuário confirmou que validou o fluxo completo end-to-end; faltava apenas registrar explicitamente no Dev Agent Record.** Não é mais um achado aberto.
+- [ ] [Review][Decision→Backlog] Divergência arquitetural — OAuth2-Proxy é proxy intermediário (`OAUTH2_PROXY_UPSTREAMS`), não validação local/sidecar no gateway. **Resolvido (2026-05-29, party mode): opção (b)** — alvo é migrar para **forward-auth** (Kong consulta o `/auth` do OAuth2-Proxy só para decisão 200/401 e faz o proxy direto ao upstream real), mantendo o Kong como autoridade de borda e tirando o OAuth2-Proxy do caminho de dados. Upstream-proxy atual **aceito como interino** para o MVP (rota de prova = userinfo; sem API de negócio até o Épico 4). Migração registrada em deferred-work com gatilho no Épico 4. Pendências de validação do AC2: medir latência adicional < 20ms e explicar `userinfo=200` com `PASS_AUTHORIZATION_HEADER=false` (investigação registrada).
+
+**Patches (correção objetiva):**
+
+- [x] [Review][Patch aplicado] Pre-flight de portas obsoleto após mudança para 80/443 [scripts/cluster-up.sh:57] — **Aplicado (2026-05-29):** `for port in 8080 8443` → `for port in 80 443`, alinhado ao mapeamento do `k3d.yaml`. `bash -n` OK.
+
+**Deferidos (documentados em deferred-work.md):**
+
+- [x] [Review][Defer] Overlays homologacao/production herdam config local-only e a OPA fixa `https://localhost` globalmente [policy/kong-edge-security.rego:199-231] — deferido, fora de escopo do MVP local
+- [x] [Review][Defer] Guardrails OPA por matching de string literal são frágeis/vacuos [policy/kong-edge-security.rego:115,157] — deferido, não bloqueia
+- [x] [Review][Defer] `OAUTH2_PROXY_TRUSTED_PROXY_IPS` confia em toda RFC1918 [oauth2-proxy-configmap.yaml:42] — deferido, aceitável no MVP local
+- [x] [Review][Defer] Certificado TLS rotaciona a cada `make up` sem reload do Kong [scripts/inject-secrets.sh:187] — deferido, baixo impacto
+- [x] [Review][Defer] Flag `INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL=true` tornado obrigatório pela OPA [policy/kong-edge-security.rego:217] — deferido, defensável para M2M
+- [x] [Review][Defer] Requisições por host != localhost/keycloak.local retornam 404 em vez de 426/redirect — deferido, AC1 ainda satisfeito (sem encaminhamento inseguro)
+- [x] [Review][Defer] Latência adicional < 20ms (AC2) não medida — deferido, alvo a validar
+- [x] [Review][Defer] `client_secret` de dev (`dev-m2m-local-secret`) versionado [realm-config.json] — deferido, pré-existente em `main` (fixture local)
+
+**Dispensados (5):** bloqueio HTTP cobre todos os paths via prefixo `/` (rotas OIDC são HTTPS-only, então HTTP só casa a rota `426`); Authorization Bearer chega ao upstream (userinfo 200 em runtime contradiz a leitura dos flags `PASS_AUTHORIZATION_HEADER`); NetworkPolicy egress 8080 casa a porta do pod pós-DNAT; fallback `random_b64`/`printf %b` de baixíssima probabilidade; `SCOPE openid` irrelevante no fluxo Bearer M2M.
+
 ## Dev Notes
 
 ### Contexto do Epico
@@ -359,25 +387,43 @@ done | tail -10
 
 **Esperado:** após aproximadamente 100 requests na janela de 1 minuto, alguma resposta retorna `429 Too Many Requests` e headers de rate limit aparecem quando suportados pelo plugin.
 
-**11. Validar sobrevivência do cache JWKS:**
+**11. Validar sobrevivência do cache JWKS (teste de queda longa — rodar offline):**
 
-Use `/oauth2/auth` para esta prova. A rota `/protected/.../userinfo` depende do Keycloak como upstream e retorna `502 Bad Gateway` quando o Deployment do Keycloak está em `replicas=0`, mesmo que a validação JWT/JWKS já tenha passado.
+Use `/oauth2/auth` para esta prova. A rota `/protected/.../userinfo` depende do Keycloak como upstream e retorna `502 Bad Gateway` quando o Keycloak está em `replicas=0`, mesmo com a validação JWT/JWKS já tendo passado.
+
+> **Nota de método (code review 2026-05-29):** o teste anterior só derrubava o Keycloak por `sleep 10` (10s), o que não prova os 60 min do AC5. Com rotação de chave **manual** (MVP), o `kid` é estável e o cache de chave pública do go-oidc valida tokens offline por toda a vida deles. Como `accessTokenLifespan=3600s`, um token vive no máximo 60 min — então o `exp` do token e a janela do AC5 coincidem. Por isso o teste valida que um token emitido ANTES da queda continua sendo validado offline, sem round-trip ao Keycloak, por toda a sua validade. Aos ~3600s o `401` passa a ser do `exp` do token (não do cache) — isso é esperado, não falha de cache.
+
+**11a. Capturar o input que decide o TTL (header `Cache-Control` do `/certs`):**
 
 ```bash
-curl -k -i https://localhost/oauth2/auth \
-  -H "Authorization: Bearer ${TOKEN}"
+curl -k -sI https://localhost/realms/cluster-local/protocol/openid-connect/certs | grep -i '^cache-control'
+```
+
+**Esperado:** registrar o `max-age` retornado pelo Keycloak 26. Não bloqueia o AC (a sobrevivência vem do `kid` estável + cache em memória), mas documenta o comportamento real.
+
+**11b. Teste de sobrevivência com token pré-emitido (loop ~55 min):**
+
+```bash
+# TOKEN deve ter sido obtido no passo 7 e estar fresco (exp ~3600s à frente).
+curl -k -i https://localhost/oauth2/auth -H "Authorization: Bearer ${TOKEN}"   # popula o cache → 202
 
 kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=0
-sleep 10
 
-curl -k -i https://localhost/oauth2/auth \
-  -H "Authorization: Bearer ${TOKEN}"
+for minute in 1 15 30 45 55; do
+  sleep 60 # repetir até atingir cada marco; ajuste conforme preferir (cron/at)
+  code="$(curl -k -s -o /dev/null -w '%{http_code}' \
+    https://localhost/oauth2/auth -H "Authorization: Bearer ${TOKEN}")"
+  echo "t+? min (marco ${minute}): HTTP ${code}"
+done
+
+# Opcional: confirmar que NÃO houve refetch de JWKS durante a queda
+kubectl logs -n kong-gateway deploy/oauth2-proxy-deployment --since=60m | grep -i 'jwks\|keys\|fetch' || echo "sem refetch de JWKS nos logs"
 
 kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=1
 kubectl rollout status deployment/keycloak-deployment -n keycloak-auth
 ```
 
-**Esperado:** a primeira chamada retorna `202 Accepted` com `gap-auth: service-account-m2m-client`; durante a queda do Keycloak, `/oauth2/auth` continua retornando `202 Accepted` enquanto o cache JWKS estiver válido; Keycloak volta a `Ready` ao final.
+**Esperado:** com o Keycloak em `replicas=0`, todas as chamadas de `/oauth2/auth` com o mesmo token (dentro do `exp`) retornam `202 Accepted` com `gap-auth: service-account-m2m-client`, e os logs do OAuth2-Proxy NÃO registram refetch de JWKS durante a janela. Isso prova validação offline pelo cache em memória. AC5 só vira `done` após este teste passar.
 
 ## References
 
@@ -504,6 +550,8 @@ Contexto carregado a partir de `SPEC.md`, companions `implementation-rules.md`, 
 - `2026-05-29 09:16:47-03:00`: Correção do segundo `403` do passo 9: o `userinfo` do Keycloak retornava `insufficient_scope` porque o token M2M era emitido com `scope=email profile`; comando de obtenção do token passou a solicitar `scope=openid profile email` e a imprimir o scope para validação explícita. Validação runtime com token novo retornou `HTTP 200` na rota protegida. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-29 09:23:05-03:00`: Correção do passo 11: teste de sobrevivência do cache JWKS deixou de usar `/protected/.../userinfo`, pois essa rota depende do Keycloak como upstream e retorna `502` quando o Keycloak está parado; o probe correto passou a ser `/oauth2/auth`, esperado `202 Accepted` com `gap-auth`. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-29 09:24:35-03:00`: Validação runtime do passo 11 corrigido: `/oauth2/auth` retornou `202` antes da queda e `202` com Keycloak em `replicas=0`; Keycloak restaurado para `replicas=1` com rollout concluído. Autoria/Implementação: GPT-5 Codex.
+- `2026-05-29 10:54:18-03:00`: Code review adversarial (Blind Hunter + Edge Case Hunter + Acceptance Auditor) executado contra `main` (`d7d2d4d..fc8e440`). 4 decision-needed, 1 patch, 8 defer, 5 dispensados. **Decisões:** D1 (AC4) → patch aplicado como plugin `rate-limiting` global + override por rota; D2 (AC5) → opção 2 (party mode): rotação de chave manual sustenta o cache offline, mas AC5 segue não comprovado até teste de queda longa (passo 11 revisado, rodado offline pelo usuário); D3 (AC6) → resolvido (usuário confirmou validação end-to-end); D4 (topologia) → opção (b) party mode: migrar para forward-auth registrado em deferred-work, upstream-proxy atual aceito como interino. **Patches aplicados:** rate-limiting global em `kong-declarative-config.yaml` e correção do pre-flight de portas (`80/443`) em `cluster-up.sh`. `make lint` 4806/4806 OPA + 0 kube-linter. Pendências para `done`: validar AC5 (teste offline 61 min), medir latência AC2 < 20ms e explicar passthrough do `Authorization` (userinfo=200 com `PASS_AUTHORIZATION_HEADER=false`). Story permanece `in-progress`. Revisão: claude-opus-4-7.
 
 ---
 Autoria/Implementação: GPT-5 Codex
+Revisão: claude-opus-4-7

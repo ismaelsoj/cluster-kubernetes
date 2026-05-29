@@ -54,7 +54,7 @@ fi
 # ─── Pre-flight: conflito de portas ──────────────────────────────────────────
 # Verifica se as portas que o k3d precisa expor (HTTP/HTTPS) já estão em uso.
 # Usa ss (Linux) como método primário e /dev/tcp (bash built-in, macOS) como fallback.
-for port in 8080 8443; do
+for port in 80 443; do
   if ss -tlnp 2>/dev/null | grep -q ":${port} " || \
      (echo >/dev/tcp/localhost/$port) 2>/dev/null; then
     echo "ERRO: Porta ${port} já está em uso no host."
