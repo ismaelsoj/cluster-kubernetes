@@ -207,6 +207,18 @@ deny contains msg if {
 }
 
 deny contains msg if {
+    is_oauth2_proxy_config
+    input.data.OAUTH2_PROXY_OIDC_EMAIL_CLAIM != "preferred_username"
+    msg := "OAuth2-Proxy deve usar preferred_username como claim de identidade para tokens M2M de service account."
+}
+
+deny contains msg if {
+    is_oauth2_proxy_config
+    input.data.OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL != "true"
+    msg := "OAuth2-Proxy deve permitir email nao verificado no fluxo M2M; a seguranca vem de issuer, audience e assinatura JWT."
+}
+
+deny contains msg if {
     is_oauth2_proxy_deployment
     env_blob := json.marshal(oauth2_proxy_container.env)
     not contains(env_blob, "oauth2-proxy-secret")

@@ -195,6 +195,7 @@ Esperado: `/ping` e `/ready` retornam sucesso HTTP.
 ### Validar rota protegida com e sem token
 
 A rota protegida de prova usa o prefixo `/protected` no Kong. O Kong remove esse prefixo antes de encaminhar ao OAuth2-Proxy, e o OAuth2-Proxy valida o Bearer JWT via JWKS interno do Keycloak.
+Para tokens M2M de service account, o OAuth2-Proxy usa `preferred_username` como identidade da sessão, porque esses tokens não representam um usuário humano com email verificado.
 
 ```bash
 curl -k -i \

@@ -331,10 +331,12 @@ wait "$PF_PID" 2>/dev/null || true
 
 **9. Validar rota protegida com e sem token:**
 
-```bash
-curl -k -i https://localhost/<rota-protegida-definida-na-implementacao>
+A rota protegida de prova é o `userinfo` do Keycloak atrás do prefixo `/protected` do Kong:
 
-curl -k -i https://localhost/<rota-protegida-definida-na-implementacao> \
+```bash
+curl -k -i https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo
+
+curl -k -i https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo \
   -H "Authorization: Bearer ${TOKEN}"
 ```
 
@@ -345,7 +347,7 @@ curl -k -i https://localhost/<rota-protegida-definida-na-implementacao> \
 ```bash
 for i in $(seq 1 105); do
   curl -ks -o /tmp/kong-rl-body.txt -w "%{http_code}\n" \
-    https://localhost/<rota-com-rate-limit-definida-na-implementacao> \
+    https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo \
     -H "Authorization: Bearer ${TOKEN}"
 done | tail -10
 ```
@@ -358,7 +360,7 @@ done | tail -10
 kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=0
 sleep 10
 
-curl -k -i https://localhost/<rota-protegida-definida-na-implementacao> \
+curl -k -i https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo \
   -H "Authorization: Bearer ${TOKEN}"
 
 kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=1
@@ -436,6 +438,7 @@ Contexto carregado a partir de `SPEC.md`, companions `implementation-rules.md`, 
 - Investigação runtime posterior confirmou que `localhost:8080/8443` não chegava ao Kong porque o `serverlb` do k3d encaminhava para portas de nó `80/443`, enquanto o `kong-service` estava exposto via MetalLB. Correção inicial aplicada com NodePorts fixos `30080/30443`; ajuste posterior mudou o caminho feliz para portas padrão do host `80/443`.
 - OAuth2-Proxy validado após correção do `cookie_secret`: `rollout status` concluído, endpoint `oauth2-proxy-service` preenchido na porta `4180`, logs sem erro de `cookie_secret`, `/ping` e `/ready` retornando `HTTP 200`.
 - Ajuste para portas padrão validado estaticamente: `bash -n scripts/inject-secrets.sh` passou; `kubectl kustomize` passou para `kong-gateway`, `oauth2-proxy` e `keycloak-auth` nos overlays `local`, `homologacao` e `production`; `make lint` passou com 4450/4450 checks OPA e 0 erros kube-linter.
+- Falha runtime do passo 9 investigada: OAuth2-Proxy retornava `403` com log `email in id_token () isn't verified` para token M2M. Correção aplicada para usar `preferred_username` como claim de identidade e permitir email não verificado no fluxo M2M, mantendo validação por issuer/audience/assinatura. `kubectl kustomize` passou para os overlays do OAuth2-Proxy e `make lint` passou com 4806/4806 checks OPA e 0 erros kube-linter.
 
 ### Completion Notes List
 
@@ -447,6 +450,7 @@ Contexto carregado a partir de `SPEC.md`, companions `implementation-rules.md`, 
 - Exposição local ajustada para os comandos de aceite em `localhost` e `localhost:443`: `k3d.yaml` encaminha host `80/443` para NodePorts fixos e `kong-service` declara `nodePort: 30080/30443`.
 - Guardrails OPA atualizados para proteger `localhost` como host local principal, issuer externo `https://localhost` no Keycloak/OAuth2-Proxy e redirect `https://localhost/oauth2/callback`.
 - Geração do `cookie_secret` do OAuth2-Proxy corrigida para produzir segredo literal de 32 bytes aceito pelo proxy; `--skip-if-exists` agora deixa de pular quando o Secret existente tem cookie inválido.
+- OAuth2-Proxy ajustado para tokens M2M de service account: `OAUTH2_PROXY_OIDC_EMAIL_CLAIM=preferred_username` e `OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL=true`.
 - Story permanece `in-progress` até autorização explícita para publicar commit/push ou outro caminho GitOps que permita o ArgoCD sincronizar os manifests e validar `localhost` com a topologia nova após recriação do cluster.
 
 ### File List
@@ -454,6 +458,7 @@ Contexto carregado a partir de `SPEC.md`, companions `implementation-rules.md`, 
 - `_bmad-output/implementation-artifacts/3-2-tls-validacao-jwks-rate-limit-default.md` - NEW
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` - UPDATE
 - `_bmad-output/implementation-artifacts/investigations/investigacao-kong-localhost-tls-resposta-vazia.md` - NEW
+- `_bmad-output/implementation-artifacts/investigations/oauth2-proxy-userinfo-403-investigation.md` - NEW
 - `cluster/infrastructure/keycloak-auth/base/keycloak-deployment.yaml` - UPDATE
 - `cluster/infrastructure/keycloak-auth/base/realm-config.json` - UPDATE
 - `cluster/infrastructure/kong-gateway/base/kong-configmap.yaml` - UPDATE
@@ -482,6 +487,8 @@ Contexto carregado a partir de `SPEC.md`, companions `implementation-rules.md`, 
 - `2026-05-29 01:01:44-03:00`: Implementação em andamento: TLS de borda, OAuth2-Proxy OSS, validação JWKS via `oidc-jwks-url`, rate limit default, política OPA de borda e runbook operacional adicionados. Validações estáticas passaram; validação runtime aguarda publicação da branch `story/3-2-context` para o ArgoCD sincronizar via GitOps. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-29 08:23:00-03:00`: Correções pós-investigação: `localhost:8080/8443` ajustado para alcançar Kong via NodePorts fixos `30080/30443`; geração e validação do `cookie_secret` do OAuth2-Proxy corrigidas; plano manual e runbook passaram a validar explicitamente OAuth2-Proxy (`rollout`, endpoints, logs, `/ping` e `/ready`). `make lint` passou 3738/3738 OPA + 0 kube-linter; OAuth2-Proxy validado em cluster após reinjeção do Secret. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-29 08:41:09-03:00`: Ajuste solicitado para usar `localhost` nas portas padrão: `k3d.yaml` mapeia `80:30080` e `443:30443`, Kong aceita `localhost` e `keycloak.local`, Keycloak/OAuth2-Proxy usam issuer externo `https://localhost`, e runbook/plano manual passaram a validar `http://localhost` e `https://localhost`. Autoria/Implementação: GPT-5 Codex.
+- `2026-05-29 08:57:11-03:00`: Plano manual corrigido para substituir placeholders de rota pela rota protegida concreta `https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo`. Autoria/Implementação: GPT-5 Codex.
+- `2026-05-29 09:04:02-03:00`: Correção do `403` no passo 9: OAuth2-Proxy passou a usar `preferred_username` como claim de identidade e permitir email não verificado no fluxo M2M de service account; investigação registrada em `investigations/oauth2-proxy-userinfo-403-investigation.md`. Autoria/Implementação: GPT-5 Codex.
 
 ---
 Autoria/Implementação: GPT-5 Codex
