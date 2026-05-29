@@ -957,16 +957,16 @@
     "schema_version": 1,
     "developer": "dev-39d71ab2",
     "scope": "live",
-    "total_hours": 3.6923,
-    "total_interactions": 943,
-    "total_sessions": 10,
-    "total_input_tokens": 16053,
-    "total_output_tokens": 173457,
-    "total_cache_creation_input_tokens": 471173,
-    "total_cache_read_input_tokens": 8211719,
-    "last_active_date": "25/05/2026",
+    "total_hours": 4.7581,
+    "total_interactions": 1346,
+    "total_sessions": 12,
+    "total_input_tokens": 80888,
+    "total_output_tokens": 358167,
+    "total_cache_creation_input_tokens": 818890,
+    "total_cache_read_input_tokens": 17438675,
+    "last_active_date": "28/05/2026",
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751682-03:00"
+    "generated_at": "2026-05-28T23:30:19.359339-03:00"
   },
   {
     "event_type": "activity_daily",
@@ -985,7 +985,7 @@
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_daily",
@@ -1004,7 +1004,7 @@
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_daily",
@@ -1023,7 +1023,7 @@
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_daily",
@@ -1042,7 +1042,7 @@
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_daily",
@@ -1061,7 +1061,7 @@
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_daily",
@@ -1080,7 +1080,7 @@
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_daily",
@@ -1091,15 +1091,15 @@
     "model": "Gemini 3.5 Flash (High)",
     "raw_model": "Gemini 3.5 Flash (High)",
     "model_confidence": "confirmado",
-    "hours": 1.1169,
+    "hours": 1.1286,
     "sessions": 1,
-    "interactions": 423,
+    "interactions": 444,
     "input_tokens": 0,
     "output_tokens": 0,
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_daily",
@@ -1110,15 +1110,53 @@
     "model": "Claude Sonnet 4.6",
     "raw_model": "Claude Sonnet 4.6",
     "model_confidence": "confirmado",
-    "hours": 0.5976,
+    "hours": 1.1517,
     "sessions": 2,
-    "interactions": 251,
-    "input_tokens": 16053,
-    "output_tokens": 173457,
-    "cache_creation_input_tokens": 471173,
-    "cache_read_input_tokens": 8211719,
+    "interactions": 571,
+    "input_tokens": 80888,
+    "output_tokens": 358167,
+    "cache_creation_input_tokens": 818890,
+    "cache_read_input_tokens": 17438675,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
+  },
+  {
+    "event_type": "activity_daily",
+    "schema_version": 1,
+    "developer": "dev-39d71ab2",
+    "date": "2026-05-27",
+    "tool": "Antigravity",
+    "model": "Gemini 3.5 Flash (High)",
+    "raw_model": "Gemini 3.5 Flash (High)",
+    "model_confidence": "confirmado",
+    "hours": 0.25,
+    "sessions": 1,
+    "interactions": 49,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "legacy": false,
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
+  },
+  {
+    "event_type": "activity_daily",
+    "schema_version": 1,
+    "developer": "dev-39d71ab2",
+    "date": "2026-05-28",
+    "tool": "Antigravity",
+    "model": "Gemini 3.5 Flash (High)",
+    "raw_model": "Gemini 3.5 Flash (High)",
+    "model_confidence": "confirmado",
+    "hours": 0.25,
+    "sessions": 1,
+    "interactions": 13,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "legacy": false,
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_branch",
@@ -1140,7 +1178,7 @@
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_branch",
@@ -1161,7 +1199,7 @@
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_branch",
@@ -1183,7 +1221,7 @@
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_branch",
@@ -1204,7 +1242,7 @@
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_branch",
@@ -1230,7 +1268,7 @@
     "cache_creation_input_tokens": 471173,
     "cache_read_input_tokens": 8211719,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_branch",
@@ -1239,19 +1277,21 @@
     "date": "2026-05-25",
     "branch": "tracker-bkl-003",
     "tools": [
-      "Antigravity"
+      "Antigravity",
+      "Claude Code"
     ],
     "models": [
+      "Claude Sonnet 4.6",
       "Gemini 3.5 Flash (High)"
     ],
-    "hours": 0.4422,
-    "interactions": 99,
-    "input_tokens": 0,
-    "output_tokens": 0,
-    "cache_creation_input_tokens": 0,
-    "cache_read_input_tokens": 0,
+    "hours": 1.0081,
+    "interactions": 440,
+    "input_tokens": 64835,
+    "output_tokens": 184710,
+    "cache_creation_input_tokens": 347717,
+    "cache_read_input_tokens": 9226956,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   },
   {
     "event_type": "activity_branch",
@@ -1272,6 +1312,48 @@
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
     "legacy": false,
-    "generated_at": "2026-05-25T16:49:54.751029-03:00"
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
+  },
+  {
+    "event_type": "activity_branch",
+    "schema_version": 1,
+    "developer": "dev-39d71ab2",
+    "date": "2026-05-27",
+    "branch": "tracker-bkl-003",
+    "tools": [
+      "Antigravity"
+    ],
+    "models": [
+      "Gemini 3.5 Flash (High)"
+    ],
+    "hours": 0.25,
+    "interactions": 49,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "legacy": false,
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
+  },
+  {
+    "event_type": "activity_branch",
+    "schema_version": 1,
+    "developer": "dev-39d71ab2",
+    "date": "2026-05-28",
+    "branch": "time-tracker",
+    "tools": [
+      "Antigravity"
+    ],
+    "models": [
+      "Gemini 3.5 Flash (High)"
+    ],
+    "hours": 0.25,
+    "interactions": 13,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "legacy": false,
+    "generated_at": "2026-05-28T23:30:19.358704-03:00"
   }
 ]

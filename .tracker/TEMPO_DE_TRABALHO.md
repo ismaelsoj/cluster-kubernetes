@@ -9,7 +9,7 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 
 ## 📊 Resumo Geral Consolidado (Todos os Desenvolvedores)
 
-* **Tempo Total de Desenvolvimento:** **33h 46m**
+* **Tempo Total de Desenvolvimento:** **35h 24m**
 
 ### 🌿 Tempo Total por Branch
 
@@ -22,22 +22,24 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | `main` | **13h 09m** |
 | `remotes/origin/1-2-makefile-scripts` | **0h 00m** |
 | `teste` | **0h 05m** |
-| `time-tracker` | **14h 36m** |
+| `time-tracker` | **14h 58m** |
+| `tracker-bkl-003` | **1h 15m** |
+| `tracker-bkl-003-export-json-csv` | **0h 00m** |
 
 ---
 
 ## 👤 Desenvolvedor: `dev-39d71ab2`
 
-* **Última Data Ativa:** 25/05/2026 (Horário de Brasília)
-* **Tempo Ativo Combinado (IA):** **23h 29m**
-* **Total de Interações:** **4396 comandos** em 21 sessões (8.9M tokens totais no Claude Code)
+* **Última Data Ativa:** 28/05/2026 (Horário de Brasília)
+* **Tempo Ativo Combinado (IA):** **25h 06m**
+* **Total de Interações:** **4967 comandos** em 23 sessões (18.7M tokens totais no Claude Code)
 
 ### 🛠️ Totais por Ferramenta
 
 | Ferramenta | Tempo Ativo | Interações | Tokens (Entrada / Saída) |
 | :---: | :---: | :---: | :---: |
-| **Antigravity** | 17h 06m | 2111 | N/A |
-| **Claude Code** | 6h 22m | 2285 | 16.053 / 173.457 |
+| **Antigravity** | 18h 10m | 2362 | N/A |
+| **Claude Code** | 6h 55m | 2605 | 80.888 / 358.167 |
 
 ### 🗓️ Detalhamento Diário das Horas (Brasília)
 
@@ -63,8 +65,10 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | 25/05/2026 | **Antigravity** | Claude Sonnet 4.6 (Thinking) | 1h 20m | 1 | 155 | N/A |
 | 25/05/2026 | **Antigravity** | GPT OSS 120B (Medium) | 0h 03m | 1 | 23 | N/A |
 | 25/05/2026 | **Antigravity** | Gemini 3.1 Pro (High) | 0h 17m | 2 | 15 | N/A |
-| 25/05/2026 | **Antigravity** | Gemini 3.5 Flash (High) | 0h 33m | 1 | 255 | N/A |
-| 25/05/2026 | **Claude Code** | Claude Sonnet 4.6 | 0h 36m | 2 | 251 | 16.053 / 173.457 |
+| 25/05/2026 | **Antigravity** | Gemini 3.5 Flash (High) | 1h 08m | 1 | 444 | N/A |
+| 25/05/2026 | **Claude Code** | Claude Sonnet 4.6 | 1h 09m | 2 | 571 | 80.888 / 358.167 |
+| 27/05/2026 | **Antigravity** | Gemini 3.5 Flash (High) | 0h 15m | 1 | 49 | N/A |
+| 28/05/2026 | **Antigravity** | Gemini 3.5 Flash (High) | 0h 15m | 1 | 13 | N/A |
 
 ### 🌿 Detalhamento Diário por Branch / História (Brasília)
 
@@ -85,7 +89,12 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | 21/05/2026 | `bmad-custom` | Antigravity | Claude Sonnet 4.6 (Thinking), Gemini 3.5 Flash (High) | 0h 05m | 20 | N/A |
 | 21/05/2026 | `main` | Antigravity | Gemini 3.5 Flash (High) | 0h 00m | 2 | N/A |
 | 21/05/2026 | `time-tracker` | Antigravity | Gemini 3.1 Pro (High), Gemini 3.5 Flash (High) | 0h 14m | 54 | N/A |
-| 25/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Sonnet 4.6, Claude Sonnet 4.6 (Thinking), GPT OSS 120B (Medium), Gemini 3.1 Pro (High), Gemini 3.5 Flash (High) | 2h 49m | 699 | 16.053 / 173.457 |
+| 25/05/2026 | `main` | Antigravity | Gemini 3.5 Flash (High) | 0h 00m | 2 | N/A |
+| 25/05/2026 | `time-tracker` | Antigravity, Claude Code | Claude Sonnet 4.6, Claude Sonnet 4.6 (Thinking), GPT OSS 120B (Medium), Gemini 3.1 Pro (High), Gemini 3.5 Flash (High) | 2h 56m | 747 | 16.053 / 173.457 |
+| 25/05/2026 | `tracker-bkl-003` | Antigravity, Claude Code | Claude Sonnet 4.6, Gemini 3.5 Flash (High) | 1h 00m | 440 | 64.835 / 184.710 |
+| 25/05/2026 | `tracker-bkl-003-export-json-csv` | Antigravity | Gemini 3.5 Flash (High) | 0h 00m | 19 | N/A |
+| 27/05/2026 | `tracker-bkl-003` | Antigravity | Gemini 3.5 Flash (High) | 0h 15m | 49 | N/A |
+| 28/05/2026 | `time-tracker` | Antigravity | Gemini 3.5 Flash (High) | 0h 15m | 13 | N/A |
 
 ### 🪙 Consumo de Tokens (Claude Code)
 
@@ -98,8 +107,8 @@ Este arquivo consolida o tempo de desenvolvimento ativo auxiliado por ferramenta
 | 18/05/2026 | Claude Sonnet 4.6 | 0 | 0 | 0 | 0 | 0 |
 | 19/05/2026 | Claude Sonnet 4.6 | 0 | 0 | 0 | 0 | 0 |
 | 20/05/2026 | Claude Sonnet 4.6 | 0 | 0 | 0 | 0 | 0 |
-| 25/05/2026 | Claude Sonnet 4.6 | 16.053 | 173.457 | 8.211.719 | 471.173 | 8.872.402 |
-| **Total** | | **16.053** | **173.457** | **8.211.719** | **471.173** | **8.872.402** |
+| 25/05/2026 | Claude Sonnet 4.6 | 80.888 | 358.167 | 17.438.675 | 818.890 | 18.696.620 |
+| **Total** | | **80.888** | **358.167** | **17.438.675** | **818.890** | **18.696.620** |
 
 ---
 
