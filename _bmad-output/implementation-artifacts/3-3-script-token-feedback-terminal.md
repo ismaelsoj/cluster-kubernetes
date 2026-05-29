@@ -6,7 +6,7 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Voce DEVE definir explicitamente o nivel de c
 
 # Story 3.3: Script de Token e Feedback Estruturado do Terminal
 
-**Status:** review
+**Status:** done
 **Complexidade:** Baixa Complexidade
 
 ## Story Foundation
@@ -57,6 +57,17 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Voce DEVE definir explicitamente o nivel de c
   - [x] Rodar `bash scripts/status.sh`.
   - [x] Validar `make down && make up`.
   - [x] Validar o caminho `401/403 -> 200` com `curl` na rota protegida e registrar evidencias no `Dev Agent Record`.
+
+### Review Findings
+
+- [x] [Review][Decision] Código de saída de `status.sh` quando token falha — RESOLVIDO: manter `exit 1` (opção 1). Comportamento honesto: endpoint quebrado = ambiente não está completamente operacional. [scripts/status.sh:118]
+- [x] [Review][Patch] `resolve_argocd_target_branch` chamado no topo do script antes dos pre-flight checks — `git` não está na lista de binários obrigatórios; `git ls-remote origin` pode travar indefinidamente em ambientes offline sem mensagem útil ao operador [scripts/cluster-up.sh:47]
+- [x] [Review][Patch] `set -euo pipefail` no topo de `token-helpers.sh` é anti-pattern para biblioteca sourced — o caller já gerencia suas próprias opções de shell; o set redundante não causa dano hoje mas é contra-indicado por convenção de boas práticas [scripts/token-helpers.sh:5]
+- [x] [Review][Patch] Atribuição "GPT-5 Codex" é nome de modelo fictício — descartado pelo dev: não relevante para este projeto [scripts/token-helpers.sh, scripts/generate-token.sh, scripts/status.sh, scripts/cluster-up.sh, docs/runbook-operacoes.md]
+- [x] [Review][Defer] `wait_for_deployment_available` pode dobrar a espera efetiva — loop de polling usa deadline correto mas passa `--timeout` original (300s) ao `kubectl rollout status` sem descontar o tempo já gasto no loop; em worst case o operador aguarda até 600s [scripts/cluster-up.sh:136-144] — deferred, baixo impacto em cluster local
+- [x] [Review][Defer] `root-app` ArgoCD patch removido do runbook sem comentário explicativo — operadores seguindo o runbook para recovery manual não receberão mais a instrução de patching do `root-app`; pode afetar reconciliação em restore [docs/runbook-operacoes.md:329] — deferred, validar se remoção é intencional
+- [x] [Review][Defer] Temp files podem ser vazados se o processo receber SIGKILL antes do `rm -f` — `request_token_response` e `status.sh` criam temp files sem `trap ... EXIT`; low risk em cluster local dev [scripts/token-helpers.sh, scripts/status.sh] — deferred, pre-existing pattern
+- [x] [Review][Defer] `TOKEN_RESPONSE_JSON` env var expõe access_token completo no ambiente do subprocess Python — visível em `/proc/<pid>/environ` e alguns outputs de `ps`; aceitável para dev local mas não-ideal [scripts/token-helpers.sh:122] — deferred, design choice para dev local
 
 ## Dev Notes
 
@@ -233,6 +244,7 @@ Esperado: cluster sobe do zero, bootstrap GitOps conclui, e o fluxo final aponta
 - 2026-05-29 13:26:48-03:00 | Criacao inicial da story 3.3 com contexto completo para implementacao | Autoria/Implementacao: GPT-5 Codex
 - 2026-05-29 13:38:13-03:00 | Implementados helper compartilhado, `generate-token.sh`, `status.sh`, ajustes no `cluster-up.sh`, testes `unittest` e atualizacao do runbook | Autoria/Implementacao: GPT-5 Codex
 - 2026-05-29 13:51:26-03:00 | Validacao real concluida com token funcional, prova `401 -> 200`, ciclo `make down && make up` e hardening adicional no `cluster-up.sh` para branch local e reconciliacao idempotente | Autoria/Implementacao: GPT-5 Codex
+- 2026-05-29 | Code review concluído: 2 patches aplicados (P2: `resolve_argocd_target_branch` após pre-flights + `git` no checklist; P3: removido `set -euo pipefail` de `token-helpers.sh`), 1 decisão tomada (D1: manter exit 1 em falha de token), 4 itens diferidos | Revisão: claude-sonnet-4-6
 
 ## References
 

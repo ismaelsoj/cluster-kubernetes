@@ -2,8 +2,6 @@
 # scripts/token-helpers.sh - Funcoes compartilhadas para token M2M e feedback terminal
 # Autoria/Implementacao: GPT-5 Codex
 
-set -euo pipefail
-
 LOCAL_BASE_URL="${LOCAL_BASE_URL:-https://localhost}"
 REALM_NAME="${REALM_NAME:-cluster-local}"
 TOKEN_ENDPOINT="${TOKEN_ENDPOINT:-${LOCAL_BASE_URL}/realms/${REALM_NAME}/protocol/openid-connect/token}"

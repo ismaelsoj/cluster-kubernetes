@@ -159,3 +159,12 @@ Revisão: GPT-5.5
 - **[AC4 — rate limit efetivo ~2× no k3d multi-nó]** Confirmado em runtime: o cluster k3d tem 2 nós e o `serverlb` faz round-robin de `localhost:443`; o kube-proxy faz SNAT para o IP de cada nó (logs do Kong mostram `client_ip` alternando `10.42.0.0`/`10.42.1.1`). Como `rate-limiting` sem consumer usa `limit_by` por IP, o contador `policy: local` se divide em 2 → limite efetivo ~200/min em vez de 100 (medido: 210 reqs → 200×`200` + 10×`429`). A config `minute: 100` está correta; é artefato da topologia local. **Opções futuras:** (a) aceitar como limitação local documentada; (b) `externalTrafficPolicy: Local` no `kong-service` para preservar IP de origem; (c) cluster k3d single-node para validação determinística do AC4. **Gatilho:** se precisar provar 100/min exato no local, ou ao endurecer produção.
 
 Revisão: claude-opus-4-7
+
+## Deferred from: code review of 3-3-script-token-feedback-terminal (2026-05-29)
+
+- **[scripts/cluster-up.sh:136-144]** `wait_for_deployment_available` pode dobrar a espera efetiva — loop de polling usa deadline correto mas passa o `--timeout` original (PLATFORM_WAIT_TIMEOUT=300s) ao `kubectl rollout status` sem descontar o tempo já gasto no loop de espera do Deployment aparecer; em worst case o operador aguarda até 600s. Baixo impacto em cluster local. Corrigir calculando `remaining=$(( deadline - $(date +%s) ))s` e passando ao rollout.
+- **[docs/runbook-operacoes.md:329]** `root-app` ArgoCD patch removido do runbook sem comentário explicativo — operadores seguindo o runbook para recovery manual não verão mais a instrução de patching do `root-app`; pode afetar reconciliação em restore manual. Validar se remoção é intencional e adicionar nota explicativa se for.
+- **[scripts/token-helpers.sh, scripts/status.sh]** Temp files criados com `mktemp` não têm `trap ... EXIT` para cleanup em caso de SIGKILL — low risk em cluster local dev mas inconsistente com boas práticas. Adicionar `trap 'rm -f "${response_file}"' EXIT` em `request_token_response` e `trap 'rm -f "${token_error_file}"' EXIT` em `status.sh`.
+- **[scripts/token-helpers.sh:122]** `TOKEN_RESPONSE_JSON` env var expõe access_token completo no ambiente do subprocess Python — visível em `/proc/<pid>/environ` e alguns outputs de `ps auxe`. Aceitável para cluster local dev. Alternativa seria passar o JSON via stdin para o Python heredoc em vez de env var.
+
+Revisão: claude-sonnet-4-6

@@ -44,15 +44,15 @@ resolve_argocd_target_branch() {
   ARGO_TARGET_BRANCH="main"
 }
 
-resolve_argocd_target_branch "${ARGO_TARGET_BRANCH}"
-
 # ─── Pre-flight: binários obrigatórios ──────────────────────────────────────
-for bin in docker kubectl k3d; do
+for bin in docker kubectl k3d git; do
   if ! command -v "$bin" >/dev/null 2>&1; then
     echo "ERRO: '$bin' não encontrado no PATH. Instale e tente novamente."
     exit 1
   fi
 done
+
+resolve_argocd_target_branch "${ARGO_TARGET_BRANCH}"
 
 # ─── Pre-flight: Docker em execução ─────────────────────────────────────────
 if ! docker info >/dev/null 2>&1; then
