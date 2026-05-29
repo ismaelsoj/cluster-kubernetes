@@ -321,6 +321,52 @@ Em projetos vivos, com múltiplas iterações, stories, revisões e subdomínios
 
 ---
 
+## O `bmad-investigate`: Quando Validação Manual Vira Investigação
+
+Durante a Story 3.2, que adicionou TLS na borda, OAuth2-Proxy, validação JWKS e rate limit default, aprendemos a usar o `bmad-investigate` em um cenário bem concreto: os comandos de validação manual estavam falhando, mas cada falha apontava para uma camada diferente da cadeia.
+
+O fluxo começou com erros de transporte:
+
+- `curl: (52) Empty reply from server` em `http://localhost:8080/`;
+- `curl: (35) SSL_ERROR_SYSCALL` em `https://localhost:8443/...`.
+
+Sem investigação disciplinada, a reação provável seria mexer na configuração TLS do Kong. O `bmad-investigate` ajudou a ancorar a análise em evidência: o Kong respondia corretamente via IP MetalLB, mas o `serverlb` do k3d encaminhava as portas do host para portas dos nós que não chegavam ao `kong-service`. A causa não era TLS; era topologia local. A correção foi fixar NodePorts e mapear o host para eles.
+
+Depois, a mesma abordagem evitou confundir sintomas parecidos:
+
+- `403 Forbidden` com log `email in id_token () isn't verified`: bloqueio do OAuth2-Proxy ao criar sessão para token M2M sem email verificado.
+- `403 Forbidden` com `www-authenticate: ... Missing openid scope`: o OAuth2-Proxy já tinha autenticado, mas o `userinfo` do Keycloak recusou o token por falta de `scope=openid`.
+- `502 Bad Gateway` no teste de cache JWKS: o token foi autenticado (`gap-auth` presente), mas o teste usava `/protected/.../userinfo`, que depende do Keycloak como upstream; com o Keycloak derrubado, o upstream ficava indisponível. O probe correto era `/oauth2/auth`.
+
+### O Que Aprendemos
+
+1. **Nem todo erro HTTP pertence à mesma camada.** Em uma cadeia `cliente -> Kong -> OAuth2-Proxy -> Keycloak`, o mesmo `403` pode vir de validação JWT, criação de sessão, escopo OIDC ou upstream. Headers como `gap-auth`, `www-authenticate`, `x-kong-upstream-latency` e logs do OAuth2-Proxy mudam completamente a conclusão.
+
+2. **O primeiro achado forte muda a investigação.** Quando vimos `gap-auth: service-account-m2m-client`, ficou confirmado que o token já tinha passado pelo OAuth2-Proxy. Isso deslocou a hipótese do gateway para o endpoint `userinfo`.
+
+3. **Hipóteses devem ser atualizadas, não apagadas.** A investigação registrou as etapas: primeiro o problema era topologia `localhost`; depois `cookie_secret`; depois email não verificado; depois escopo `openid`; por fim, teste de cache usando endpoint errado. Cada hipótese ficou documentada com resolução.
+
+4. **Plano de validação também pode estar errado.** A skill não serviu apenas para encontrar bugs no código. Ela mostrou que o passo 11 do plano manual estava conceitualmente errado: ele tentava provar cache JWKS usando um endpoint que dependia do Keycloak estar de pé.
+
+5. **Arquivo de investigação vira memória operacional.** Os achados foram registrados em `_bmad-output/implementation-artifacts/investigations/`, permitindo que a story, o runbook e os comandos manuais fossem corrigidos sem depender da memória da conversa.
+
+### Regra Prática que Surgiu
+
+Use `bmad-investigate` quando uma validação manual falha e ainda não está claro se o problema está em:
+
+- rota/topologia;
+- TLS/porta/hostname;
+- autenticação;
+- autorização/escopo;
+- upstream;
+- ou no próprio teste.
+
+O sinal para ativar a skill é: **há evidência runtime, mas a causa ainda é ambígua**. A partir daí, o trabalho é separar camadas, registrar achados confirmados e só então corrigir.
+
+**Takeaway:** `bmad-investigate` é a skill certa quando a implementação já existe, mas a realidade discorda dela. Ela transforma tentativa-e-erro em investigação rastreável.
+
+---
+
 ## O Party Mode: Alinhamento Coletivo de Decisões
 
 Em um momento de transição — quando reestruturamos a organização de documentação do tracker para seguir o padrão SDD (Sistema de Documentação Distribuída) do BMad — usamos o `bmad-party-mode` para fazer os agentes (Winston/Arquiteto, Amelia/Dev, Mary/Analista) discutirem a proposta em conjunto antes de implementar.
@@ -367,6 +413,7 @@ O `deferred-work.md` rastreou 23+ itens ao longo do Épico 1. Isso não é débi
 | `AGENTS.md` | Para políticas do repositório que se aplicam a *todos* os agentes e ferramentas |
 | `bmad-distillator` | Quando o contexto do projeto ficou grande demais para carregar a cada sessão |
 | `bmad-spec` | Quando o projeto já tem resumos/distillates suficientes, mas ainda falta uma fonte ativa única, com kernel, companions e precedência clara |
+| `bmad-investigate` | Quando há evidência runtime de falha, mas a causa ainda é ambígua entre teste, configuração, gateway, autenticação, autorização ou upstream |
 | `bmad-party-mode` | Para decisões que impactam arquitetura, produto e processo ao mesmo tempo |
 | Sprint Change Proposal | Para mudanças de escopo que afetam múltiplos artefatos — documenta a decisão e mantém os artefatos alinhados |
 | Retrospectiva (`bmad-retrospective`) | Ao final de cada épico — não como formalidade, mas para capturar o que mudou no processo |
@@ -393,3 +440,4 @@ Cada etapa dessa cadeia virou uma regra nos TOMLs. Não porque o processo seja r
 
 *Autoria: claude-sonnet-4-6 | 2026-05-25*
 *Revisão/Atualização: GPT-5 Codex | 2026-05-28 00:05:48-03:00*
+*Revisão/Atualização: GPT-5 Codex | 2026-05-29 09:28:21-03:00*

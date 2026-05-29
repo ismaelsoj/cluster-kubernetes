@@ -287,18 +287,23 @@ curl -k -i https://localhost/realms/cluster-local/.well-known/openid-configurati
 TOKEN="$(
   curl -ksf -X POST https://localhost/realms/cluster-local/protocol/openid-connect/token \
     -H 'Content-Type: application/x-www-form-urlencoded' \
-    -d 'grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret' \
+    -d 'grant_type=client_credentials' \
+    -d 'client_id=m2m-client' \
+    -d 'client_secret=dev-m2m-local-secret' \
+    --data-urlencode 'scope=openid profile email' \
     | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])'
 )"
 
 python3 - <<'PY' "$TOKEN"
 import base64, json, sys
 payload = sys.argv[1].split('.')[1] + '=='
-print(json.loads(base64.urlsafe_b64decode(payload))["iss"])
+claims = json.loads(base64.urlsafe_b64decode(payload))
+print("iss=" + claims["iss"])
+print("scope=" + claims.get("scope", ""))
 PY
 ```
 
-**Esperado:** token gerado; `iss` impresso bate com issuer aceito pelo plugin JWKS/OIDC do Kong.
+**Esperado:** token gerado; `iss` impresso bate com issuer aceito pelo plugin JWKS/OIDC do Kong; `scope` contém `openid`.
 
 **8. Validar OAuth2-Proxy antes da rota protegida:**
 
@@ -356,18 +361,23 @@ done | tail -10
 
 **11. Validar sobrevivência do cache JWKS:**
 
+Use `/oauth2/auth` para esta prova. A rota `/protected/.../userinfo` depende do Keycloak como upstream e retorna `502 Bad Gateway` quando o Deployment do Keycloak está em `replicas=0`, mesmo que a validação JWT/JWKS já tenha passado.
+
 ```bash
+curl -k -i https://localhost/oauth2/auth \
+  -H "Authorization: Bearer ${TOKEN}"
+
 kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=0
 sleep 10
 
-curl -k -i https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo \
+curl -k -i https://localhost/oauth2/auth \
   -H "Authorization: Bearer ${TOKEN}"
 
 kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=1
 kubectl rollout status deployment/keycloak-deployment -n keycloak-auth
 ```
 
-**Esperado:** token previamente validável continua aceito enquanto cache JWKS estiver válido; Keycloak volta a `Ready` ao final.
+**Esperado:** a primeira chamada retorna `202 Accepted` com `gap-auth: service-account-m2m-client`; durante a queda do Keycloak, `/oauth2/auth` continua retornando `202 Accepted` enquanto o cache JWKS estiver válido; Keycloak volta a `Ready` ao final.
 
 ## References
 
@@ -439,6 +449,8 @@ Contexto carregado a partir de `SPEC.md`, companions `implementation-rules.md`, 
 - OAuth2-Proxy validado após correção do `cookie_secret`: `rollout status` concluído, endpoint `oauth2-proxy-service` preenchido na porta `4180`, logs sem erro de `cookie_secret`, `/ping` e `/ready` retornando `HTTP 200`.
 - Ajuste para portas padrão validado estaticamente: `bash -n scripts/inject-secrets.sh` passou; `kubectl kustomize` passou para `kong-gateway`, `oauth2-proxy` e `keycloak-auth` nos overlays `local`, `homologacao` e `production`; `make lint` passou com 4450/4450 checks OPA e 0 erros kube-linter.
 - Falha runtime do passo 9 investigada: OAuth2-Proxy retornava `403` com log `email in id_token () isn't verified` para token M2M. Correção aplicada para usar `preferred_username` como claim de identidade e permitir email não verificado no fluxo M2M, mantendo validação por issuer/audience/assinatura. `kubectl kustomize` passou para os overlays do OAuth2-Proxy e `make lint` passou com 4806/4806 checks OPA e 0 erros kube-linter.
+- Segundo `403` do passo 9 validado como resposta do `userinfo` por escopo ausente: token antigo tinha `scope=email profile`; comando corrigido com `scope=openid profile email` gerou token com `scope=openid email profile` e `curl` na rota protegida retornou `HTTP 200`.
+- Retorno `502` do passo 11 diagnosticado como teste incorreto: `/protected/.../userinfo` valida o token, mas depois precisa do upstream Keycloak. Com Keycloak em `replicas=0`, o probe correto de cache JWKS é `/oauth2/auth`, que retornou `HTTP 202` antes da queda e `HTTP 202` durante a queda; Keycloak voltou com rollout concluído.
 
 ### Completion Notes List
 
@@ -489,6 +501,9 @@ Contexto carregado a partir de `SPEC.md`, companions `implementation-rules.md`, 
 - `2026-05-29 08:41:09-03:00`: Ajuste solicitado para usar `localhost` nas portas padrão: `k3d.yaml` mapeia `80:30080` e `443:30443`, Kong aceita `localhost` e `keycloak.local`, Keycloak/OAuth2-Proxy usam issuer externo `https://localhost`, e runbook/plano manual passaram a validar `http://localhost` e `https://localhost`. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-29 08:57:11-03:00`: Plano manual corrigido para substituir placeholders de rota pela rota protegida concreta `https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo`. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-29 09:04:02-03:00`: Correção do `403` no passo 9: OAuth2-Proxy passou a usar `preferred_username` como claim de identidade e permitir email não verificado no fluxo M2M de service account; investigação registrada em `investigations/oauth2-proxy-userinfo-403-investigation.md`. Autoria/Implementação: GPT-5 Codex.
+- `2026-05-29 09:16:47-03:00`: Correção do segundo `403` do passo 9: o `userinfo` do Keycloak retornava `insufficient_scope` porque o token M2M era emitido com `scope=email profile`; comando de obtenção do token passou a solicitar `scope=openid profile email` e a imprimir o scope para validação explícita. Validação runtime com token novo retornou `HTTP 200` na rota protegida. Autoria/Implementação: GPT-5 Codex.
+- `2026-05-29 09:23:05-03:00`: Correção do passo 11: teste de sobrevivência do cache JWKS deixou de usar `/protected/.../userinfo`, pois essa rota depende do Keycloak como upstream e retorna `502` quando o Keycloak está parado; o probe correto passou a ser `/oauth2/auth`, esperado `202 Accepted` com `gap-auth`. Autoria/Implementação: GPT-5 Codex.
+- `2026-05-29 09:24:35-03:00`: Validação runtime do passo 11 corrigido: `/oauth2/auth` retornou `202` antes da queda e `202` com Keycloak em `replicas=0`; Keycloak restaurado para `replicas=1` com rollout concluído. Autoria/Implementação: GPT-5 Codex.
 
 ---
 Autoria/Implementação: GPT-5 Codex

@@ -152,14 +152,23 @@ TOKEN="$(
   curl -ksf -X POST \
     https://localhost/realms/cluster-local/protocol/openid-connect/token \
     -H 'Content-Type: application/x-www-form-urlencoded' \
-    -d 'grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret' \
+    -d 'grant_type=client_credentials' \
+    -d 'client_id=m2m-client' \
+    -d 'client_secret=dev-m2m-local-secret' \
+    --data-urlencode 'scope=openid profile email' \
     | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])'
 )"
 
-python3 -c 'import base64,json,sys; p=sys.argv[1].split(".")[1] + "=="; print(json.loads(base64.urlsafe_b64decode(p))["iss"])' "${TOKEN}"
+python3 - <<'PY' "${TOKEN}"
+import base64, json, sys
+payload = sys.argv[1].split(".")[1] + "=="
+claims = json.loads(base64.urlsafe_b64decode(payload))
+print("iss=" + claims["iss"])
+print("scope=" + claims.get("scope", ""))
+PY
 ```
 
-Esperado: token gerado e `iss` igual a `https://localhost/realms/cluster-local`.
+Esperado: token gerado, `iss` igual a `https://localhost/realms/cluster-local` e `scope` contendo `openid`.
 
 ### Validar OAuth2-Proxy
 
@@ -223,20 +232,23 @@ Esperado: após aproximadamente 100 requisições dentro de 1 minuto, alguma res
 ### Validar sobrevivência temporária do cache JWKS
 
 O OAuth2-Proxy usa `oidc-jwks-url` interno e o verificador remoto de chaves do provider OIDC. Esse verificador é mantido em memória e reutiliza chaves já conhecidas enquanto o `kid` do token continuar disponível no cache.
+Use o endpoint `/oauth2/auth` para este teste, porque ele valida o Bearer token sem encaminhar a chamada para o upstream Keycloak. A rota `/protected/.../userinfo` não serve para esta prova: quando o Keycloak está com `replicas=0`, o upstream dela também fica indisponível e o resultado esperado vira `502 Bad Gateway`.
 
 ```bash
+curl -k -i https://localhost/oauth2/auth \
+  -H "Authorization: Bearer ${TOKEN}"
+
 kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=0
 sleep 10
 
-curl -k -i \
-  https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo \
+curl -k -i https://localhost/oauth2/auth \
   -H "Authorization: Bearer ${TOKEN}"
 
 kubectl scale deployment/keycloak-deployment -n keycloak-auth --replicas=1
 kubectl rollout status deployment/keycloak-deployment -n keycloak-auth
 ```
 
-Esperado: token previamente validável continua aceito enquanto a chave JWKS necessária estiver em cache; ao final, o Keycloak volta a `Ready`.
+Esperado: a primeira chamada aquece/confirma o cache e retorna `202 Accepted` com `gap-auth: service-account-m2m-client`; durante a queda do Keycloak, `/oauth2/auth` continua retornando `202 Accepted` enquanto a chave JWKS necessária estiver em cache; ao final, o Keycloak volta a `Ready`.
 
 ---
 
@@ -368,7 +380,10 @@ fi
 
 curl -sf -X POST http://localhost:8090/realms/cluster-local/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials&client_id=m2m-client&client_secret=dev-m2m-local-secret" \
+  -d "grant_type=client_credentials" \
+  -d "client_id=m2m-client" \
+  -d "client_secret=dev-m2m-local-secret" \
+  --data-urlencode "scope=openid profile email" \
   | python3 -c "import sys,json; d=json.load(sys.stdin); token=d.get('access_token'); assert token, 'ERRO: access_token ausente'; print('Token OK:', len(token) > 0)"
 kill "$PF_PID" 2>/dev/null || true
 wait "$PF_PID" 2>/dev/null || true

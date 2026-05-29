@@ -39,5 +39,69 @@
 
 Correção aplicada nos manifests e guardrails em 2026-05-29. A validação runtime final depende de sincronizar os manifests pelo fluxo GitOps e reiniciar o OAuth2-Proxy com o novo ConfigMap.
 
+## Follow-up: 2026-05-29
+
+### Nova Evidência
+
+Após a primeira correção, a rota protegida continuou retornando `403`, mas com outra assinatura:
+
+- Header `gap-auth: service-account-m2m-client`, indicando que a identidade M2M foi aceita e encaminhada.
+- Header `www-authenticate: Bearer realm="cluster-local", error="insufficient_scope", error_description="Missing openid scope"`.
+- JWT decodificado com `scope` igual a `email profile`, sem `openid`.
+
+### Conclusão Atualizada
+
+O primeiro `403` era do OAuth2-Proxy ao criar sessão sem email verificado. O segundo `403` já vem do `userinfo` do Keycloak: o token passou pela borda, mas o endpoint OIDC `userinfo` exige escopo `openid`.
+
+### Correção Adicional
+
+Os comandos de obtenção de token M2M no runbook e na story passaram a solicitar explicitamente:
+
+```bash
+--data-urlencode 'scope=openid profile email'
+```
+
+O passo de validação também passou a imprimir o `scope` do JWT para confirmar que `openid` está presente antes de chamar o `userinfo`.
+
+### Resultado Runtime
+
+Com token novo gerado por `--data-urlencode 'scope=openid profile email'`, o JWT apresentou `scope=openid email profile` e a rota `https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo` retornou `HTTP 200`.
+
+## Follow-up: 2026-05-29 #2
+
+### Nova Evidência
+
+Durante o teste de sobrevivência do cache JWKS, o Keycloak foi escalado para `replicas=0` e a rota `https://localhost/protected/realms/cluster-local/protocol/openid-connect/userinfo` retornou `HTTP/2 502`.
+
+Headers relevantes:
+
+- `gap-auth: service-account-m2m-client`
+- `x-kong-upstream-latency: 3`
+
+O corpo HTML veio do OAuth2-Proxy com a mensagem: `There was a problem connecting to the upstream server.`
+
+### Conclusão Atualizada
+
+O teste antigo não isolava o cache JWKS. A presença de `gap-auth` confirma que o OAuth2-Proxy autenticou o token; o `502` ocorreu depois, ao tentar encaminhar para o upstream Keycloak, que estava indisponível por causa do próprio teste.
+
+### Correção do Teste
+
+O passo de cache JWKS deve usar:
+
+```bash
+curl -k -i https://localhost/oauth2/auth \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+Esse endpoint valida o Bearer token e retorna `202 Accepted` sem depender do upstream `userinfo`. A chamada deve ser feita uma vez com Keycloak disponível para aquecer/confirmar o cache, e repetida durante `replicas=0`.
+
+### Resultado Runtime
+
+O teste corrigido foi executado com token novo:
+
+- `/oauth2/auth` antes da queda do Keycloak: `202`.
+- `/oauth2/auth` com Keycloak em `replicas=0`: `202`.
+- Keycloak restaurado para `replicas=1` com rollout concluído.
+
 ---
 Autoria/Implementação: GPT-5 Codex
