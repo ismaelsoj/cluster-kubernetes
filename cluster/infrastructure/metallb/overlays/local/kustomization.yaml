@@ -1,0 +1,12 @@
+# Kustomization overlay local - metallb - cluster-kubernetes
+# Ambiente: local (k3d) — adiciona IPAddressPool e L2Advertisement para rede Docker
+# Wave 2: CRs aplicados após o controller (Wave 1) estar pronto
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - ip-address-pool.yaml
+  - l2advertisement.yaml
+
+# Autoria/Implementação: claude-sonnet-4-6

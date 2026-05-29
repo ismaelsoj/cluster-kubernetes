@@ -1,5 +1,5 @@
-# ConfigMap declarativo do Kong DB-Less - gateway de borda da plataforma
-# Centraliza a configuração GitOps do runtime e a rota inicial do Keycloak.
+# ConfigMap de variáveis de ambiente do Kong DB-Less - gateway de borda da plataforma
+# Contém apenas env vars do runtime; a configuração declarativa está em kong-declarative-config.yaml.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -21,28 +21,8 @@ data:
   KONG_PROXY_ACCESS_LOG: /dev/stdout kong_json
   KONG_PROXY_ERROR_LOG: /dev/stderr
   KONG_LOG_LEVEL: notice
-  KONG_NGINX_WORKER_PROCESSES: "1"
+  KONG_NGINX_WORKER_PROCESSES: "auto"
   KONG_NGINX_HTTP_LOG_FORMAT: >-
     kong_json escape=json '{"time":"$time_iso8601","request_id":"$kong_request_id","client_ip":"$remote_addr","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$bytes_sent,"request_time":$request_time,"upstream_addr":"$upstream_addr","upstream_status":"$upstream_status","upstream_response_time":"$upstream_response_time","user_agent":"$http_user_agent"}'
-  kong.yml: |
-    _format_version: "3.0"
-    _transform: true
 
-    services:
-      - name: keycloak-service
-        host: keycloak-service.keycloak-auth.svc.cluster.local
-        port: 80
-        protocol: http
-        routes:
-          - name: keycloak-route
-            hosts:
-              - keycloak.local
-            paths:
-              - /
-            preserve_host: true
-            strip_path: false
-            protocols:
-              - http
-              - https
-
-# Autoria/Implementação: GPT-5 Codex
+# Autoria/Implementação: claude-sonnet-4-6

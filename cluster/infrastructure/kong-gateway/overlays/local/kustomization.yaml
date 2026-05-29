@@ -5,3 +5,16 @@ kind: Kustomization
 
 resources:
   - ../../base
+
+# Fix OOMKilled no k3d: limita a 1 worker para evitar consumo excessivo de memória
+patches:
+  - patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: kong-configmap
+      data:
+        KONG_NGINX_WORKER_PROCESSES: "1"
+    target:
+      kind: ConfigMap
+      name: kong-configmap

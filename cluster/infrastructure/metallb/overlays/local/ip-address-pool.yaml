@@ -1,0 +1,19 @@
+# IPAddressPool do MetalLB para ambiente local k3d
+# Range reservado dentro da subnet Docker do k3d (172.18.0.0/16).
+# Subnet confirmada via: docker network inspect k3d-cluster-kubernetes
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: local-pool
+  namespace: metallb-system
+  labels:
+    app.kubernetes.io/name: metallb
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  addresses:
+    - 172.18.0.200-172.18.0.250
+
+# Autoria/Implementação: claude-sonnet-4-6

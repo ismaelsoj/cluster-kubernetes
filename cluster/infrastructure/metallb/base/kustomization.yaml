@@ -1,0 +1,13 @@
+# Kustomization base - metallb - cluster-kubernetes
+# Wave 1 — controlador de LoadBalancer para clusters bare-metal/local (k3d)
+# CRs de pool e advertisement ficam nos overlays por ambiente.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "1"
+
+resources:
+  - https://raw.githubusercontent.com/metallb/metallb/v0.16.0/config/manifests/metallb-native.yaml
+
+# Autoria/Implementação: claude-sonnet-4-6

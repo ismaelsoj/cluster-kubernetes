@@ -1,0 +1,8 @@
+# Kustomization overlay production - metallb - cluster-kubernetes
+# MetalLB não utilizado em produção (ambiente VM usa Klipper/cloud CCM).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources: []
+
+# Autoria/Implementação: claude-sonnet-4-6

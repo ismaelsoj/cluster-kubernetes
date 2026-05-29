@@ -279,12 +279,22 @@ Contexto carregado a partir de `SPEC.md`, `implementation-rules.md`, `architectu
 
 - `_bmad-output/implementation-artifacts/3-1-manifestos-kustomize-kong-db-less.md` - UPDATE
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` - UPDATE
+- `cluster/infrastructure/kustomization.yaml` - UPDATE
+- `cluster/infrastructure/namespaces/base/namespaces.yaml` - UPDATE (sem namespace metallb-system — criado pelo manifesto upstream)
 - `cluster/infrastructure/kong-gateway/base/kustomization.yaml` - UPDATE
-- `cluster/infrastructure/kong-gateway/base/kong-configmap.yaml` - NEW
-- `cluster/infrastructure/kong-gateway/base/kong-deployment.yaml` - NEW
+- `cluster/infrastructure/kong-gateway/base/kong-configmap.yaml` - UPDATE (removido kong.yml; apenas env vars)
+- `cluster/infrastructure/kong-gateway/base/kong-declarative-config.yaml` - NEW
+- `cluster/infrastructure/kong-gateway/base/kong-deployment.yaml` - UPDATE (volume aponta para kong-declarative-config)
 - `cluster/infrastructure/kong-gateway/base/kong-networkpolicy.yaml` - NEW
-- `cluster/infrastructure/kong-gateway/base/kong-priorityclass.yaml` - NEW
+- `cluster/infrastructure/kong-gateway/base/kong-priorityclass.yaml` - UPDATE (value: 1100000)
 - `cluster/infrastructure/kong-gateway/base/kong-service.yaml` - NEW
+- `cluster/infrastructure/kong-gateway/overlays/local/kustomization.yaml` - UPDATE (patch KONG_NGINX_WORKER_PROCESSES: "1")
+- `cluster/infrastructure/metallb/base/kustomization.yaml` - NEW
+- `cluster/infrastructure/metallb/overlays/local/kustomization.yaml` - NEW
+- `cluster/infrastructure/metallb/overlays/local/ip-address-pool.yaml` - NEW
+- `cluster/infrastructure/metallb/overlays/local/l2advertisement.yaml` - NEW
+- `cluster/infrastructure/metallb/overlays/homologacao/kustomization.yaml` - NEW
+- `cluster/infrastructure/metallb/overlays/production/kustomization.yaml` - NEW
 
 ## Change Log
 
@@ -292,6 +302,8 @@ Contexto carregado a partir de `SPEC.md`, `implementation-rules.md`, `architectu
 - `2026-05-28 15:47:58-03:00`: Implementacao concluida com manifests base do Kong DB-Less, rota declarativa inicial para `keycloak.local`, hardening do container em modo read-only e validacoes `kubectl kustomize` + `make lint`. Status atualizado para `review`. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-28 17:27:01-03:00`: Correcao pos-validacao em cluster: imagem ajustada de `kong:3.14.0.3` para `kong/kong-gateway:3.14.0.3` apos `ImagePullBackOff` por repositório inexistente em `docker.io/library`. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-28 17:37:28-03:00`: Correcao pos-validacao em cluster: configurado `KONG_NGINX_WORKER_PROCESSES=1` apos `CrashLoopBackOff` por `OOMKilled`, reduzindo o default `auto` que estava abrindo 10 workers no nó Kubernetes. Autoria/Implementação: GPT-5 Codex.
+- `2026-05-28 23:36:45-03:00`: Code review pós-implementação (6 findings). Aplicados: (F3) split do ConfigMap misto em `kong-configmap.yaml` (env vars) e `kong-declarative-config.yaml` (config DB-less montado via volumeMount); (F5) PriorityClass `kong-critical` elevado de 1000000 para 1100000, acima do `keycloak-critical`; (F6) `KONG_NGINX_WORKER_PROCESSES` movido para `auto` na base e override `"1"` adicionado no overlay local via patch Kustomize, corrigindo shipping do workaround de OOMKill para produção. Não aplicados: (F2) porta 8080 na NetworkPolicy egress confirmada correta via análise de ordem iptables (DNAT em nat/OUTPUT antes de filter/OUTPUT); (F4) rota Keycloak aceitando HTTP mantida até Story 3.2. Adicionado: componente `cluster/infrastructure/metallb/` com MetalLB v0.16.0 via remote reference Kustomize no overlay local, resolvendo Service LoadBalancer em `<pending>` no k3d (Finding 1); IPAddressPool `172.18.0.200-172.18.0.250` na subnet Docker do k3d. Autoria/Implementação: claude-sonnet-4-6. Revisão: claude-sonnet-4-6.
 
 ---
 Autoria/Implementação: GPT-5 Codex
+Revisão: claude-sonnet-4-6

@@ -10,9 +10,9 @@ metadata:
     app.kubernetes.io/part-of: cluster-kubernetes
   annotations:
     argocd.argoproj.io/sync-wave: "3"
-value: 1000000
+value: 1100000
 globalDefault: false
 preemptionPolicy: PreemptLowerPriority
-description: "Prioridade máxima para o Kong DB-Less que recebe o tráfego de borda"
+description: "Prioridade do gateway de borda Kong DB-Less (acima de keycloak-critical: 1000000)"
 
-# Autoria/Implementação: GPT-5 Codex
+# Autoria/Implementação: claude-sonnet-4-6

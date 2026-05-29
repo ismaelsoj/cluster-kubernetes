@@ -8,9 +8,10 @@ namespace: kong-gateway
 
 resources:
   - kong-configmap.yaml
+  - kong-declarative-config.yaml
   - kong-deployment.yaml
   - kong-service.yaml
   - kong-priorityclass.yaml
   - kong-networkpolicy.yaml
 
-# Autoria/Implementação: GPT-5 Codex
+# Autoria/Implementação: claude-sonnet-4-6

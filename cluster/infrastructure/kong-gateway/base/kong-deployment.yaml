@@ -96,10 +96,10 @@ spec:
       volumes:
         - name: kong-declarative-config
           configMap:
-            name: kong-configmap
+            name: kong-declarative-config
         - name: kong-prefix
           emptyDir: {}
         - name: kong-tmp
           emptyDir: {}
 
-# Autoria/Implementação: GPT-5 Codex
+# Autoria/Implementação: claude-sonnet-4-6

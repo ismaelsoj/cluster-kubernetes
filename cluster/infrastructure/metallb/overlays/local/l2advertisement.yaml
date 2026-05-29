@@ -1,0 +1,18 @@
+# L2Advertisement do MetalLB para ambiente local k3d
+# Anuncia via ARP os IPs do pool local-pool na rede Docker do k3d.
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: local-l2
+  namespace: metallb-system
+  labels:
+    app.kubernetes.io/name: metallb
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  ipAddressPools:
+    - local-pool
+
+# Autoria/Implementação: claude-sonnet-4-6

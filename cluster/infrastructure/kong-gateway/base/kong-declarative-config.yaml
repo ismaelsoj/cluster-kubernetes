@@ -1,0 +1,36 @@
+# ConfigMap da configuração declarativa do Kong DB-Less - rota inicial do Keycloak
+# Montado como arquivo em /kong/declarative/kong.yml via volumeMount + subPath.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-declarative-config
+  namespace: kong-gateway
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: cluster-kubernetes
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+data:
+  kong.yml: |
+    _format_version: "3.0"
+    _transform: true
+
+    services:
+      - name: keycloak-service
+        host: keycloak-service.keycloak-auth.svc.cluster.local
+        port: 80
+        protocol: http
+        routes:
+          - name: keycloak-route
+            hosts:
+              - keycloak.local
+            paths:
+              - /
+            preserve_host: true
+            strip_path: false
+            protocols:
+              - http
+              - https
+
+# Autoria/Implementação: claude-sonnet-4-6
