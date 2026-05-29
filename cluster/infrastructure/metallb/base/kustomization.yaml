@@ -10,4 +10,65 @@ commonAnnotations:
 resources:
   - https://raw.githubusercontent.com/metallb/metallb/v0.16.0/config/manifests/metallb-native.yaml
 
+# Suprime checks do kube-linter para recursos vendor do MetalLB.
+# Não controlamos o manifest upstream — as violações são intencionais no design do MetalLB.
+patches:
+  - patch: |-
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: metallb-webhook-service
+        namespace: metallb-system
+        annotations:
+          ignore-check.kube-linter.io/required-label-name: "recurso vendor upstream"
+          ignore-check.kube-linter.io/required-label-component: "recurso vendor upstream"
+          ignore-check.kube-linter.io/required-label-part-of: "recurso vendor upstream"
+    target:
+      kind: Service
+      name: metallb-webhook-service
+      namespace: metallb-system
+
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: controller
+        namespace: metallb-system
+        annotations:
+          ignore-check.kube-linter.io/env-var-secret: "MetalLB configura ML secret via env var — design upstream imutável"
+          ignore-check.kube-linter.io/liveness-port: "Probe do controller usa porta não exposta — design upstream imutável"
+          ignore-check.kube-linter.io/readiness-port: "Probe do controller usa porta não exposta — design upstream imutável"
+          ignore-check.kube-linter.io/required-label-name: "recurso vendor upstream"
+          ignore-check.kube-linter.io/required-label-component: "recurso vendor upstream"
+          ignore-check.kube-linter.io/required-label-part-of: "recurso vendor upstream"
+          ignore-check.kube-linter.io/unset-cpu-requirements: "recurso vendor upstream sem requests/limits"
+          ignore-check.kube-linter.io/unset-memory-requirements: "recurso vendor upstream sem requests/limits"
+    target:
+      kind: Deployment
+      name: controller
+      namespace: metallb-system
+
+  - patch: |-
+      apiVersion: apps/v1
+      kind: DaemonSet
+      metadata:
+        name: speaker
+        namespace: metallb-system
+        annotations:
+          ignore-check.kube-linter.io/drop-net-raw-capability: "MetalLB speaker requer NET_RAW para anunciar IPs via ARP no Layer 2"
+          ignore-check.kube-linter.io/env-var-secret: "MetalLB configura ML secret path via env var — design upstream imutável"
+          ignore-check.kube-linter.io/host-network: "MetalLB speaker requer hostNetwork para ARP Layer 2"
+          ignore-check.kube-linter.io/liveness-port: "Probe do speaker usa porta não exposta — design upstream imutável"
+          ignore-check.kube-linter.io/readiness-port: "Probe do speaker usa porta não exposta — design upstream imutável"
+          ignore-check.kube-linter.io/required-label-name: "recurso vendor upstream"
+          ignore-check.kube-linter.io/required-label-component: "recurso vendor upstream"
+          ignore-check.kube-linter.io/required-label-part-of: "recurso vendor upstream"
+          ignore-check.kube-linter.io/run-as-non-root: "MetalLB speaker requer root para operações de rede de baixo nível (ARP/BGP)"
+          ignore-check.kube-linter.io/unset-cpu-requirements: "recurso vendor upstream sem requests/limits"
+          ignore-check.kube-linter.io/unset-memory-requirements: "recurso vendor upstream sem requests/limits"
+    target:
+      kind: DaemonSet
+      name: speaker
+      namespace: metallb-system
+
 # Autoria/Implementação: claude-sonnet-4-6

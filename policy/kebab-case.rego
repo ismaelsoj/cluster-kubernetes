@@ -13,8 +13,15 @@ kebab_case_pattern := "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
 # Conjunto de exceções permitidas
 exceptions := {
     "default",
-    "system:serviceaccount:argocd:argocd-application-controller"
+    "system:serviceaccount:argocd:argocd-application-controller",
+    # MetalLB RBAC: convenção k8s de <namespace>:<nome> para ClusterRole/ClusterRoleBinding
+    "metallb-system:controller",
+    "metallb-system:speaker",
 }
+
+# Kinds cujo nome segue formato externo imutável (não controlamos o padrão)
+# CustomResourceDefinition: nome obrigatoriamente <plural>.<group> pela spec do k8s
+skip_name_check_kinds := {"CustomResourceDefinition"}
 
 # Verifica se o valor é uma exceção
 is_exception(val) if {
@@ -25,6 +32,7 @@ is_exception(val) if {
 deny contains msg if {
     name := input.metadata.name
     not is_exception(name)
+    not skip_name_check_kinds[input.kind]
     not regex.match(kebab_case_pattern, name)
     msg := sprintf("Recurso '%s' (Kind: %s) não está seguindo o padrão kebab-case (deve conter apenas letras minúsculas, números e hifens).", [name, input.kind])
 }
