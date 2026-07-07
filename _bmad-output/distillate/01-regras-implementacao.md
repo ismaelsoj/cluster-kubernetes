@@ -7,7 +7,7 @@
 - Ancoragem: nome do recurso K8s DEVE derivar do nome do diretório em `/apps/` (dir `api-pedidos` → deployment `api-pedidos-deployment`, namespace `api-pedidos`)
 - Labels obrigatórios em TODO recurso:
   - `app.kubernetes.io/name`: igual ao nome do diretório/app
-  - `app.kubernetes.io/component`: valores permitidos: `api`, `database`, `identity-provider`, `gateway`, `worker`
+  - `app.kubernetes.io/component`: valores permitidos: `api`, `database`, `identity-provider`, `gateway`, `worker`, `network`
   - `app.kubernetes.io/part-of`: fixo `cluster-kubernetes`
 - Dependências internas (ex: PostgreSQL do Keycloak) ficam no namespace do serviço pai (`keycloak-auth`); apenas serviços independentes recebem namespaces próprios
 
@@ -49,6 +49,22 @@
 - `infra-app.yaml`: `prune: false` (Safe-Prune)
 - `apps-app.yaml`: `prune: true` + `CreateNamespace=true` + glob `cluster/apps/*`
 - NUNCA usar `ApplicationSets` — padrão é App-of-Apps clássico
+
+## Exceção de Labels para Recursos Vendor Upstream
+
+- Recursos importados diretamente de manifestos oficiais de projetos vendor (ex: MetalLB via `https://raw.githubusercontent.com/metallb/metallb/.../metallb-native.yaml`) NÃO precisam carregar os labels obrigatórios `app.kubernetes.io/{name,component,part-of}`
+- Justificativa: modificar labels em recursos vendor via Kustomize introduz drift entre nosso repositório e o upstream, dificulta upgrades e mascara origem do manifesto
+- Formalização obrigatória: cada supressão via `ignore-check.kube-linter.io/required-label-*` deve incluir mensagem explícita `"recurso vendor upstream"` e ficar no `kustomization.yaml` do componente que consome o vendor
+- Recursos NOSSOS que operam sobre o vendor (ex: `IPAddressPool`, `L2Advertisement` do MetalLB definidos por nós) DEVEM carregar todos os labels normalmente
+
+## Valores de `app.kubernetes.io/component` — Semântica
+
+- `api`: APIs de negócio deployadas via boilerplate em `/cluster/apps/*`
+- `database`: banco de dados de estado de um componente
+- `identity-provider`: emissor OIDC/OAuth2 (Keycloak)
+- `gateway`: API Gateway/edge (Kong)
+- `worker`: processos batch/assíncronos
+- `network`: controladores/CRs de rede (MetalLB, futuros CNIs/network policies vendor)
 
 ## Validação Automatizada
 

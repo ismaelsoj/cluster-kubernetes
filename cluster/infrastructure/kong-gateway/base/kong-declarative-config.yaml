@@ -16,8 +16,10 @@ data:
     _format_version: "3.0"
     _transform: true
 
-    # Rate limit default global (AC4): aplica-se a toda requisição sem limite próprio.
+    # Rate limit default global: aplica-se a toda requisição sem limite próprio.
     # Rotas podem sobrescrever com plugin rate-limiting específico (precedência por rota).
+    # NOTA (2026-07-06): plugin foi mantido no scope creep aceito da Story 3.1;
+    # Story 3.2 refina policy (local → cluster/redis) e limites por consumidor.
     plugins:
       - name: rate-limiting
         config:

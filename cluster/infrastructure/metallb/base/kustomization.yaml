@@ -1,11 +1,10 @@
 # Kustomization base - metallb - cluster-kubernetes
 # Wave 1 — controlador de LoadBalancer para clusters bare-metal/local (k3d)
-# CRs de pool e advertisement ficam nos overlays por ambiente.
+# CRs de pool e advertisement ficam nos overlays por ambiente (Wave 2).
+# Nota: sync-wave é aplicado apenas nos recursos vendor abaixo (não via commonAnnotations)
+# para evitar sobrescrever o sync-wave dos CRs definidos nos overlays.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
-commonAnnotations:
-  argocd.argoproj.io/sync-wave: "1"
 
 resources:
   - https://raw.githubusercontent.com/metallb/metallb/v0.16.0/config/manifests/metallb-native.yaml
@@ -20,6 +19,7 @@ patches:
         name: metallb-webhook-service
         namespace: metallb-system
         annotations:
+          argocd.argoproj.io/sync-wave: "1"
           ignore-check.kube-linter.io/required-label-name: "recurso vendor upstream"
           ignore-check.kube-linter.io/required-label-component: "recurso vendor upstream"
           ignore-check.kube-linter.io/required-label-part-of: "recurso vendor upstream"
@@ -35,6 +35,7 @@ patches:
         name: controller
         namespace: metallb-system
         annotations:
+          argocd.argoproj.io/sync-wave: "1"
           ignore-check.kube-linter.io/env-var-secret: "MetalLB configura ML secret via env var — design upstream imutável"
           ignore-check.kube-linter.io/liveness-port: "Probe do controller usa porta não exposta — design upstream imutável"
           ignore-check.kube-linter.io/readiness-port: "Probe do controller usa porta não exposta — design upstream imutável"
@@ -55,6 +56,7 @@ patches:
         name: speaker
         namespace: metallb-system
         annotations:
+          argocd.argoproj.io/sync-wave: "1"
           ignore-check.kube-linter.io/drop-net-raw-capability: "MetalLB speaker requer NET_RAW para anunciar IPs via ARP no Layer 2"
           ignore-check.kube-linter.io/env-var-secret: "MetalLB configura ML secret path via env var — design upstream imutável"
           ignore-check.kube-linter.io/host-network: "MetalLB speaker requer hostNetwork para ARP Layer 2"

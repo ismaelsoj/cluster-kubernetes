@@ -20,11 +20,21 @@ spec:
     - Ingress
     - Egress
   ingress:
+    # Tráfego de borda (proxy HTTP/HTTPS) — aberto ao cluster; LB e kube-proxy chegam com origem SNAT-ada
     - ports:
         - protocol: TCP
           port: 8000
         - protocol: TCP
           port: 8443
+    # Status API — restrita ao kube-system (kubelet probes) e ao próprio namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kong-gateway
+      ports:
         - protocol: TCP
           port: 8100
   egress:

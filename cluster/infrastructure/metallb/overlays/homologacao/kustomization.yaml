@@ -1,8 +1,13 @@
 # Kustomization overlay homologacao - metallb - cluster-kubernetes
 # MetalLB não utilizado em homologacao (ambiente VM usa Klipper/cloud CCM).
+# Overlay mantido intencionalmente sem `resources` — quem for ativar MetalLB
+# em homologacao deve apontar para `../../base` e adicionar os CRs de pool/advertisement.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Sem base referenciada: overlay é no-op deliberado.
+# NÃO inserir `resources: []` sem esta nota para evitar renders vazios silenciosos.
 resources: []
 
 # Autoria/Implementação: claude-sonnet-4-6
+# Revisão: claude-opus-4-7

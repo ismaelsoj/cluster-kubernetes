@@ -28,14 +28,14 @@ customChecks:
     template: required-label
     params:
       key: app.kubernetes.io/component
-      value: "^(api|database|identity-provider|gateway|worker)$"
+      value: "^(api|database|identity-provider|gateway|worker|network)$"
     scope:
       objectKinds:
         - Deployment
         - Service
         - StatefulSet
         - DaemonSet
-    remediation: "Todos os recursos devem conter o label 'app.kubernetes.io/component' restrito a um dos valores válidos: api, database, identity-provider, gateway, worker."
+    remediation: "Todos os recursos devem conter o label 'app.kubernetes.io/component' restrito a um dos valores válidos: api, database, identity-provider, gateway, worker, network."
 
   - name: required-label-part-of
     template: required-label

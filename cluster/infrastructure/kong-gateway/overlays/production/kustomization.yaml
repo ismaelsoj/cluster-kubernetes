@@ -5,3 +5,30 @@ kind: Kustomization
 
 resources:
   - ../../base
+
+# Sizing de produção: workers `auto` (por vCPU), requests para reserva mínima
+# e limits generosos para absorver picos de tráfego sem OOMKilled.
+# Base usa limits 500m/512Mi (adequado apenas para local k3d — causou OOMKilled em bootstrap).
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: kong-deployment
+      spec:
+        template:
+          spec:
+            containers:
+              - name: kong
+                resources:
+                  requests:
+                    cpu: 500m
+                    memory: 1Gi
+                  limits:
+                    cpu: "2"
+                    memory: 2Gi
+    target:
+      kind: Deployment
+      name: kong-deployment
+
+# Autoria/Implementação: claude-opus-4-7

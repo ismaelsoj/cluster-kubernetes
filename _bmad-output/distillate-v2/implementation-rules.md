@@ -7,7 +7,7 @@ Use este companion para implementar ou revisar manifests, overlays, scripts e au
 - Nomes Kubernetes, diretórios e manifests em `kebab-case`.
 - Padrão de nome: `<app>-<tipo>`.
 - Labels obrigatórios: `app.kubernetes.io/name`, `app.kubernetes.io/component`, `app.kubernetes.io/part-of=cluster-kubernetes`.
-- `app.kubernetes.io/component` só pode ser `api`, `database`, `identity-provider`, `gateway` ou `worker`.
+- `app.kubernetes.io/component` só pode ser `api`, `database`, `identity-provider`, `gateway`, `worker` ou `network`.
 - YAML com 2 espaços, comentário inicial em pt-BR e tags Docker imutáveis; nunca `latest`.
 - Todo componente segue `base/` + `overlays/local|homologacao|production`.
 - Scripts ficam em `/scripts/`; documentação em `/docs/`.
@@ -46,7 +46,7 @@ Aplicadas a `Deployment`, `Service`, `StatefulSet` e `DaemonSet`:
 | Check | Regra |
 |-------|-------|
 | `required-label-name` | `app.kubernetes.io/name` obrigatório |
-| `required-label-component` | `app.kubernetes.io/component` ∈ `{api, database, identity-provider, gateway, worker}` |
+| `required-label-component` | `app.kubernetes.io/component` ∈ `{api, database, identity-provider, gateway, worker, network}` |
 | `required-label-part-of` | `app.kubernetes.io/part-of: cluster-kubernetes` fixo |
 | `no-liveness-probe` | `livenessProbe` obrigatório em Deployments |
 | `no-readiness-probe` | `readinessProbe` obrigatório em Deployments |

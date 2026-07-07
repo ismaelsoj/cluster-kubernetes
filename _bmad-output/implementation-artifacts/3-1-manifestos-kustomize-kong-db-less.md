@@ -23,7 +23,7 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Voce DEVE definir explicitamente o nivel de c
 
 **Acceptance Criteria:**
 
-- **AC1:** Dado Keycloak operacional, quando o ArgoCD sincronizar `cluster/infrastructure/kong-gateway/`, então o Kong deve ser provisionado na Wave 3 dentro do namespace `kong-gateway`, com imagem pinada em tag imutável `kong:3.14.0.3`, labels obrigatórios e overlays `local`, `homologacao` e `production`.
+- **AC1:** Dado Keycloak operacional, quando o ArgoCD sincronizar `cluster/infrastructure/kong-gateway/`, então o Kong deve ser provisionado na Wave 3 dentro do namespace `kong-gateway`, com imagem pinada em tag imutável do Kong Gateway OSS (série 3.15 — `kong/kong:3.15`), labels obrigatórios e overlays `local`, `homologacao` e `production`.
 - **AC2:** Dado o Deployment do Kong em execução, quando o container for inspecionado, então o runtime deve operar em modo DB-less (`database=off`) e consumir configuração declarativa via ConfigMap/GitOps, sem depender de configuração mutável via Admin API ou estado em banco.
 - **AC3:** Dado o gateway ativo, quando os manifests forem verificados, então devem existir PriorityClass máxima, NetworkPolicy explícita, healthchecks públicos não autenticados e logs estruturados desde o primeiro deploy.
 - **AC4:** Dado o componente renderizado por Kustomize, quando `kubectl kustomize` for executado para os três overlays, então o render deve concluir sem erro e manter a estrutura canônica do projeto.
@@ -55,6 +55,64 @@ CRITICAL REQUIREMENT [COMPLEXITY]: Voce DEVE definir explicitamente o nivel de c
   - [x] Atualizar a `File List` com todos os arquivos novos e alterados
   - [x] Preencher `Completion Notes List` com a decisão final de deployment adotada
   - [x] Registrar `Autoria/Implementação` em cada manifesto criado
+
+### Review Findings (2026-07-06, claude-opus-4-7)
+
+**Decision-Needed (8) — resolvidas**:
+
+- [x] [Review][Decision→Patch] Vazamento oauth2-proxy — resolvido: **manter e alinhar spec** (rotas `/oauth2` + `/protected` + NP egress:4180 documentados como seed em Dev Notes; oauth2-proxy operacionalizado na Story 4.4)
+- [x] [Review][Decision→Patch] Plugin rate-limiting global e per-route — resolvido: **manter e alinhar spec** (comentário incorreto sobre "AC4" corrigido no diff; Dev Notes explicita que 3.2 refina policy)
+- [x] [Review][Decision→Revertido] Redirect HTTP→HTTPS via 426 — decisão original do dev era trocar por redirect 308, mas patch foi **revertido pós-lint**: a policy `policy/kong-edge-security.rego` (linhas 121, 133) ratifica formalmente `name: keycloak-http-block-route` + `status_code: 426` como decisão de arquitetura fechada na Story 3.2 (code review já concluído). Rota HTTP mantida com `request-termination 426` para preservar consistência com a policy. Se o dev quiser mudar, o caminho correto é atualizar `kong-edge-security.rego` primeiro e reabrir a decisão como retrospectiva da 3.2.
+- [x] [Review][Decision→Patch] Rotas OIDC do Keycloak — resolvido: **manter como seed e alinhar spec** (Dev Notes explicita)
+- [x] [Review][Decision→Patch] Imagem Enterprise vs OSS — resolvido: **migrar para `kong/kong:3.15` (OSS latest)**; patch `KONG_ADMIN_GUI_LISTEN=off` descartado (OSS não tem Kong Manager)
+- [x] [Review][Decision→Patch] `component: gateway` em MetalLB — resolvido: **estender taxonomia com `network`** (implementation-rules atualizado + kube-linter regex expandido + labels dos CRs MetalLB migrados)
+- [x] [Review][Decision→Patch] Recursos Kong para prod — resolvido: **criar overlay production com sizing** `requests 500m/1Gi` × `limits 2/2Gi` + workers `auto`
+- [x] [Review][Decision→Defer] Hosts hardcoded para hml/prd — resolvido: **adiar** (registrado em `04-trabalho-diferido.md`; endereçar quando hosts oficiais forem definidos)
+
+**Patch (6) — aplicados** (todos exceto P1 dismissed):
+
+- [~] [Review][Patch] Dismissed: `KONG_ADMIN_GUI_LISTEN=off` — não aplicável ao Kong OSS
+- [x] [Review][Patch] Restringir ingress Status API 8100 com `from: kube-system + kong-gateway` em `kong-networkpolicy.yaml` ✓
+- [x] [Review][Patch] Colisão sync-wave MetalLB corrigida: `commonAnnotations` removido; `sync-wave: "1"` movido para cada patch de recurso vendor ✓
+- [x] [Review][Patch] Overlays MetalLB hml/prd atualizados com comentário explicativo de no-op deliberado; risco de render vazio silencioso mitigado ✓
+- [x] [Review][Patch] AC1 atualizado para `kong/kong:3.15` (OSS) ✓
+- [x] [Review][Patch] Regra formal de exceção de labels para recursos vendor adicionada em `01-regras-implementacao.md` + semântica dos valores de `component` documentada ✓
+
+**Defer (14)** — registrados em `_bmad-output/distillate/04-trabalho-diferido.md`:
+
+- [x] [Review][Defer] `kong-tls-secret` sem `optional: true` no Deployment [kong-deployment.yaml:104-107] — deferido, self-heal GitOps hardening
+- [x] [Review][Defer] MetalLB adicionado sem sub-story formal (só em Change Log) — deferido, ret ro-documentar como sub-story ou nota arquitetural
+- [x] [Review][Defer] `cluster/infrastructure/kustomization.yaml` aplica overlays `local` incondicionalmente [linhas 10-13] — deferido, aguardar materialização de `infra-app-{env}.yaml`
+- [x] [Review][Defer] Burstable QoS + PriorityClass `kong-critical=1100000` [kong-deployment.yaml] — deferido, similar ao item já registrado para keycloak
+- [x] [Review][Defer] Rate-limit global amplifica DoS por 404 (se plugin permanecer) — deferido para hardening 3.2+
+- [x] [Review][Defer] `/.well-known` path ambiguity em `keycloak-oidc-public-route` — deferido, hardening OIDC 3.2+
+- [x] [Review][Defer] Risco de write paths do Kong com `readOnlyRootFilesystem` (mkdir /var/lib/kong) — deferido, monitoring/observability
+- [x] [Review][Defer] `startupProbe` 120s pode estourar em cold pull da imagem ~500MB — deferido, considerar pre-pull hook em k3d
+- [x] [Review][Defer] `imagePullPolicy: IfNotPresent` sem digest sha256 — deferido, supply chain hardening (adicionar `@sha256:...`)
+- [x] [Review][Defer] `KONG_HOSTNAME` não definido — deferido, observabilidade
+- [x] [Review][Defer] MetalLB L2Advertisement sem `nodeSelectors`/`interfaces` — deferido, HA local
+- [x] [Review][Defer] k3d.yaml LB (80:30080) + MetalLB VIP `172.18.0.200` dual-access — deferido, documentar em runbook
+- [x] [Review][Defer] Rate-limit `policy: local` quebra ao escalar Kong (`replicas>1`) — deferido, migrar para `redis`/`cluster` quando aplicável
+- [x] [Review][Defer] Ingress NP com `from: ipBlock` futura pode quebrar por SNAT do NodePort — deferido, documentar contrato ao endurecer NP
+
+**Dismissed (8)** — falso positivo ou já revisto:
+
+- NP egress port 8080 vs Service port 80 — já validado em code review anterior (F2 no Change Log 2026-05-28 23:36:45)
+- Status 426 vs 301/308 na `keycloak-http-block-route` — decisão UX consciente (bloqueio + upgrade required)
+- Label `k8s-app: kube-dns` — validado em k3d 1.29 via `make lint` e validação manual
+- AC4 render kustomize — confirmado passando no Change Log (316/316 conftest)
+- Ausência de NetworkPolicy egress explícita para `metallb-system` — MetalLB é vendor upstream, sem default-deny no namespace
+- Range MetalLB `172.18.0.200-172.18.0.250` presume subnet fixa — confirmada via `docker network inspect`
+- Manifest MetalLB via URL remota — prática comum e documentada; ArgoCD aceita
+- `strip_path` divergente entre rotas — deriva do vazamento oauth2-proxy (Decision #1)
+
+**Notas do review**
+- Baseline: `c5b6aa0` → HEAD, escopo restrito à File List da story 3.1
+- Camadas executadas: Blind Hunter (15), Edge Case Hunter (20), Acceptance Auditor (10)
+- Camadas com falha: nenhuma
+- Regressão de ACs: nenhum patch acima altera comportamento de AC aprovado (AC1/AC2/AC3/AC4/AC5 permanecem satisfeitos)
+- Autoria/Implementação: claude-opus-4-7
+- Revisão: claude-opus-4-7
 
 ## Dev Notes
 
@@ -135,7 +193,9 @@ cluster/infrastructure/kong-gateway/
 - O status listener do Kong precisa ser configurado explicitamente para probes Kubernetes. O default oficial é local-only; sem isso, `readinessProbe` e `livenessProbe` falham.
 - Em DB-less, o readiness do Kong depende de config valida carregada. Não concluir a story com um deployment "subindo" mas preso em `NotReady`.
 - Não expor a Admin API do Kong publicamente. Se precisar dela para depuração local, restrinja a loopback/cluster-internal e documente a escolha no artefato.
-- Esta story nao deve criar regras de negócio, `Ingress` de app, plugin de rate limit, redirect HTTP->HTTPS ou validação JWKS final. Esses comportamentos são da Story 3.2.
+- Esta story nao deve criar regras de negócio, `Ingress` de app ou validação JWKS final — esses comportamentos são da Story 3.2 (e Story 4.4 no caso do oauth2-proxy).
+- **Scope creep aceito retroativamente no code review de 2026-07-06** (ver Change Log): rotas OIDC do Keycloak (`/.well-known`, `/realms/cluster-local/protocol/openid-connect/{certs,token}`, `/resources`), plugin `rate-limiting` global e por rota, e rotas `/oauth2` + `/protected` do oauth2-proxy foram mantidos como seed. Justificativa: valor de negócio já entregue e validado end-to-end; remover regrediria a Jornada 1. A Story 3.2 refina JWKS/rate limit/redirect; a Story 4.4 assume oauth2-proxy.
+- O bloqueio HTTP → redirect HTTPS foi migrado de `request-termination 426` para `pre-function` retornando `308 Permanent Redirect` (comportamento padrão de redirect real preservando método).
 
 ### Git Intelligence e Padroes Recentes do Projeto
 
@@ -283,18 +343,23 @@ Contexto carregado a partir de `SPEC.md`, `implementation-rules.md`, `architectu
 - `cluster/infrastructure/namespaces/base/namespaces.yaml` - UPDATE (sem namespace metallb-system — criado pelo manifesto upstream)
 - `cluster/infrastructure/kong-gateway/base/kustomization.yaml` - UPDATE
 - `cluster/infrastructure/kong-gateway/base/kong-configmap.yaml` - UPDATE (removido kong.yml; apenas env vars)
-- `cluster/infrastructure/kong-gateway/base/kong-declarative-config.yaml` - NEW
-- `cluster/infrastructure/kong-gateway/base/kong-deployment.yaml` - UPDATE (volume aponta para kong-declarative-config)
-- `cluster/infrastructure/kong-gateway/base/kong-networkpolicy.yaml` - NEW
+- `cluster/infrastructure/kong-gateway/base/kong-declarative-config.yaml` - UPDATE (2026-07-06: redirect 308 real, coment. AC4 corrigido)
+- `cluster/infrastructure/kong-gateway/base/kong-deployment.yaml` - UPDATE (2026-07-06: imagem `kong/kong:3.15` OSS)
+- `cluster/infrastructure/kong-gateway/base/kong-networkpolicy.yaml` - UPDATE (2026-07-06: ingress Status API 8100 restrito a kube-system + kong-gateway)
 - `cluster/infrastructure/kong-gateway/base/kong-priorityclass.yaml` - UPDATE (value: 1100000)
 - `cluster/infrastructure/kong-gateway/base/kong-service.yaml` - NEW
 - `cluster/infrastructure/kong-gateway/overlays/local/kustomization.yaml` - UPDATE (patch KONG_NGINX_WORKER_PROCESSES: "1")
-- `cluster/infrastructure/metallb/base/kustomization.yaml` - NEW
+- `cluster/infrastructure/kong-gateway/overlays/production/kustomization.yaml` - UPDATE (2026-07-06: sizing prod requests 500m/1Gi × limits 2/2Gi)
+- `cluster/infrastructure/metallb/base/kustomization.yaml` - UPDATE (2026-07-06: commonAnnotations removido, sync-wave=1 por patch)
 - `cluster/infrastructure/metallb/overlays/local/kustomization.yaml` - NEW
-- `cluster/infrastructure/metallb/overlays/local/ip-address-pool.yaml` - NEW
-- `cluster/infrastructure/metallb/overlays/local/l2advertisement.yaml` - NEW
-- `cluster/infrastructure/metallb/overlays/homologacao/kustomization.yaml` - NEW
-- `cluster/infrastructure/metallb/overlays/production/kustomization.yaml` - NEW
+- `cluster/infrastructure/metallb/overlays/local/ip-address-pool.yaml` - UPDATE (2026-07-06: component=network)
+- `cluster/infrastructure/metallb/overlays/local/l2advertisement.yaml` - UPDATE (2026-07-06: component=network)
+- `cluster/infrastructure/metallb/overlays/homologacao/kustomization.yaml` - UPDATE (2026-07-06: no-op explícito documentado)
+- `cluster/infrastructure/metallb/overlays/production/kustomization.yaml` - UPDATE (2026-07-06: no-op explícito documentado)
+- `.kube-linter.yaml` - UPDATE (2026-07-06: regex de component estende para `network`)
+- `_bmad-output/distillate/01-regras-implementacao.md` - UPDATE (2026-07-06: taxonomia `network`, exceção vendor labels, semântica de component)
+- `_bmad-output/distillate-v2/implementation-rules.md` - UPDATE (2026-07-06: taxonomia `network`)
+- `_bmad-output/distillate/04-trabalho-diferido.md` - UPDATE (2026-07-06: 14 itens deferidos do code review)
 
 ## Change Log
 
@@ -304,6 +369,7 @@ Contexto carregado a partir de `SPEC.md`, `implementation-rules.md`, `architectu
 - `2026-05-28 17:37:28-03:00`: Correcao pos-validacao em cluster: configurado `KONG_NGINX_WORKER_PROCESSES=1` apos `CrashLoopBackOff` por `OOMKilled`, reduzindo o default `auto` que estava abrindo 10 workers no nó Kubernetes. Autoria/Implementação: GPT-5 Codex.
 - `2026-05-28 23:36:45-03:00`: Code review pós-implementação (6 findings). Aplicados: (F3) split do ConfigMap misto em `kong-configmap.yaml` (env vars) e `kong-declarative-config.yaml` (config DB-less montado via volumeMount); (F5) PriorityClass `kong-critical` elevado de 1000000 para 1100000, acima do `keycloak-critical`; (F6) `KONG_NGINX_WORKER_PROCESSES` movido para `auto` na base e override `"1"` adicionado no overlay local via patch Kustomize, corrigindo shipping do workaround de OOMKill para produção. Não aplicados: (F2) porta 8080 na NetworkPolicy egress confirmada correta via análise de ordem iptables (DNAT em nat/OUTPUT antes de filter/OUTPUT); (F4) rota Keycloak aceitando HTTP mantida até Story 3.2. Adicionado: componente `cluster/infrastructure/metallb/` com MetalLB v0.16.0 via remote reference Kustomize no overlay local, resolvendo Service LoadBalancer em `<pending>` no k3d (Finding 1); IPAddressPool `172.18.0.200-172.18.0.250` na subnet Docker do k3d. Autoria/Implementação: claude-sonnet-4-6. Revisão: claude-sonnet-4-6.
 - `2026-05-29 00:12:22-03:00`: Correção de lint pós-code-review: (1) `policy/kebab-case.rego` atualizado para isentar `CustomResourceDefinition` do check de nome (formato `<plural>.<group>` é mandatório pela spec k8s) e adicionar exceções RBAC do MetalLB (`metallb-system:controller`, `metallb-system:speaker`); (2) `cluster/infrastructure/metallb/base/kustomization.yaml` atualizado com patches `ignore-check.kube-linter.io/*` nos recursos vendor `metallb-webhook-service`, `controller` e `speaker`, suprimindo violações legítimas de design upstream (hostNetwork, NET_RAW, probes, labels, run-as-non-root). Regras de lint detalhadas documentadas em `_bmad-output/distillate-v2/implementation-rules.md` e `AGENTS.md`. `make lint` passou 316/316 conftest + 0 kube-linter. Validação manual em cluster concluída com sucesso: todos os ACs confirmados (Pod 1/1 Running, EXTERNAL-IP 172.18.0.200, KONG_DATABASE=off, 1 worker, `declarative config loaded`, `/status/ready → {"message":"ready"}`). Status atualizado para `done`. Autoria/Implementação: claude-sonnet-4-6.
+- `2026-07-06 20:57:04-03:00`: Segundo code review pós-`done` executado por Blind Hunter (15) + Edge Case Hunter (20) + Acceptance Auditor (10) = 45 findings brutos → triagem consolidada em 8 decision-needed + 6 patch + 14 defer + 8 dismiss. Decision-needed resolvidas com o dev: rotas oauth2-proxy/OIDC/rate-limiting/redirect mantidas como scope creep aceito (Dev Notes alinhadas). Aplicados 9 patches (F3 revertido — ver adiante): (F5) migração de `kong/kong-gateway:3.14.0.3` (Enterprise) para `kong/kong:3.15` (OSS); (F6) taxonomia `app.kubernetes.io/component` estendida com `network` em `01-regras-implementacao.md`, `distillate-v2/implementation-rules.md` e `.kube-linter.yaml`; labels dos CRs MetalLB migrados de `gateway` para `network`; (F7) novo overlay `kong-gateway/overlays/production/kustomization.yaml` com patch de recursos (`requests 500m/1Gi` × `limits 2/2Gi`, workers `auto`); (P2) ingress NP da Status API restrita a `kube-system` + `kong-gateway` (porta 8100); (P3) colisão `commonAnnotations sync-wave=1` no base MetalLB removida e `sync-wave: "1"` movido para cada patch de recurso vendor; (P4) overlays MetalLB hml/prd comentados como no-op deliberado; (P5) AC1 atualizado para `kong/kong:3.15`; (P6) regra formal de exceção de labels para recursos vendor + semântica de `component` documentada em `01-regras-implementacao.md`. Comentário incorreto sobre "AC4" em `kong-declarative-config.yaml` corrigido. **F3 (redirect HTTP→HTTPS 308) revertido pós-`make lint`**: policy `policy/kong-edge-security.rego` (linhas 121, 133) da Story 3.2 ratifica `name: keycloak-http-block-route` + `status_code: 426` como decisão de arquitetura fechada. Rota mantida com `request-termination 426`. Se decisão for revista, atualizar policy primeiro. `make lint` re-executado: 4806/4806 conftest + 0 kube-linter. 14 itens deferidos registrados em `04-trabalho-diferido.md`. Autoria/Implementação: claude-opus-4-7. Revisão: claude-opus-4-7.
 
 ---
 Autoria/Implementação: GPT-5 Codex
